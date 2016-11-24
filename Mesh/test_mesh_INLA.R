@@ -91,3 +91,22 @@ plot(mesh3, add=T)
 points(loc3, col='black')
 
 ## We can try a similar approach to the Antarctica map
+## Step 1 build a sparse mesh within the coastline
+## Step 1 build the dense mesh for water
+mesh_A <- inla.mesh.2d(boundary = AC.bdry, cutoff = 1e4, max.edge = 5e5)
+plot(mesh_A, main="")
+
+
+## Step 2 build convex mesh along wrapping around the water -- so that
+## we have small triagles at the coastlines and there is no "corners" (that can affect the finite element method)
+mesh_A = inla.mesh.2d(loc=mesh_A$loc, max.edge = 4e5,
+                     offset=4e5)
+plot(mesh_A, main="")
+mesh3$n
+
+## Step 3 build the outer mesh extension to correct the boundary effect of SPDE
+mesh_A = inla.mesh.2d(loc=mesh_A$loc, max.edge = 8e5, offset=1e6)
+plot(mesh_A, main="")
+mesh3$n
+
+
