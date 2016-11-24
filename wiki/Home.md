@@ -1,42 +1,19 @@
 # Welcome
 
-Welcome to your wiki! This is the default page we've installed for your convenience. Go ahead and edit it.
+Welcome to this project wiki page!
 
-## Wiki features
+## Project Description
 
-This wiki uses the [Markdown](http://daringfireball.net/projects/markdown/) syntax. The [MarkDownDemo tutorial](https://bitbucket.org/tutorials/markdowndemo) shows how various elements are rendered. [Bitbucket documentation](https://confluence.atlassian.com/display/BITBUCKET/Use+a+wiki) has more information about how using a wiki.
+More to come...
 
-The wiki itself is actually a git repository, which means you can clone it, edit it locally/offline, add images or any other file type, and push it back to us. It will be live immediately.
+## How to install the MVST package
+The MVST pakage by Andrew can be installed for latest R by following the step on [this page](https://bitbucket.org/ZheSha/globalmass_code/wiki/Installing%20MVST)
 
-Go ahead and try:
+## Current Work
+The folder "Mesh" contains examples and test for meshing using the INLA package.
 
-```
-$ git clone https://ZheSha@bitbucket.org/ZheSha/globalmass_code.git/wiki
-```
-
-Wiki pages are normal files, with the .md extension. You can edit them locally, as well as creating new ones.
-
-## Syntax highlighting
-
-
-You can also highlight snippets of text (we use the excellent [Pygments][] library).
-
-[Pygments]: http://pygments.org/
-
-
-Here's an example of some Python code:
-
-```
-#!python
-
-def wiki_rocks(text):
-    formatter = lambda t: "funky"+t
-    return formatter(text)
-```
-
-
-You can check out the source of this page to see how that's done, and make sure to bookmark [the vast library of Pygment lexers][lexers], we accept the 'short name' or the 'mimetype' of anything in there.
-[lexers]: http://pygments.org/docs/lexers/
-
-
-Have fun!
+* Uniform triangulation on the globe :white_check_mark:
+* mesh on a polygon example :white_check_mark:
+* mesh on a polygon with adaptive size along boundary Example :white_check_mark:
+* Adaptive mesh on Antarctica :construction:
+* Adaptive mesh on Globe :construction:
