@@ -1,9 +1,20 @@
-## Test script for generating global mesh using package INLA
+##################################################################################
+##          Test script for generating mesh using package INLA                  ##
+## This script includes :                                                       ##
+## 1. Instructions for installing INLA                                          ##
+## 2. Example of generating uniform mesh on the globe                           ##
+## 3. Uniform mesh on the Antarctica map                                        ##
+## 4. Example of generating adaptive mesh on Norweigian coastal area            ##
+## 5. Adaptive mesh on the Antarctica map                                       ##
+##################################################################################
 
+#### 1. Install INLA
 ## If the packages is not installed, use
 ## install.packages("INLA", repos="https://www.math.ntnu.no/inla/R/stable")
 library(INLA)
 
+
+#### 2. Uniform mesh on the globe
 ## A simplest way to generate coarse and uniform mesh on the globe
 mesh_g <- inla.mesh.create(globe = 10) # specify the number of sub-segments to use, when subdividing an icosahedron
 plot(mesh_g)
@@ -12,12 +23,14 @@ plot(mesh_g)
 ## install.packages("rgl")
 plot(mesh.g, rgl = TRUE)
 
-## Now try to build an mesh using the Antarctic Data
+
+#### 3. Uniform mesh over Antarctica
+## Now try to build an mesh using the Antarctica Data
 ## Load the map of the data
 require(maptools)
-AntCoast <- readShapePoly(fn = "ArcGIS_shapefiles/moa_coast_poly.shp", proj4string = CRS("+proj=longlat +ellps=WGS84"))
-AntGround <- readShapePoly(fn = "ArcGIS_shapefiles/moa_grounding_poly.shp", proj4string = CRS("+proj=longlat +ellps=WGS84"))
-AntIslands <- readShapePoly(fn = "ArcGIS_shapefiles/islands_poly.shp", proj4string = CRS("+proj=longlat +ellps=WGS84"))
+AntCoast <- readShapePoly(fn = "shapefiles/Antarctica/moa_coast_poly.shp", proj4string = CRS("+proj=longlat +ellps=WGS84"))
+AntGround <- readShapePoly(fn = "shapefiles/Antarctica/moa_grounding_poly.shp", proj4string = CRS("+proj=longlat +ellps=WGS84"))
+AntIslands <- readShapePoly(fn = "shapefiles/Antarctica/islands_poly.shp", proj4string = CRS("+proj=longlat +ellps=WGS84"))
 ## Plot the map
 plot(AntCoast, border = "grey") 
 plot(AntGround, add = T)
@@ -30,6 +43,8 @@ summary(mesh_A)
 mesh_A$n # number of triangle cells
 plot(mesh_A)
 
+
+#### 4. Example of Adaptive mesh along coastlines
 ## Try iteratively generate adaptive mesh -- dense at the coast and sparse otherwise
 ## Got the idea and help from https://groups.google.com/forum/#!topic/r-inla-discussion-group/b3uinntrh9E
 ## An example from the tutorial p16 of https://drive.google.com/drive/folders/0B55S_W3X6C38WS13T1NtTVlvblU
@@ -90,23 +105,24 @@ plot(Omega.SP3[[2]], add=T, col='lightblue')
 plot(mesh3, add=T)
 points(loc3, col='black')
 
+
+
+#### 5. Adaptive coastline mesh over the Antartica 
 ## We can try a similar approach to the Antarctica map
 ## Step 1 build a sparse mesh within the coastline
-## Step 1 build the dense mesh for water
-mesh_A <- inla.mesh.2d(boundary = AC.bdry, cutoff = 1e4, max.edge = 5e5)
+mesh_A <- inla.mesh.2d(boundary = AC.bdry, cutoff = 5e4, max.edge = 5e5)
 plot(mesh_A, main="")
 
 
-## Step 2 build convex mesh along wrapping around the water -- so that
-## we have small triagles at the coastlines and there is no "corners" (that can affect the finite element method)
+## Step 2 build convex mesh along wrapping around the land
 mesh_A = inla.mesh.2d(loc=mesh_A$loc, max.edge = 4e5,
                      offset=4e5)
 plot(mesh_A, main="")
-mesh3$n
+mesh_A$n
 
 ## Step 3 build the outer mesh extension to correct the boundary effect of SPDE
 mesh_A = inla.mesh.2d(loc=mesh_A$loc, max.edge = 8e5, offset=1e6)
 plot(mesh_A, main="")
-mesh3$n
+mesh_A$n
 
 
