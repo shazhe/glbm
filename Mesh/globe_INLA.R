@@ -79,12 +79,14 @@ poly2xyz <- function(polygs){
 plot.polys <- function(Polys){
   poly.list <- slot(Polys, "polygons")
   poly.coords <- lapply(poly.list, poly2xyz)
-  lapply(poly.coords, plot3d, type="l", col = "red", lwd =4, add = TRUE)
+  lapply(poly.coords, points3d, col = "red", cex=5, add = TRUE)
 }
 
-plot(MeshB, rgl = TRUE)
+plot(MeshB,rgl=TRUE)
 plot.polys(BLand)
 
+filename <- writeWebGL(dir = file.path(getwd(), "GlobeMesh"), 
+                       width = 1000, reuse = TRUE)
 
 summary(MeshB)
 MeshB$n # number of triangle cells
