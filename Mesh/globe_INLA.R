@@ -12,13 +12,14 @@
 ##                                                                              ##
 ## ***Meshing procedure outline***                                              ##
 ## *1. Load shapefiles                                                          ##
-## *2. Group polygons                                                           ##
-## *3. Mesh within the polygons                                                 ##
-## *4. Get the locations from the mesh                                          ##
-## *5. Convert the longlat location to Cartesian                                ##
-## *6  Use the location coordinates to mesh on the globe                        ##
+## *2. Simplify: remove small islands                                           ##
+## *3. Generate sampling points                                                 ##
+## *4. Generate mesh on the globe                                               ##
+## *5. Plot the results and save                                                ##
 ##################################################################################
 
+#### 0. Load packages and set working directory
+setwd("O:/globalmass_code/Mesh")
 library(INLA)
 library(rgdal)
 library(maptools)
@@ -42,32 +43,37 @@ AnGlines <- readOGR(dsn= "Shapefiles/GSHHS", layer = "GSHHS_c_L6")
 plot(AnGlines)
 summary(AnGlines)
 
-## check and remove small islands
+#### 2. Remove small islands
+## To simplify the coastlines, remove all the islands with area smaller than 20 
 AnGareas <- sapply(slot(AnGlines, "polygons"), function(x) slot(x, "area"))
 AnGland <- AnGareas > 20
 AnGlines2 <- AnGlines[AnGland,]
 plot(AnGlines2)
 
-## Plot Both maps
-plot(COIlines2)
-plot(AnGlines2, add =T)
-
 ## Conbine the two SpatialPolygonDataFrame objs
 row.names(COIlines2) <- paste("C", row.names(COIlines2), sep="_")
 row.names(AnGlines2) <- paste("A", row.names(AnGlines2), sep="_")
 BLand <- spRbind(COIlines2, AnGlines2)
-plot(BLand)
+plot(BLand) #plot the combined map
 
-## Get the sampling points along the coastlines using the inla segment function
-## Try a coarse mesh on the area defined by coastline
+#### 3. Get the sampling points as starting nodes for inla mesh
+## use the points defined the coastlines as the sampling points
+## Generate a boundary object from the polygons and extract the points defining the boundary
 B.bdry <- inla.sp2segment(BLand) # get the boundary from the polygon object
 B.points <- B.bdry$loc # get the coordinates of the coastline points (long lat)
-B.xyz <- do.call(cbind, Lll2xyz(B.points[,2], B.points[,1]))
-plot3d(B.xyz)
+B.xyz <- do.call(cbind, Lll2xyz(B.points[,2], B.points[,1])) # project longlat back to cartesian xyz
+plot3d(B.xyz) # visualise these points in 3d
 
+#### 4. Generate the mesh on the globe by using the sampling points
 MeshB <- inla.mesh.2d(loc = B.xyz, cutoff = 0.005, max.edge = 0.2)
-plot(MeshB, rgl = TRUE)
-plot3d(B.xyz, type = "l", add = TRUE, lwd = 10, col = "red")
+summary(MeshB)
+MeshB$n # number of triangle cells
+
+#### 5. Plot the result
+plot(MeshB,rgl=TRUE) # plot the mesh grid in 3d
+plot3d(B.xyz, add = TRUE, col = "red", cex = 2) # add the coastlines points
+filename <- writeWebGL(dir = file.path(getwd(), "GlobeMesh"),  # save the plot as an html
+                       width = 1000, reuse = TRUE)
 
 ## Try to plot the lines of the polygons 
 ## Function for extract coordinates of the polygon and converted it to 3d xyz
@@ -82,11 +88,3 @@ plot.polys <- function(Polys){
   lapply(poly.coords, points3d, col = "red", cex=5, add = TRUE)
 }
 
-plot(MeshB,rgl=TRUE)
-plot.polys(BLand)
-
-filename <- writeWebGL(dir = file.path(getwd(), "GlobeMesh"), 
-                       width = 1000, reuse = TRUE)
-
-summary(MeshB)
-MeshB$n # number of triangle cells
