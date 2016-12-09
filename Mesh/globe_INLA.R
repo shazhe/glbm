@@ -11,15 +11,15 @@
 ## * CRS: geodetic longitude, latitude, locations on the WGS-84 ellipsoid       ##
 ##                                                                              ##
 ## ***Meshing procedure outline***                                              ##
-## *1. Load shapefiles                                                          ##
-## *2. Simplify: remove small islands                                           ##
-## *3. Generate sampling points                                                 ##
-## *4. Generate mesh on the globe                                               ##
-## *5. Plot the results and save                                                ##
+## * 1. Load shapefiles                                                         ##
+## * 2. Simplify: remove small islands                                          ##
+## * 3. Generate sampling points                                                ##
+## * 4. Generate mesh on the globe                                              ##
+## * 5. Plot the results and save                                               ##
 ##################################################################################
 
 #### 0. Load packages and set working directory
-setwd("O:/globalmass_code/Mesh")
+setwd("O:/globalmass_code")
 library(INLA)
 library(rgdal)
 library(maptools)
@@ -28,7 +28,7 @@ library(rgl)
 
 #### 1. Loadshape files
 ## Continents and ocean islands
-COIlines <- readOGR(dsn = "shapefiles/GSHHS", layer = "GSHHS_c_L1")
+COIlines <- readOGR(dsn = "Mesh/shapefiles/GSHHS", layer = "GSHHS_c_L1")
 plot(COIlines, col = "grey")
 summary(COIlines)
 
@@ -39,7 +39,7 @@ COIlines2 <- COIlines[Clands,]
 plot(COIlines2)
 
 ## Antarctica grounding line
-AnGlines <- readOGR(dsn= "Shapefiles/GSHHS", layer = "GSHHS_c_L6")
+AnGlines <- readOGR(dsn= "Mesh/Shapefiles/GSHHS", layer = "GSHHS_c_L6")
 plot(AnGlines)
 summary(AnGlines)
 
@@ -68,12 +68,14 @@ plot3d(B.xyz) # visualise these points in 3d
 MeshB <- inla.mesh.2d(loc = B.xyz, cutoff = 0.005, max.edge = 0.2)
 summary(MeshB)
 MeshB$n # number of triangle cells
+save(BLand, B.xyz, MeshB, file = "Mesh/GlobeMesh/MeshGlobe.RData")
 
 #### 5. Plot the result
 plot(MeshB,rgl=TRUE) # plot the mesh grid in 3d
 plot3d(B.xyz, add = TRUE, col = "red", cex = 2) # add the coastlines points
-filename <- writeWebGL(dir = file.path(getwd(), "GlobeMesh"),  # save the plot as an html
-                       width = 1000, reuse = TRUE)
+writeWebGL(dir = "Mesh/GlobeMesh", filename= "Mesh/GlobeMesh/GlobeMesh.html",  # save the plot as an html
+            width = 1000, reuse = TRUE)
+
 
 ## Try to plot the lines of the polygons 
 ## Function for extract coordinates of the polygon and converted it to 3d xyz
