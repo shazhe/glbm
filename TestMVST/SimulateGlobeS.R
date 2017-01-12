@@ -18,7 +18,7 @@
 ##################################################################################
 
 #### 0. Set working directory, load data and packages 
-setwd("O:/globalmass_code")
+setwd("O:/glbm")
 load("Mesh/GlobeMesh/MeshGlobe.RData")
 library(INLA)
 library(rgdal)
@@ -44,8 +44,9 @@ mglb_tv <- MeshB$loc # extract the triaulation vertices
 mglb_sc <- mesh.centroid(MeshB) # extract the centroids the cells
 
 ## Simulate the process based on the veritices
-mglb_S1 <- Matern(as.matrix(dist(mglb_tv)), nu = 3/2, var=4, kappa = 0.1) # create the Matern covmat
-mglb_Q1 <- GMRF(Q=as(chol2inv(chol(mglb_S1)),"dgCMatrix")) # the precmat
+## Now we actually have a dense covariance and precision matrix
+mglb_S1 <- Matern(as.matrix(dist(mglb_tv)), nu = 3/2, var = 4, kappa = 0.1) # create the Matern covmat
+mglb_Q1 <- GMRF(Q = as(chol2inv(chol(mglb_S1)),"dgCMatrix")) # the precmat
 mglb_x1 <- sample_GMRF(mglb_Q1) # simulate the true processs
 
 ## Simulate the observations, assume the error is Gaussian with sd = 0.1
@@ -54,25 +55,25 @@ mglb_y1 <- mglb_x1 + rnorm(length(mglb_x1))*sd1
 
 ## Plot the true process and observations
 clims <- range(c(mglb_x1, mglb_y1))
-clens <- round((clims[2] - clims[1])*100) +1
+clens <- round((clims[2] - clims[1])*100) + 1
 colpal <- terrain.colors(clens, alpha=0)
-colx <- colpal[round((mglb_x1 - clims[1])*100)+1]
-plot(MeshB, rgl = TRUE, col = colx, edge.color = rgb(0, 0.5, 0.6, alpha =0.1))
+colx <- colpal[round((mglb_x1 - clims[1])*100) + 1]
+plot(MeshB, rgl = TRUE, col = colx, edge.color = rgb(0, 0.5, 0.6, alpha = 0.1))
 plot3d(mglb_tv, add = TRUE, col = colx, cex = 2) # add the coastlines points
 
 ## Plot the observatons
 coly <- colpal[round((mglb_y1 - clims[1])*100) + 1]
-plot(MeshB, rgl = TRUE, col = coly, edge.color = rgb(0, 0.5, 0.6, alpha =0.1))
+plot(MeshB, rgl = TRUE, col = coly, edge.color = rgb(0, 0.5, 0.6, alpha = 0.1))
 plot3d(mglb_tv, add = TRUE, col = coly, cex = 2) # add the coastlines points
 
 #### 2. Infer the process from the observations
-obs <- Obs(df=data.frame(x=mglb_tv,z=mglb_y1,std=sd1))
+obs <- Obs(df=data.frame(x = mglb_tv[,1], y = mglb_tv[,2], w = mglb_tv[,3], z = mglb_y1, std = sd1))
 C <- Imat(nrow(mglb_tv))
 L1 <- link(mglb_Q1,obs,Cmat = C)
 
 e <- new("link_list",list(L1))
-v <- new("block_list",list(G1=mglb_Q1, O=obs))
-G <- new("Graph",e=e,v=v)
+v <- new("block_list",list(G1 = mglb_Q1, O = obs))
+G <- new("Graph",e = e,v = v)
 G_reduced <- compress(G)
 Results <- Infer(G_reduced)
 
@@ -82,7 +83,7 @@ x1_mpost<- mglb_x1_post$x_mean
 x1_spost <- sqrt(mglb_x1_post$x_margvar)
 
 ## Plot the posterior results
-colxp <- colpal[round(x1_mpost*100) - clims[1]+1]
+colxp <- colpal[round((x1_mpost - clims[1])*100) + 1]
 plot(MeshB, rgl = TRUE, col = colxp, edge.color = rgb(0, 0.5, 0.6, alpha =0.1))
 plot3d(mglb_tv, add = TRUE, col = colxp, cex = 2) # add the coastlines points
 
