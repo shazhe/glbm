@@ -164,5 +164,5 @@ image(x,y,z,col=heat.colors(148),axes=FALSE,xlab="",ylab="")
 title("Posterior standard error")
 axis(1)})
 
-writeWebGL(dir = "Mesh/GlobeMesh", filename= "Mesh/GlobeMesh/Sim1.html",  # save the plot as an html
+writeWebGL(dir = "Mesh/GlobeMesh", filename= "Mesh/GlobeMesh/Sim2.html",  # save the plot as an html
            width = 1500, reuse = TRUE)
