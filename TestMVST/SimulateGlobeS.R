@@ -67,30 +67,83 @@ plot(MeshB, rgl = TRUE, col = coly, edge.color = rgb(0, 0.5, 0.6, alpha = 0.1))
 plot3d(mglb_tv, add = TRUE, col = coly, cex = 2) # add the coastlines points
 
 #### 2. Infer the process from the observations
-obs <- Obs(df=data.frame(x = mglb_tv[,1], y = mglb_tv[,2], w = mglb_tv[,3], z = mglb_y1, std = sd1))
-C <- Imat(nrow(mglb_tv))
-L1 <- link(mglb_Q1,obs,Cmat = C)
+obs <- Obs(df=data.frame(x = mglb_tv[,1], y = mglb_tv[,2], w = mglb_tv[,3], z = mglb_y1, std = sd1, t = rep(0, nrow(mglb_tv))))
+C1 <- Imat(nrow(mglb_tv))
+
+## Create the finite element object from the inla mesh
+MeshB_fem <- inla.mesh.fem(MeshB, order = 2)
+MeshBf <- initFEbasis(p=MeshB$loc,
+                      t=MeshB$graph$tv,
+                      M=MeshB_fem$c1,
+                      K=MeshB_fem$g1)
+
+mglb_p <- GMRF_basis(mglb_Q1, Basis = MeshBf)
+
+L1 <- link(mglb_p, obs)
+L1c <- link(mglb_Q1, obs, Cmat = C1)
 
 e <- new("link_list",list(L1))
 v <- new("block_list",list(G1 = mglb_Q1, O = obs))
 G <- new("Graph",e = e,v = v)
 G_reduced <- compress(G)
-Results <- Infer(G_reduced)
+Results1 <- Infer(G_reduced)
 
-## Get the posterior mean and variance
 mglb_x1_post <- Results$Post_GMRF@rep
 x1_mpost<- mglb_x1_post$x_mean
+## Get the posterior mean and variance
 x1_spost <- sqrt(mglb_x1_post$x_margvar)
 
 ## Plot the posterior results
-colxp <- colpal[round((x1_mpost - clims[1])*100) + 1]
+colxp1 <- colpal[round((x1_mpost - clims[1])*100) + 1]
 plot(MeshB, rgl = TRUE, col = colxp, edge.color = rgb(0, 0.5, 0.6, alpha =0.1))
 plot3d(mglb_tv, add = TRUE, col = colxp, cex = 2) # add the coastlines points
 
 climss <- round(range(x1_spost*20000))
-clenss <- climss[2] - climss[1] +1
+clenss <- climss[2] - climss[1] + 1
 colpals <- heat.colors(clenss, alpha=0)
 colsp <- colpals[round(x1_spost*20000) - climss[1]+1]
+
+
+#### process points different from observations
+## generate some random points on the globe
+lat <- sample(runif(5000,-90, 90), 1000)
+long <- sample(runif(5000,-180, 180), 1000)
+obs_xyz <- do.call(cbind, Lll2xyz(lat, long))
+plot3d(obs_xyz)
+## Now we actually have a dense covariance and precision matrix
+mglb_S2 <- Matern(as.matrix(dist(obs_xyz)), nu = 3/2, var = 4, kappa = 0.1) # create the Matern covmat
+mglb_Q2 <- GMRF(Q = as(chol2inv(chol(mglb_S2)),"dgCMatrix")) # the precmat
+mglb_x2 <- sample_GMRF(mglb_Q2) # simulate the true processs
+
+
+## Simulate the observations, assume the error is Gaussian with sd = 0.1
+sd2 <- 0.1
+mglb_y2 <- mglb_x2 + rnorm(length(mglb_x2))*sd2
+obs2 <- Obs(df=data.frame(x = obs_xyz[,1], y = obs_xyz[,2], w = obs_xyz[,3], z = mglb_y2, std = sd2, t = rep(0, nrow(obs_xyz))))
+
+C2 <- inla.spde.make.A(mesh = MeshB, loc = obs_xyz)
+L2 <- link(mglb_Q1, obs2, Cmat = C2)
+e2 <- new("link_list",list(L2))
+v2 <- new("block_list",list(G1 = mglb_Q1, O = obs2))
+G2 <- new("Graph",e = e2,v = v2)
+G_reduced <- compress(G2)
+Results2 <- Infer(G_reduced)
+
+mglb_x2_post <- Results2$Post_GMRF@rep
+x2_mpost<- mglb_x2_post$x_mean
+## Get the posterior mean and variance
+x2_spost <- sqrt(mglb_x2_post$x_margvar)
+
+## Plot the posterior results
+colxp2 <- colpal[round((x2_mpost - min(x2_mpost))*100) + 1]
+plot(MeshB, rgl = TRUE, col = colx, edge.color = rgb(0, 0.5, 0.6, alpha =0.1))
+plot3d(obs_xyz, add = TRUE, col = colxp2, cex = 2) # add the coastlines points
+
+climss <- round(range(x2_spost*20000))
+clenss <- climss[2] - climss[1] + 1
+colpals <- heat.colors(clenss, alpha=0)
+colsp <- colpals[round(x2_spost*20000) - climss[1]+1]
+
 
 #### 3. Plot the result and save
 ## 3.1 True Process vs Observations

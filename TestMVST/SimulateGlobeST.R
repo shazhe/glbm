@@ -124,9 +124,9 @@ plot3d(mglb_tv, add = TRUE, col = coly, cex = 2) # add the coastlines points
 
 #### 2. Infer the process from the observations
 ## Create the observation object
-obs0 <- data.frame(x=mglb_tv[,1], y = mglb_tv[,2], z = mglb_tv[,3], val=x.obs[,1], std=sd1)
+obs0 <- data.frame(x=mglb_tv[,1], y = mglb_tv[,2], w = mglb_tv[,3], z=x.obs[,1], std=sd1)
 obs_df <- do.call(rbind, lapply(1:7, function(x) 
-  data.frame(x=mglb_tv[,1], y = mglb_tv[,2], z = mglb_tv[,3], val=x.obs[,x], std=sd1, t = x-1)))
+  data.frame(x=mglb_tv[,1], y = mglb_tv[,2], w = mglb_tv[,3], z=x.obs[,x], std=sd1, t = x-1)))
 Xobs <- Obs(df=obs_df,name="Xobs")
 
 ## Create the GMRF basis for the spatial temporal auto-regressive processes
@@ -162,7 +162,7 @@ t_axis = 0:6
 Xtrue_VAR <- VAR_Gauss( mu = mu, A=A, Qw = Q, t_axis = t_axis, name="Xtrue")
 
 Xtrue <- GMRF_basis(G = Xtrue_VAR, Basis = MeshBf)
-L1 <- MVST:::link(Xtrue, Xobs)
+L1 <- MVST:::link(Xtrue, Xobs, Cmat = Imat(nrow(Xobs)))
 
 
 L1 <- new("linkGO", from = Xtrue, to = Xobs,  md5_wrapper = md5_wrapper)
