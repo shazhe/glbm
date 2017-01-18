@@ -151,7 +151,7 @@ colxp1 <- colpal[round((x1_mpost - clims[1])*100) + 1]
 open3d()
 par3d(windowRect = c(100, 100, 1800, 900))
 layout3d(matrix(1:4, 2,2), heights = c(8,2), sharedMouse = TRUE)
-## The posterior mean
+
 par3d(zoom = 0.8)
 plot3d(mglb_tv,  col = colx1, cex = 2, xlab = "", ylab = "", zlab = "", axe=FALSE) # plot the vertices
 plot(MeshB, rgl = TRUE, col = colx1, edge.color = rgb(0, 0.5, 0.6, alpha =0.1), add = TRUE) # add the triangulation
@@ -167,7 +167,7 @@ axis(1)})
 
 next3d(reuse = FALSE)
 par3d(zoom=0.8)
-## The posterior marginal std
+
 plot3d(mglb_tv,  col = coly1, cex = 2, xlab = "", ylab = "", zlab = "", axe=FALSE) # plot the vertices
 plot(MeshB, rgl = TRUE, col = coly1, edge.color = rgb(0, 0.5, 0.6, alpha =0.1), add = TRUE) # add the triangulation
 
@@ -180,7 +180,7 @@ image(x,y,z,col = terrain.colors(clens), axes = FALSE,xlab = "",ylab = "")
 title("Observed values")
 axis(1)})
 
-writeWebGL(dir = "Mesh/GlobeMesh", filename= "Mesh/GlobeMesh/Sim1.html",  # save the plot as an html
+writeWebGL(dir = "shazhe.github.io", filename= "PvsObs1.html",  # save the plot as an html
            width = 1500, reuse = TRUE)
 
 climss <- round(range(x1_spost*20000))
@@ -222,7 +222,7 @@ image(x,y,z,col=heat.colors(148),axes=FALSE,xlab="",ylab="")
 title("Posterior standard error")
 axis(1)})
 
-writeWebGL(dir = "Mesh/GlobeMesh", filename= "Mesh/GlobeMesh/Sim2.html",  # save the plot as an html
+writeWebGL(dir = "shazhe.github.io", filename= "posterior1.html",  # save the plot as an html
            width = 1500, reuse = TRUE)
 
 ### 3.2 Process points != observations
@@ -236,7 +236,7 @@ colxp2 <- colpal[round((x2_mpost - clims[1])*100) + 1]
 open3d()
 par3d(windowRect = c(100, 100, 1800, 900))
 layout3d(matrix(1:4, 2,2), heights = c(8,2), sharedMouse = TRUE)
-## The posterior mean
+
 par3d(zoom = 0.8)
 plot3d(obsloc,  col = colx2, cex = 2, xlab = "", ylab = "", zlab = "", axe=FALSE) # plot the vertices
 plot(MeshB, rgl = TRUE, edge.color = rgb(0, 0.5, 0.6, alpha =0.1), add = TRUE) # add the triangulation
@@ -252,7 +252,6 @@ axis(1)})
 
 next3d(reuse = FALSE)
 par3d(zoom=0.8)
-## The posterior marginal std
 plot3d(obsloc,  col = coly2, cex = 2, xlab = "", ylab = "", zlab = "", axe=FALSE) # plot the vertices
 plot(MeshB, rgl = TRUE, edge.color = rgb(0, 0.5, 0.6, alpha =0.1), add = TRUE) # add the triangulation
 
@@ -265,7 +264,7 @@ image(x,y,z,col = terrain.colors(clens), axes = FALSE,xlab = "",ylab = "")
 title("Observed values")
 axis(1)})
 
-writeWebGL(dir = "Mesh/GlobeMesh", filename= "Mesh/GlobeMesh/Sim1.html",  # save the plot as an html
+writeWebGL(dir = "shazhe.github.io", filename= "PvsObs2.html",  # save the plot as an html
            width = 1500, reuse = TRUE)
 
 climss <- round(range(x2_spost*20000))
@@ -307,5 +306,5 @@ image(x,y,z,col=heat.colors(clenss),axes=FALSE,xlab="",ylab="")
 title("Posterior standard error")
 axis(1)})
 
-writeWebGL(dir = "Mesh/GlobeMesh", filename= "Mesh/GlobeMesh/Sim2.html",  # save the plot as an html
+writeWebGL(dir = "shazhe.github.io", filename= "posterior2.html",  # save the plot as an html
            width = 1500, reuse = TRUE)
