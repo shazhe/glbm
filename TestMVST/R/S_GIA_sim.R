@@ -28,7 +28,7 @@ library(rgl)
 library(dplyr)
 library(ggplot2)
 library(MVST)
-
+################################################################################
 #### 1. Simulate the true process and observed data 
 ## Asssume the true process follows a GP with zero mean and Matern kernel
 ## The true process is simulated at the triangulation vertices
@@ -77,9 +77,29 @@ MeshS2 <- inla.mesh.2d(loc = obsloc, cutoff = 0.005, max.edge = 0.2)
 summary(MeshS2)
 plot(MeshS2, rgl = TRUE)
 
-## Construct Obs_poly object
+## Construct the Obs_poly object, using the generated mesh grid
+## grid value take the average of the three vertex
+n.poly <- nrow(MeshS2$graph$tv)
+id <- 1:n.poly
+tvid <- MeshS2$graph$tv # get the table of triangle vertex id
+vloc <- MeshS2$loc # get the xyz coordinates of the vertex
+poly_xy <- data.frame(do.call(rbind,lapply(id, function(x) c(t(apply(vloc[tvid[x,],], 1, xyz2ll))))))
+names(poly_xy) <- c("x1", "x2", "x3", "y1", "y2", "y3")
+poly_df <- cbind(id = id, poly_xy, t = 0)
+
+## Find the centroid of each triangle and calculate the mean 
+df_xy <- data.frame(do.call(rbind,lapply(id, function(x) rowMeans(apply(vloc[tvid[x,],], 1, xyz2ll)))))
+names(df_xy) <- c("x", "y")
+mglb_S2b <- Matern(as.matrix(dist(vloc)), nu = 3/2, var = 4, kappa = 0.1) # create the Matern covmat
+mglb_Q2b <- GMRF(Q = as(chol2inv(chol(mglb_S2b)),"dgCMatrix")) # the precmat
+mglb_x2b <- sample_GMRF(mglb_Q2b) # simulate the true processs
+df_val <- data.frame(z = sapply(id, function(x) mean(mglb_x2b[tvid[x,]]))) + rnorm(length(mglb_x2b))*sd2
+dfS2b <- cbind(id = id, df_xy, df_val, std = sd2, t = 0)
+
+Obs2b <- Obs_poly(df = dfS2b, pol_df = poly_df)
 
 
+################################################################################
 #### 2. Infer the process from the observations
 ### 2.1 process points = observation points
 ## 2.1.1 Supply a user-defined Cmat
