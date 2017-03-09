@@ -28,9 +28,9 @@ plot(mesh.g, rgl = TRUE)
 ## Now try to build an mesh using the Antarctica Data
 ## Load the map of the data
 require(maptools)
-AntCoast <- readShapePoly(fn = "shapefiles/Antarctica/moa_coast_poly.shp", proj4string = CRS("+proj=longlat +ellps=WGS84"))
-AntGround <- readShapePoly(fn = "shapefiles/Antarctica/moa_grounding_poly.shp", proj4string = CRS("+proj=longlat +ellps=WGS84"))
-AntIslands <- readShapePoly(fn = "shapefiles/Antarctica/islands_poly.shp", proj4string = CRS("+proj=longlat +ellps=WGS84"))
+AntCoast <- readShapePoly(fn = "../data/Shapefiles/Antarctica/moa_coast_poly.shp", proj4string = CRS("+proj=longlat +ellps=WGS84"))
+AntGround <- readShapePoly(fn = "../data/Shapefiles/Antarctica/moa_grounding_poly.shp", proj4string = CRS("+proj=longlat +ellps=WGS84"))
+AntIslands <- readShapePoly(fn = "../data/Shapefiles/Antarctica/islands_poly.shp", proj4string = CRS("+proj=longlat +ellps=WGS84"))
 ## Plot the map
 plot(AntCoast, border = "grey") 
 plot(AntGround, add = T)

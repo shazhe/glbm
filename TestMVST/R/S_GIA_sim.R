@@ -18,8 +18,7 @@
 ##################################################################################
 
 #### 0. Set working directory, load data and packages 
-setwd("O:/glbm")
-load("Mesh/GlobeMesh/MeshGlobe.RData")
+load("../Results/Mesh/MeshGlobe.RData")
 library(INLA)
 library(rgdal)
 library(maptools)
@@ -31,41 +30,37 @@ library(ggplot2)
 library(MVST)
 
 #### 1. Simulate the true process and observed data 
-## Assume the true process follows a GP with zero mean and Matern kernel
-## Extract mesh grid points
-##mesh.centroid <- function(mesh){
-  # get the geometric centroid of the meshed grids
-##  total.vertices <- 1:length(mesh$graph$tv[,1])
-##  t(sapply(total.vertices, function(x) colMeans(mesh$loc[mesh$graph$tv[x,],])))
-##}
-##mglb_sc <- mesh.centroid(MeshB) # extract the centroids the cells
-
-### 1.1 Process points = observation points
-mglb_tv <- MeshB$loc # extract the triaulation vertices
-## Simulate the process based on the veritices
-## Now we actually have a dense covariance and precision matrix
+## Asssume the true process follows a GP with zero mean and Matern kernel
+## The true process is simulated at the triangulation vertices
+mglb_tv <- MeshB$loc # extract the triangulation vertices
 mglb_S1 <- Matern(as.matrix(dist(mglb_tv)), nu = 3/2, var = 4, kappa = 0.1) # create the Matern covmat
+## Use a GMRF to approximate the true GP
 mglb_Q1 <- GMRF(Q = as(chol2inv(chol(mglb_S1)),"dgCMatrix")) # the precmat
 mglb_x1 <- sample_GMRF(mglb_Q1) # simulate the true processs
 
+################################################################################
+## Denote by S1 the set of triangle vertices and                              ##
+## S2 a set of spatial units where the observations are taken.                ##
+## We simulate observations for the following situations                      ##
+################################################################################
+
+### 1.1 S2 = S1
 ## Simulate the observations, assume the error is Gaussian with sd = 0.1
 sd1 <- 0.1
 mglb_y1 <- mglb_x1 + rnorm(length(mglb_x1))*sd1
 obs <- Obs(df=data.frame(x = mglb_tv[,1], y = mglb_tv[,2], w = mglb_tv[,3], z = mglb_y1, std = sd1, t = rep(0, nrow(mglb_tv))))
 
-
-
-### 1.2 Process ponints != observation points
+### 1.2 S2 ! = S1
+## Generate S2 
 ## sample a few points from the mesh location and add some noises
 ll_loc <- do.call(cbind, Lxyz2ll(list(x = mglb_tv[,1], y = mglb_tv[,2], z = mglb_tv[,3])))
 newloc <- ll_loc[sample(1:nrow(ll_loc), 1000), ] + matrix(rnorm(2000, 0, 4), ncol = 2, nrow = 1000)
 newloc[,1] <- ifelse(abs(newloc[,1]) > 90, sign(newloc[,1])*90, newloc[,1])
 newloc[,2] <- ifelse(abs(newloc[,2]) > 180, sign(newloc[,2])*180, newloc[,2])
-
 obsloc <- do.call(cbind, Lll2xyz(lat = newloc[,1], lon = newloc[,2]))
 plot3d(obsloc)
 
-## Now we actually have a dense covariance and precision matrix
+## Simulate the true process on S2
 mglb_S2 <- Matern(as.matrix(dist(obsloc)), nu = 3/2, var = 4, kappa = 0.1) # create the Matern covmat
 mglb_Q2 <- GMRF(Q = as(chol2inv(chol(mglb_S2)),"dgCMatrix")) # the precmat
 mglb_x2 <- sample_GMRF(mglb_Q2) # simulate the true processs
@@ -75,20 +70,15 @@ sd2 <- 0.1
 mglb_y2 <- mglb_x2 + rnorm(length(mglb_x2))*sd2
 obs2 <- Obs(df=data.frame(x = obsloc[,1], y = obsloc[,2], w = obsloc[,3], z = mglb_y2, std = sd2, t = rep(0, nrow(obsloc))))
 
-### Sample the true process from these poionts together
-#loc_all <- rbind(mglb_tv, obsloc)
-#Gcov <- Matern(as.matrix(dist(loc_all)), nu = 3/2, var = 4, kappa = 0.1) # create the Matern covmat
-#Gprec <- GMRF(Q = as(chol2inv(chol(Gcov)),"dgCMatrix")) # the precmat
-## problem -- easily get ill-conditioned mat!!!
-#xtrue <- sample_GMRF(Gprec) # simulate the true processs
-#sd <- 0.1
-#x.obs <- xtrue + rnorm(length(xtrue))*sd
+### 1.3 S2 != S1 and S2 is a set of polygons
+## Use the previous S2 to generate a triangulation an muse use triangles 
+## as the polygons
+MeshS2 <- inla.mesh.2d(loc = obsloc, cutoff = 0.005, max.edge = 0.2)
+summary(MeshS2)
+plot(MeshS2, rgl = TRUE)
 
-#obs <- Obs(df=data.frame(x = mglb_tv[,1], y = mglb_tv[,2], w = mglb_tv[,3], z = x.obs[1:6851], std = sd1, t = rep(0, nrow(mglb_tv))))
-#obs2 <- Obs(df=data.frame(x = obsloc[,1], y = obsloc[,2], w = obsloc[,3], z = x.obs[6852:7851], std = sd2, t = rep(0, nrow(obsloc))))
+## Construct Obs_poly object
 
-### 1.3 observation from a different support
-## Define polygons and asign observation values to these polygons
 
 #### 2. Infer the process from the observations
 ### 2.1 process points = observation points

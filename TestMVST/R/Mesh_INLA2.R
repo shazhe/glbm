@@ -19,7 +19,6 @@
 ##################################################################################
 
 #### 0. Load packages and set working directory
-setwd("O:/globalmass_code")
 library(INLA)
 library(rgdal)
 library(maptools)
@@ -28,7 +27,7 @@ library(rgl)
 
 #### 1. Loadshape files
 ## Continents and ocean islands
-COIlines <- readOGR(dsn = "Mesh/shapefiles/GSHHS", layer = "GSHHS_c_L1")
+COIlines <- readOGR(dsn = "../data/Shapefiles/GSHHS", layer = "GSHHS_c_L1")
 plot(COIlines, col = "grey")
 summary(COIlines)
 
@@ -39,7 +38,7 @@ COIlines2 <- COIlines[Clands,]
 plot(COIlines2)
 
 ## Antarctica grounding line
-AnGlines <- readOGR(dsn= "Mesh/Shapefiles/GSHHS", layer = "GSHHS_c_L6")
+AnGlines <- readOGR(dsn= "../data/Shapefiles/GSHHS", layer = "GSHHS_c_L6")
 plot(AnGlines)
 summary(AnGlines)
 
@@ -68,12 +67,12 @@ plot3d(B.xyz) # visualise these points in 3d
 MeshB <- inla.mesh.2d(loc = B.xyz, cutoff = 0.005, max.edge = 0.2)
 summary(MeshB)
 MeshB$n # number of triangle cells
-save(BLand, B.xyz, MeshB, file = "Mesh/GlobeMesh/MeshGlobe.RData")
+save(BLand, B.xyz, MeshB, file = "../Results/Mesh/MeshGlobe.RData")
 
 #### 5. Plot the result
 plot(MeshB,rgl=TRUE) # plot the mesh grid in 3d
 plot3d(B.xyz, add = TRUE, col = "red", cex = 2) # add the coastlines points
-writeWebGL(dir = "Mesh/GlobeMesh", filename= "Mesh/GlobeMesh/GlobeMesh.html",  # save the plot as an html
+writeWebGL(dir = "../Results/Mesh/GlobeMesh", filename= "../Resutls/Mesh/GlobeMesh.html",  # save the plot as an html
             width = 1000, reuse = TRUE)
 
 
