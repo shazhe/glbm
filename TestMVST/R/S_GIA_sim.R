@@ -228,7 +228,7 @@ err2 <- x2_mpost - mglb_x2
 mean(err2^2)
 
 ### 2.c Plot and save results
-## 1.c.1 Compare the true process and the observed values
+## 2.c.1 Compare the true process and the observed values
 ## Palette setting 
 clims <- range(c(mglb_x2all, mglb_y2, x2_mpost))
 clens <- round((clims[2] - clims[1])*100) + 1
@@ -320,7 +320,7 @@ writeWebGL(dir = "../Results/GIAtest", filename= "../Results/GIAtest/posterior2.
 ### 3.a Simulate the true process and observed data 
 ## Use the previous S2 to generate a triangulation an muse use triangles 
 ## as the polygons
-MeshS2 <- inla.mesh.2d(loc = obsloc, cutoff = 0.05, max.edge = 0.2)
+MeshS2 <- inla.mesh.2d(loc = obsloc, cutoff = 0.5, max.edge = 1)
 summary(MeshS2)
 plot(MeshS2, rgl = TRUE)
 
@@ -330,37 +330,132 @@ n.poly <- nrow(MeshS2$graph$tv)
 id <- 1:n.poly
 tvid <- MeshS2$graph$tv # get the table of triangle vertex id
 vloc <- MeshS2$loc # get the xyz coordinates of the vertex
-poly_xy <- data.frame(do.call(rbind,lapply(id, function(x) c(t(apply(vloc[tvid[x,],], 1, xyz2ll))))))
-names(poly_xy) <- c("x1", "x2", "x3", "y1", "y2", "y3")
-poly_df <- cbind(id = id, poly_xy, t = 0)
+poly_xys <- data.frame(do.call(rbind,lapply(id, function(x) c(t(apply(vloc[tvid[x,],], 1, xyz2ll))))))
+names(poly_xys) <- c("x1", "x2", "x3", "y1", "y2", "y3")
+poly_df <- cbind(id = id, poly_xys, t = 0)
 
 ## Find the centroid of each triangle and calculate the mean 
 df_xy <- data.frame(do.call(rbind,lapply(id, function(x) rowMeans(apply(vloc[tvid[x,],], 1, xyz2ll)))))
 names(df_xy) <- c("x", "y")
-mglb_S2b <- Matern(as.matrix(dist(vloc)), nu = 3/2, var = 4, kappa = 0.1) # create the Matern covmat
+
+loc_all <- rbind(mglb_tv, vloc)
+mglb_S2b <- MVST::Matern(as.matrix(dist(loc_all)), nu = 3/2, var = 4, kappa = 0.1) # create the Matern covmat
 mglb_Q2b <- GMRF(Q = as(chol2inv(chol(mglb_S2b)),"dgCMatrix")) # the precmat
-mglb_x2b <- sample_GMRF(mglb_Q2b) # simulate the true processs
-df_val <- data.frame(z = sapply(id, function(x) mean(mglb_x2b[tvid[x,]]))) + rnorm(length(mglb_x2b))*sd2
+mglb_x2ball <- sample_GMRF(mglb_Q2b) # simulate the true processs
+
+n_S1 <- nrow(mglb_tv)
+n_S2b <- nrow(vloc)
+mglb_x2b <- mglb_x2ball[1:n_S1]
+mglb_x2bobs <- mglb_x2ball[-(1:n_S1)]
+
+
+df_val <- data.frame(z = sapply(id, function(x) mean(mglb_x2bobs[tvid[x,]]))) + rnorm(length(mglb_x2bobs))*sd2
 dfS2b <- cbind(id = id, df_xy, df_val, std = sd2, t = 0)
 Obs2b <- Obs_poly(df = dfS2b, pol_df = poly_df)
-
+Obs2b_area <- sapply(Obs2b@pol, area.poly)
+Obs2b@df$z <- Obs2b@df$z * Obs2b_area
 
 ### 3.b Update the true process given the observations
 ## Use the GMRF basis and find the Cmat by FindC_polyareage
 ## Build the LinkGo obj
-L3 <- link(mglb_p, obs)  # build from process
-e2 <- new("link_list",list(L3))
+L3 <- link(mglb_p, Obs2b, n_grid = 200)  # build from process
+e3 <- new("link_list",list(L3))
 v3 <- new("block_list",list(G1 = mglb_Q1, O = Obs2b))
 G3 <- new("Graph",e = e3,v = v3)
 G_reduced <- compress(G3)
 Results3 <- Infer(G_reduced)
 
-mglb_x3_post <- Results3$Post_GMRF@rep
-x3_mpost<- mglb_x3_post$x_mean
+mglb_x2b_post <- Results3$Post_GMRF@rep
+x2b_mpost<- mglb_x2b_post$x_mean
 ## Get the posterior mean and variance
-x3_spost <- sqrt(mglb_x3_post$x_margvar)
+x2b_spost <- sqrt(mglb_x2b_post$x_margvar)
 
 ## Compare mean square error with the true value
-err2 <- x2_mpost - mglb_x2
-mean(err2^2)
+err2b <- x2b_mpost - mglb_x2b
+mean(err2b^2)
 
+### 3.c Plot and save results
+## 3.c.1 Compare the true process and the observed values
+## Palette setting 
+clims <- range(c(mglb_x2ball, df_val, x3_mpost))
+clens <- round((clims[2] - clims[1])*100) + 1
+colpal <- terrain.colors(clens, alpha=0)
+colx2bobs <- colpal[round((mglb_x2bobs - clims[1])*100) + 1]
+colx2true <- colpal[round((mglb_x2b - clims[1])*100) + 1]
+coly2b <- colpal[round((df_val - clims[1])*100) + 1]
+colxp2b <- colpal[round((x2b_mpost - clims[1])*100) + 1]
+## Start plotting
+open3d()
+par3d(windowRect = c(100, 100, 1800, 900))
+layout3d(matrix(1:4, 2,2), heights = c(8,2), sharedMouse = TRUE)
+## Plot the true process
+par3d(zoom = 0.8)
+plot3d(vloc,  col = colx2bobs, cex = 2, xlab = "", ylab = "", zlab = "", axe=FALSE) # plot the vertices
+plot(MeshB, rgl = TRUE, col = colx2true, edge.color = rgb(0, 0.5, 0.6, alpha =0.1), add = TRUE) # add the triangulation
+## plot the color bar
+next3d(reuse = FALSE)
+bgplot3d({z=matrix(1:clens, nrow = clens)
+y=1
+x=seq(clims[1],clims[2],len = clens)
+par(cex = 1.5, fin = c(8, 1), mai = c(0,0, 0.5, 0), oma = c(1, 0, 0, 0))
+image(x,y,z,col = terrain.colors(clens),axes=FALSE,xlab="",ylab="")
+title("The true process")
+axis(1)})
+## plot the observed value
+next3d(reuse = FALSE)
+par3d(zoom=0.8)
+plot3d(obsloc,  col = coly2, cex = 2, xlab = "", ylab = "", zlab = "", axe=FALSE) # plot the vertices
+plot(MeshB, rgl = TRUE, col = colx2true, edge.color = rgb(0, 0.5, 0.6, alpha =0.1), add = TRUE) # add the triangulation
+## plot the color bar
+next3d(reuse = FALSE)
+bgplot3d({z=matrix(1:clens,nrow = clens)
+y=1
+x=seq(clims[1],clims[2],len = clens)
+par(cex = 1.5, fin = c(8, 1), mai = c(0,0, 0.5, 0), oma = c(1, 0, 0, 0))
+image(x,y,z,col = terrain.colors(clens), axes = FALSE,xlab = "",ylab = "")
+title("Observed values")
+axis(1)})
+## Finish plotting and save the plot as an html
+writeWebGL(dir = "../Results/GIAtest", filename= "../Results/GIAtest/PvsObs2.html", width = 1500, reuse = TRUE)
+
+## 3.c.2 Compare the Posterior Mean and variances
+## reset palette
+climss <- round(range(x2_spost*20000))
+clenss <- climss[2] - climss[1] + 1
+colpals <- heat.colors(clenss, alpha=0)
+colsp2 <- colpals[round(x2_spost*20000) - climss[1]+1]
+## Start plotting
+open3d()
+par3d(windowRect = c(100, 100, 1800, 900))
+layout3d(matrix(1:4, 2,2), heights = c(8,2), sharedMouse = TRUE)
+## The posterior mean
+par3d(zoom = 0.8)
+plot3d(obsloc,  col = colxp2, cex = 2, xlab = "", ylab = "", zlab = "", axe=FALSE) # plot the vertices
+plot(MeshB, rgl = TRUE, col = colx2true, edge.color = rgb(0, 0.5, 0.6, alpha =0.1), add = TRUE) # add the triangulation
+
+next3d(reuse = FALSE)
+bgplot3d({z=matrix(1:clens,nrow = clens)
+y=1
+x=seq(clims[1],clims[2],len = clens)
+par(cex = 1.5, fin = c(8, 1), mai = c(0,0, 0.5, 0), oma = c(1, 0, 0, 0))
+image(x,y,z,col=terrain.colors(clens),axes=FALSE,xlab="",ylab="")
+title("Posterior mean")
+axis(1)})
+
+
+next3d(reuse = FALSE)
+par3d(zoom=0.8)
+## The posterior marginal std
+plot3d(obsloc, cex = 2, xlab = "", ylab = "", zlab = "", axe=FALSE) # plot the vertices
+plot(MeshB, rgl = TRUE, col = colsp2, edge.color = rgb(0, 0.5, 0.6, alpha =0.1), add = TRUE) # add the triangulation
+
+next3d(reuse = FALSE)
+bgplot3d({z=matrix(1:clenss,nrow=clenss)
+y=1
+x=seq(min(x2_spost),max(x2_spost),len=clenss)
+par(cex = 1.5, fin = c(8, 1), mai = c(0,0, 0.5, 0), oma = c(1, 0, 0, 0))
+image(x,y,z,col=heat.colors(clenss),axes=FALSE,xlab="",ylab="")
+title("Posterior standard error")
+axis(1)})
+
+writeWebGL(dir = "../Results/GIAtest", filename= "../Results/GIAtest/posterior2.html", width = 1500, reuse = TRUE)
