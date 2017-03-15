@@ -63,7 +63,6 @@ obs <- Obs(df=data.frame(x = mglb_tv[,1], y = mglb_tv[,2], w = mglb_tv[,3], z = 
 C1 <- Imat(nrow(mglb_tv))
 
 ## 1.b.2 use a GMRF basis and find the Cmat by FindC 
-## source the new initFEbasis code first before running the following
 ## Create the finite element object from the inla mesh
 MeshB_fem <- inla.mesh.fem(MeshB, order = 2)
 MeshBf <- initFEbasis(p=MeshB$loc,
@@ -149,7 +148,8 @@ image(x,y,z,col = terrain.colors(clens), axes = FALSE,xlab = "",ylab = "")
 title("Observed values")
 axis(1)})
 ## Finish plotting and save the plots as an html
-writeWebGL(dir = "../Results/GIAtest", filename= "../Results/GIAtest/PvsObs1.html", width = 1500, reuse = TRUE) 
+rgl.close()
+#writeWebGL(dir = "../Results/GIAtest", filename= "../Results/GIAtest/PvsObs1.html", width = 1500, reuse = TRUE) 
 
 ## 1.c.2 Compare the Posterior Mean and variances
 ## reset palette
@@ -189,7 +189,8 @@ image(x,y,z,col=heat.colors(148),axes=FALSE,xlab="",ylab="")
 title("Posterior standard error")
 axis(1)})
 ## Finish plot and save it as an html
-writeWebGL(dir = "../Results/GIAtest", filename= "../Results/GIAtest/posterior1.html", width = 1500, reuse = TRUE)
+rgl.close()
+#writeWebGL(dir = "../Results/GIAtest", filename= "../Results/GIAtest/posterior1.html", width = 1500, reuse = TRUE)
 
 
 
@@ -292,7 +293,8 @@ image(x,y,z,col = terrain.colors(clens), axes = FALSE,xlab = "",ylab = "")
 title("Observed values")
 axis(1)})
 ## Finish plotting and save the plot as an html
-writeWebGL(dir = "../Results/GIAtest", filename= "../Results/GIAtest/PvsObs2.html", width = 1500, reuse = TRUE)
+rgl.close()
+#writeWebGL(dir = "../Results/GIAtest", filename= "../Results/GIAtest/PvsObs2.html", width = 1500, reuse = TRUE)
 
 ## 2.c.2 Compare the Posterior Mean and variances
 ## reset palette
@@ -333,8 +335,8 @@ par(cex = 1.5, fin = c(8, 1), mai = c(0,0, 0.5, 0), oma = c(1, 0, 0, 0))
 image(x,y,z,col=heat.colors(clenss),axes=FALSE,xlab="",ylab="")
 title("Posterior standard error")
 axis(1)})
-
-writeWebGL(dir = "../Results/GIAtest", filename= "../Results/GIAtest/posterior2.html", width = 1500, reuse = TRUE)
+rgl.close()
+#writeWebGL(dir = "../Results/GIAtest", filename= "../Results/GIAtest/posterior2.html", width = 1500, reuse = TRUE)
 
 
 
@@ -343,7 +345,7 @@ writeWebGL(dir = "../Results/GIAtest", filename= "../Results/GIAtest/posterior2.
 ### 3.a Simulate the true process and observed data 
 ## Use the previous S2 to generate a triangulation an muse use triangles 
 ## as the polygons
-MeshS2 <- inla.mesh.2d(loc = obsloc, cutoff = 0.5, max.edge = 1)
+MeshS2 <- inla.mesh.2d(loc = obsloc, cutoff = 0.01, max.edge = 0.2)
 summary(MeshS2)
 plot(MeshS2, rgl = TRUE)
 
@@ -386,9 +388,7 @@ Obs2b@df$z <- Obs2b@df$z * Obs2b_area
 ### 3.b Update the true process given the observations
 ## Use the GMRF basis and find the Cmat by FindC_polyareage
 ## Build the LinkGo obj
-## Run link and .find_inc_Cmat internally 
 L3 <- link(mglb_p, Obs2b, n_grid = 400)  # build from process
-L3@Cmat <- C
 e3 <- new("link_list",list(L3))
 v3 <- new("block_list",list(G1 = mglb_Q1, O = Obs2b))
 G3 <- new("Graph",e = e3,v = v3)
@@ -415,12 +415,12 @@ plot(x2b_spost)
 ### 3.c Plot and save results
 ## 3.c.1 Compare the true process and the observed values
 ## Palette setting 
-clims <- range(c(mglb_x2ball, df_val, x3_mpost))
+clims <- range(c(mglb_x2ball, df_val, x2b_mpost))
 clens <- round((clims[2] - clims[1])*100) + 1
 colpal <- terrain.colors(clens, alpha=0)
 colx2bobs <- colpal[round((mglb_x2bobs - clims[1])*100) + 1]
 colx2true <- colpal[round((mglb_x2b - clims[1])*100) + 1]
-coly2b <- colpal[round((df_val - clims[1])*100) + 1]
+coly2b <- colpal[round((df_val$z - clims[1])*100) + 1]
 colxp2b <- colpal[round((x2b_mpost - clims[1])*100) + 1]
 ## Start plotting
 open3d()
@@ -454,14 +454,15 @@ image(x,y,z,col = terrain.colors(clens), axes = FALSE,xlab = "",ylab = "")
 title("Observed values")
 axis(1)})
 ## Finish plotting and save the plot as an html
-writeWebGL(dir = "../Results/GIAtest", filename= "../Results/GIAtest/PvsObs2.html", width = 1500, reuse = TRUE)
+rgl.close()
+#writeWebGL(dir = "../Results/GIAtest", filename= "../Results/GIAtest/PvsObs2.html", width = 1500, reuse = TRUE)
 
 ## 3.c.2 Compare the Posterior Mean and variances
 ## reset palette
-climss <- round(range(x2_spost*20000))
+climss <- round(range(x2b_spost*20000))
 clenss <- climss[2] - climss[1] + 1
 colpals <- heat.colors(clenss, alpha=0)
-colsp2 <- colpals[round(x2_spost*20000) - climss[1]+1]
+colsp2 <- colpals[round(x2b_spost*20000) - climss[1]+1]
 ## Start plotting
 open3d()
 par3d(windowRect = c(100, 100, 1800, 900))
@@ -495,5 +496,7 @@ par(cex = 1.5, fin = c(8, 1), mai = c(0,0, 0.5, 0), oma = c(1, 0, 0, 0))
 image(x,y,z,col=heat.colors(clenss),axes=FALSE,xlab="",ylab="")
 title("Posterior standard error")
 axis(1)})
+rgl.close()
+#writeWebGL(dir = "../Results/GIAtest", filename= "../Results/GIAtest/posterior2.html", width = 1500, reuse = TRUE)
 
-writeWebGL(dir = "../Results/GIAtest", filename= "../Results/GIAtest/posterior2.html", width = 1500, reuse = TRUE)
+save.image(file = "C:/Users/zs16444/Local Documents/Zhe/TestGIA2.RData")
