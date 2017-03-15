@@ -31,6 +31,9 @@ library(dplyr)
 library(ggplot2)
 library(MVST)
 
+### Set seed for reproducible results
+set.seed(123)
+
 ################################################################################
 ## Asssume the true process follows a GP with zero mean and Matern kernel.    ##
 ## The true process is simulated at the triangulation vertices.               ## 
@@ -92,6 +95,19 @@ err1 <- x1_mpost - mglb_x1
 mean(resid1^2)
 mean(err1^2)
 
+par(mfrow=c(3,3))
+plot(mglb_y1, mglb_x1)
+plot(mglb_y1, x1_mpost)
+plot(x1_mpost, mglb_x1)
+
+plot(mglb_x1)
+plot(mglb_y1)
+plot(x1_mpost)
+
+
+plot(err1)
+plot(resid1)
+plot(x1_spost)
 ### 1.c Plot and save results
 ## 1.c.1 Compare the true process and the observed values
 ## Palette setting 
@@ -186,9 +202,8 @@ writeWebGL(dir = "../Results/GIAtest", filename= "../Results/GIAtest/posterior1.
 ## Generate S2 
 ## sample a few points from the mesh location and add some noises
 ll_loc <- do.call(cbind, Lxyz2ll(list(x = mglb_tv[,1], y = mglb_tv[,2], z = mglb_tv[,3])))
-newloc <- ll_loc[sample(1:nrow(ll_loc), 1000), ] + matrix(rnorm(2000, 0, 4), ncol = 2, nrow = 1000)
-newloc[,1] <- ifelse(abs(newloc[,1]) > 90, sign(newloc[,1])*90, newloc[,1])
-newloc[,2] <- ifelse(abs(newloc[,2]) > 180, sign(newloc[,2])*180, newloc[,2])
+newloc <- ll_loc[sample(1:nrow(ll_loc), 1000), ] + matrix(rnorm(2000, 10, 20), ncol = 2, nrow = 1000)
+newloc <- newloc[(abs(newloc[,1]) <= 90) &  (abs(newloc[,2]) <= 180) , ] #remove impossible coords
 obsloc <- do.call(cbind, Lll2xyz(lat = newloc[,1], lon = newloc[,2]))
 plot3d(obsloc)
 
@@ -226,6 +241,14 @@ x2_spost <- sqrt(mglb_x2_post$x_margvar)
 ## Compare mean square error with the true value
 err2 <- x2_mpost - mglb_x2
 mean(err2^2)
+
+par(mfrow=c(2,3))
+plot(mglb_x2)
+plot(mglb_x2obs)
+plot(x2_mpost, mglb_x2)
+plot(err2)
+plot(x2_spost)
+
 
 ### 2.c Plot and save results
 ## 2.c.1 Compare the true process and the observed values
@@ -337,14 +360,15 @@ poly_df <- cbind(id = id, poly_xys, t = 0)
 ## Find the centroid of each triangle and calculate the mean 
 df_xy <- data.frame(do.call(rbind,lapply(id, function(x) rowMeans(apply(vloc[tvid[x,],], 1, xyz2ll)))))
 names(df_xy) <- c("x", "y")
+df_xy_loc <- do.call(cbind, Lll2xyz(lat = df_xy[,1],lon = df_xy[,2]))
 
-loc_all <- rbind(mglb_tv, vloc)
+loc_all <- rbind(mglb_tv, df_xy_loc)
 mglb_S2b <- MVST::Matern(as.matrix(dist(loc_all)), nu = 3/2, var = 4, kappa = 0.1) # create the Matern covmat
 mglb_Q2b <- GMRF(Q = as(chol2inv(chol(mglb_S2b)),"dgCMatrix")) # the precmat
 mglb_x2ball <- sample_GMRF(mglb_Q2b) # simulate the true processs
 
 n_S1 <- nrow(mglb_tv)
-n_S2b <- nrow(vloc)
+n_S2b <- nrow(df_xy_loc)
 mglb_x2b <- mglb_x2ball[1:n_S1]
 mglb_x2bobs <- mglb_x2ball[-(1:n_S1)]
 
@@ -352,13 +376,19 @@ mglb_x2bobs <- mglb_x2ball[-(1:n_S1)]
 df_val <- data.frame(z = sapply(id, function(x) mean(mglb_x2bobs[tvid[x,]]))) + rnorm(length(mglb_x2bobs))*sd2
 dfS2b <- cbind(id = id, df_xy, df_val, std = sd2, t = 0)
 Obs2b <- Obs_poly(df = dfS2b, pol_df = poly_df)
-Obs2b_area <- sapply(Obs2b@pol, area.poly)
+Obs2b_area <- sapply(Obs2b@pol, gpclib::area.poly)
 Obs2b@df$z <- Obs2b@df$z * Obs2b_area
+#save.image(file = "C:/Users/zs16444/Local Documents/Zhe/TestGIA.RData")
+#load(file = "C:/Users/zs16444/Local Documents/Zhe/TestGIA.RData")
+
+
 
 ### 3.b Update the true process given the observations
 ## Use the GMRF basis and find the Cmat by FindC_polyareage
 ## Build the LinkGo obj
-L3 <- link(mglb_p, Obs2b, n_grid = 200)  # build from process
+## Run link and .find_inc_Cmat internally 
+L3 <- link(mglb_p, Obs2b, n_grid = 400)  # build from process
+L3@Cmat <- C
 e3 <- new("link_list",list(L3))
 v3 <- new("block_list",list(G1 = mglb_Q1, O = Obs2b))
 G3 <- new("Graph",e = e3,v = v3)
@@ -373,6 +403,14 @@ x2b_spost <- sqrt(mglb_x2b_post$x_margvar)
 ## Compare mean square error with the true value
 err2b <- x2b_mpost - mglb_x2b
 mean(err2b^2)
+
+par(mfrow=c(2,3))
+plot(mglb_x2b)
+plot(mglb_x2bobs)
+plot(x2b_mpost, mglb_x2b)
+plot(err2)
+plot(x2b_spost)
+
 
 ### 3.c Plot and save results
 ## 3.c.1 Compare the true process and the observed values
