@@ -22,7 +22,7 @@
 
 #### 0. Set working directory, load data and packages 
 setwd("O:/glbm/TestMVST/R")
-load("../Results/Mesh/MeshB.RData")
+load("C:/Users/zs16444/Local Documents/GlobalMass/TestIO/sim_1.RData")
 library(INLA)
 library(rgdal)
 library(maptools)
@@ -34,7 +34,7 @@ library(ggplot2)
 library(MVST)
 
 ### Set seed for reproducible results
-set.seed(123)
+set.seed(22)
 
 ################################################################################
 ## Asssume the true process follows a GP with zero mean and Matern kernel.    ##
@@ -47,11 +47,12 @@ set.seed(123)
 ### 2.a Simulate the true process and observed data 
 ## Generate S2 
 ## sample a few points from the mesh location and add some noises
+mglb_tv <- MeshB$loc
 ll_loc <- do.call(cbind, Lxyz2ll(list(x = mglb_tv[,1], y = mglb_tv[,2], z = mglb_tv[,3])))
 newloc <- ll_loc[sample(1:nrow(ll_loc), 1000), ] + matrix(rnorm(2000, 10, 20), ncol = 2, nrow = 1000)
 newloc <- newloc[(abs(newloc[,1]) <= 90) &  (abs(newloc[,2]) <= 180) , ] #remove impossible coords
 obsloc <- do.call(cbind, Lll2xyz(lat = newloc[,1], lon = newloc[,2]))
-plot3d(obsloc)
+#plot3d(obsloc)
 
 ## Simulate the true process on S2 + S1
 loc_all <- rbind(mglb_tv, obsloc)
@@ -183,3 +184,4 @@ axis(1)})
 rgl.close()
 #writeWebGL(dir = "../Results/GIAtest", filename= "../Results/GIAtest/posterior2.html", width = 1500, reuse = TRUE)
 
+save.image(file = "C:/Users/zs16444/Local Documents/GlobalMass/TestIO/Sim2all.RData")

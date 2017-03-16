@@ -21,7 +21,7 @@
 ##################################################################################
 #### 0. Set working directory, load data and packages 
 setwd("O:/glbm/TestMVST/R")
-load("../Results/Mesh/MeshGlobe.RData")
+load("../Results/Mesh/MeshB.RData")
 library(INLA)
 library(rgdal)
 library(maptools)
@@ -33,7 +33,7 @@ library(ggplot2)
 library(MVST)
 
 ### Set seed for reproducible results
-set.seed(123)
+set.seed(11)
 
 ################################################################################
 ## Asssume the true process follows a GP with zero mean and Matern kernel.    ##
@@ -190,5 +190,5 @@ axis(1)})
 rgl.close()
 #writeWebGL(dir = "../Results/GIAtest", filename= "../Results/GIAtest/posterior1.html", width = 1500, reuse = TRUE)
 
-save(MeshB,mglb_Q1, mglb_Q1, file = "../Results/")
-save.image(file = "C/user")
+save(MeshB,mglb_Q1, file = "C:/Users/zs16444/Local Documents/GlobalMass/TestIO/sim_1.RData")
+save.image(file = "C:/Users/zs16444/Local Documents/GlobalMass/TestIO/Sim1all.RData")

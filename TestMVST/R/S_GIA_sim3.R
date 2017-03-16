@@ -22,7 +22,7 @@
 
 #### 0. Set working directory, load data and packages 
 setwd("O:/glbm/TestMVST/R")
-load("../Results/Mesh/MeshB.RData")
+load("C:/Users/zs16444/Local Documents/GlobalMass/TestIO/sim_1.RData")
 library(INLA)
 library(rgdal)
 library(maptools)
@@ -34,7 +34,7 @@ library(ggplot2)
 library(MVST)
 
 ### Set seed for reproducible results
-set.seed(123)
+set.seed(33)
 
 ################################################################################
 ## Asssume the true process follows a GP with zero mean and Matern kernel.    ##
@@ -46,6 +46,15 @@ set.seed(123)
 ################################################################################
 ################################################################################
 ### 3.a Simulate the true process and observed data 
+
+## Generate S2 
+## sample a few points from the mesh location and add some noises
+mglb_tv <- MeshB$loc
+ll_loc <- do.call(cbind, Lxyz2ll(list(x = mglb_tv[,1], y = mglb_tv[,2], z = mglb_tv[,3])))
+newloc <- ll_loc[sample(1:nrow(ll_loc), 1000), ] + matrix(rnorm(2000, 10, 20), ncol = 2, nrow = 1000)
+newloc <- newloc[(abs(newloc[,1]) <= 90) &  (abs(newloc[,2]) <= 180) , ] #remove impossible coords
+obsloc <- do.call(cbind, Lll2xyz(lat = newloc[,1], lon = newloc[,2]))
+
 ## Use the previous S2 to generate a triangulation an muse use triangles 
 ## as the polygons
 MeshS2 <- inla.mesh.2d(loc = obsloc, cutoff = 0.01, max.edge = 0.2)
@@ -90,6 +99,13 @@ Obs2b@df$z <- Obs2b@df$z * Obs2b_area
 
 ### 3.b Update the true process given the observations
 ## Use the GMRF basis and find the Cmat by FindC_polyareage
+## Create the finite element object from the inla mesh
+MeshB_fem <- inla.mesh.fem(MeshB, order = 2)
+MeshBf <- initFEbasis(p=MeshB$loc,
+                      t=MeshB$graph$tv,
+                      M=MeshB_fem$c1,
+                      K=MeshB_fem$g1)
+mglb_p <- GMRF_basis(mglb_Q1, Basis = MeshBf)
 ## Build the LinkGo obj
 L3 <- link(mglb_p, Obs2b, n_grid = 400)  # build from process
 e3 <- new("link_list",list(L3))
@@ -202,4 +218,4 @@ axis(1)})
 rgl.close()
 #writeWebGL(dir = "../Results/GIAtest", filename= "../Results/GIAtest/posterior2.html", width = 1500, reuse = TRUE)
 
-save.image(file = "C:/Users/zs16444/Local Documents/Zhe/TestGIA2.RData")
+save.image(file = "C:/Users/zs16444/Local Documents/GlobalMass/TestIO/Sim3all.RData")
