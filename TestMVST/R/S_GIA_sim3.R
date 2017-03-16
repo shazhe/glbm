@@ -46,27 +46,32 @@ set.seed(33)
 ################################################################################
 ################################################################################
 ### 3.a Simulate the true process and observed data 
+## Create the finite element object from the inla mesh for S1
+MeshB_fem <- inla.mesh.fem(MeshB, order = 2)
+MeshBf <- initFEbasis(p=MeshB$loc,
+                      t=MeshB$graph$tv,
+                      M=MeshB_fem$c1,
+                      K=MeshB_fem$g1)
+mglb_p <- GMRF_basis(mglb_Q1, Basis = MeshBf)
 
-## Generate S2 
+## Generate S3 
 ## sample a few points from the mesh location and add some noises
 mglb_tv <- MeshB$loc
 ll_loc <- do.call(cbind, Lxyz2ll(list(x = mglb_tv[,1], y = mglb_tv[,2], z = mglb_tv[,3])))
 newloc <- ll_loc[sample(1:nrow(ll_loc), 1000), ] + matrix(rnorm(2000, 10, 20), ncol = 2, nrow = 1000)
 newloc <- newloc[(abs(newloc[,1]) <= 90) &  (abs(newloc[,2]) <= 180) , ] #remove impossible coords
 obsloc <- do.call(cbind, Lll2xyz(lat = newloc[,1], lon = newloc[,2]))
-
-## Use the previous S2 to generate a triangulation an muse use triangles 
-## as the polygons
-MeshS2 <- inla.mesh.2d(loc = obsloc, cutoff = 0.01, max.edge = 0.2)
-summary(MeshS2)
-plot(MeshS2, rgl = TRUE)
+## use new locations as vertice to generate meshed triangles as the polygons
+MeshS3 <- inla.mesh.2d(loc = obsloc, cutoff = 0.5, max.edge = 0.5)
+summary(MeshS3)
+#plot(MeshS2, rgl = TRUE)
 
 ## Construct the Obs_poly object, using the generated mesh grid
 ## grid value take the average of the three vertex
-n.poly <- nrow(MeshS2$graph$tv)
+n.poly <- nrow(MeshS3$graph$tv)
 id <- 1:n.poly
-tvid <- MeshS2$graph$tv # get the table of triangle vertex id
-vloc <- MeshS2$loc # get the xyz coordinates of the vertex
+tvid <- MeshS3$graph$tv # get the table of triangle vertex id
+vloc <- MeshS3$loc # get the xyz coordinates of the vertex
 poly_xys <- data.frame(do.call(rbind,lapply(id, function(x) c(t(apply(vloc[tvid[x,],], 1, xyz2ll))))))
 names(poly_xys) <- c("x1", "x2", "x3", "y1", "y2", "y3")
 poly_df <- cbind(id = id, poly_xys, t = 0)
@@ -76,79 +81,78 @@ df_xy <- data.frame(do.call(rbind,lapply(id, function(x) rowMeans(apply(vloc[tvi
 names(df_xy) <- c("x", "y")
 df_xy_loc <- do.call(cbind, Lll2xyz(lat = df_xy[,1],lon = df_xy[,2]))
 
-loc_all <- rbind(mglb_tv, df_xy_loc)
-mglb_S2b <- MVST::Matern(as.matrix(dist(loc_all)), nu = 3/2, var = 4, kappa = 0.1) # create the Matern covmat
-mglb_Q2b <- GMRF(Q = as(chol2inv(chol(mglb_S2b)),"dgCMatrix")) # the precmat
-mglb_x2ball <- sample_GMRF(mglb_Q2b) # simulate the true processs
+loc_all <- rbind(mglb_tv, vloc)
+mglb_S3 <- MVST::Matern(as.matrix(dist(loc_all)), nu = 3/2, var = 4, kappa = 0.1) # create the Matern covmat
+mglb_Q3 <- GMRF(Q = as(chol2inv(chol(mglb_S3)),"dgCMatrix")) # the precmat
+mglb_x3all <- sample_GMRF(mglb_Q3) # simulate the true processs
 
 n_S1 <- length(mglb_p@G@mu)
-n_S2b <- nrow(df_xy_loc)
-mglb_x2b <- mglb_x2ball[1:n_S1]
-mglb_x2bobs <- mglb_x2ball[-(1:n_S1)]
+n_S3v <- nrow(vloc)
+n_s3 <- nrow(df_xy_loc)
+mglb_x3 <- mglb_x3all[1:n_S1]
+mglb_x3v <- mglb_x3all[-(1:n_S1)]
+mglb_x3obs <- sapply(id, function(x) mean(mglb_x3v[tvid[x,]]))
 
 
-df_val <- data.frame(z = sapply(id, function(x) mean(mglb_x2bobs[tvid[x,]]))) + rnorm(length(mglb_x2bobs))*sd2
-dfS2b <- cbind(id = id, df_xy, df_val, std = sd2, t = 0)
-Obs2b <- Obs_poly(df = dfS2b, pol_df = poly_df)
-Obs2b_area <- sapply(Obs2b@pol, gpclib::area.poly)
-Obs2b@df$z <- Obs2b@df$z * Obs2b_area
-#save.image(file = "C:/Users/zs16444/Local Documents/Zhe/TestGIA.RData")
-#load(file = "C:/Users/zs16444/Local Documents/Zhe/TestGIA.RData")
-
+sd3 <- 0.1
+df_val <- data.frame(z = mglb_x3obs + rnorm(length(mglb_x3obs))*sd3)
+dfS3 <- cbind(id = id, df_xy, df_val, std = sd3, t = 0)
+Obs3 <- Obs_poly(df = dfS3, pol_df = poly_df)
+Obs3_area <- sapply(Obs3@pol, gpclib::area.poly)
+Obs3@df$z <- Obs3@df$z * Obs3_area
 
 
 ### 3.b Update the true process given the observations
 ## Use the GMRF basis and find the Cmat by FindC_polyareage
-## Create the finite element object from the inla mesh
-MeshB_fem <- inla.mesh.fem(MeshB, order = 2)
-MeshBf <- initFEbasis(p=MeshB$loc,
-                      t=MeshB$graph$tv,
-                      M=MeshB_fem$c1,
-                      K=MeshB_fem$g1)
-mglb_p <- GMRF_basis(mglb_Q1, Basis = MeshBf)
 ## Build the LinkGo obj
-L3 <- link(mglb_p, Obs2b, n_grid = 400)  # build from process
+L3 <- link(mglb_p, Obs3)  # build from process
 e3 <- new("link_list",list(L3))
-v3 <- new("block_list",list(G1 = mglb_Q1, O = Obs2b))
+v3 <- new("block_list",list(G1 = mglb_Q1, O = Obs3))
 G3 <- new("Graph",e = e3,v = v3)
-G_reduced <- compress(G3)
-Results3 <- Infer(G_reduced)
+G_reduced3 <- compress(G3)
+Results3 <- Infer(G_reduced3)
 
-mglb_x2b_post <- Results3$Post_GMRF@rep
-x2b_mpost<- mglb_x2b_post$x_mean
+mglb_x3_post <- Results3$Post_GMRF@rep
+x3_mpost<- mglb_x3_post$x_mean
+max3 <- round(mglb_x3all)
+min3 <- round(mglb_x3all)
+x3_mpostc <- ifelse(x3_mpost> max3, max3 , x3_mpost)
+x3_mpostc <- ifelse(x3_mpostc < min3, min3, x3_mpostc)
+
 ## Get the posterior mean and variance
-x2b_spost <- sqrt(mglb_x2b_post$x_margvar)
+x3_spost <- sqrt(mglb_x3_post$x_margvar)
 
 ## Compare mean square error with the true value
-err2b <- x2b_mpost - mglb_x2b
-mean(err2b^2)
+err3 <- x3_mpost - mglb_x3
+mean(err3^2)
 
 par(mfrow=c(2,3))
-plot(mglb_x2b)
-plot(mglb_x2bobs)
-plot(x2b_mpost, mglb_x2b)
-plot(err2)
-plot(x2b_spost)
+plot(mglb_x3)
+plot(mglb_x3obs)
+plot(x3_mpostc, mglb_x3)
+plot(err3)
+plot(x3_spost)
 
 
 ### 3.c Plot and save results
 ## 3.c.1 Compare the true process and the observed values
 ## Palette setting 
-clims <- range(c(mglb_x2ball, df_val, x2b_mpost))
+clims <- range(c(mglb_x3all, df_val, x3_mpostc))
 clens <- round((clims[2] - clims[1])*100) + 1
 colpal <- terrain.colors(clens, alpha=0)
-colx2bobs <- colpal[round((mglb_x2bobs - clims[1])*100) + 1]
-colx2true <- colpal[round((mglb_x2b - clims[1])*100) + 1]
-coly2b <- colpal[round((df_val$z - clims[1])*100) + 1]
-colxp2b <- colpal[round((x2b_mpost - clims[1])*100) + 1]
+colx3true <- colpal[round((mglb_x3 - clims[1])*100) + 1]
+colx3v <- colpal[round((mglb_x3v - clims[1])*100) + 1]
+colx3obs <- colpal[round((df_val$z - clims[1])*100) + 1]
+
+colxp3 <- colpal[round((x3_mpostc - clims[1])*100) + 1]
 ## Start plotting
 open3d()
 par3d(windowRect = c(100, 100, 1800, 900))
 layout3d(matrix(1:4, 2,2), heights = c(8,2), sharedMouse = TRUE)
 ## Plot the true process
 par3d(zoom = 0.8)
-plot3d(vloc,  col = colx2bobs, cex = 2, xlab = "", ylab = "", zlab = "", axe=FALSE) # plot the vertices
-plot(MeshB, rgl = TRUE, col = colx2true, edge.color = rgb(0, 0.5, 0.6, alpha =0.1), add = TRUE) # add the triangulation
+plot3d(mglb_tv,  col = colx3true, cex = 2, xlab = "", ylab = "", zlab = "", axe=FALSE) # plot the vertices
+plot(MeshB, rgl = TRUE, col = colx3true, edge.color = rgb(0, 0.5, 0.6, alpha =0.1), add = TRUE) # add the triangulation
 ## plot the color bar
 next3d(reuse = FALSE)
 bgplot3d({z=matrix(1:clens, nrow = clens)
@@ -158,11 +162,12 @@ par(cex = 1.5, fin = c(8, 1), mai = c(0,0, 0.5, 0), oma = c(1, 0, 0, 0))
 image(x,y,z,col = terrain.colors(clens),axes=FALSE,xlab="",ylab="")
 title("The true process")
 axis(1)})
+
 ## plot the observed value
 next3d(reuse = FALSE)
 par3d(zoom=0.8)
-plot3d(obsloc,  col = coly2, cex = 2, xlab = "", ylab = "", zlab = "", axe=FALSE) # plot the vertices
-plot(MeshB, rgl = TRUE, col = colx2true, edge.color = rgb(0, 0.5, 0.6, alpha =0.1), add = TRUE) # add the triangulation
+plot3d(df_xy_loc,  col = colx3obs, cex = 2, xlab = "", ylab = "", zlab = "", axe=FALSE) # plot the vertices
+plot(MeshS3, rgl = TRUE, col = colx3v, edge.color = rgb(0, 0.5, 0.6, alpha =0.1), add = TRUE) # add the triangulation
 ## plot the color bar
 next3d(reuse = FALSE)
 bgplot3d({z=matrix(1:clens,nrow = clens)
@@ -178,18 +183,18 @@ rgl.close()
 
 ## 3.c.2 Compare the Posterior Mean and variances
 ## reset palette
-climss <- round(range(x2b_spost*20000))
+climss <- round(range(x3_spost*20000))
 clenss <- climss[2] - climss[1] + 1
 colpals <- heat.colors(clenss, alpha=0)
-colsp2 <- colpals[round(x2b_spost*20000) - climss[1]+1]
+colsp3 <- colpals[round(x3_spost*20000) - climss[1]+1]
 ## Start plotting
 open3d()
 par3d(windowRect = c(100, 100, 1800, 900))
 layout3d(matrix(1:4, 2,2), heights = c(8,2), sharedMouse = TRUE)
 ## The posterior mean
 par3d(zoom = 0.8)
-plot3d(obsloc,  col = colxp2, cex = 2, xlab = "", ylab = "", zlab = "", axe=FALSE) # plot the vertices
-plot(MeshB, rgl = TRUE, col = colx2true, edge.color = rgb(0, 0.5, 0.6, alpha =0.1), add = TRUE) # add the triangulation
+plot3d(mglb_tv,  col = colxp3, cex = 2, xlab = "", ylab = "", zlab = "", axe=FALSE) # plot the vertices
+plot(MeshB, rgl = TRUE, col = colxp3, edge.color = rgb(0, 0.5, 0.6, alpha =0.1), add = TRUE) # add the triangulation
 
 next3d(reuse = FALSE)
 bgplot3d({z=matrix(1:clens,nrow = clens)
@@ -204,13 +209,13 @@ axis(1)})
 next3d(reuse = FALSE)
 par3d(zoom=0.8)
 ## The posterior marginal std
-plot3d(obsloc, cex = 2, xlab = "", ylab = "", zlab = "", axe=FALSE) # plot the vertices
-plot(MeshB, rgl = TRUE, col = colsp2, edge.color = rgb(0, 0.5, 0.6, alpha =0.1), add = TRUE) # add the triangulation
+plot3d(df_xy_loc, cex = 2, xlab = "", ylab = "", zlab = "", axe=FALSE) # plot the vertices
+plot(MeshB, rgl = TRUE, col = colsp3, edge.color = rgb(0, 0.5, 0.6, alpha =0.1), add = TRUE) # add the triangulation
 
 next3d(reuse = FALSE)
 bgplot3d({z=matrix(1:clenss,nrow=clenss)
 y=1
-x=seq(min(x2_spost),max(x2_spost),len=clenss)
+x=seq(min(x3_spost),max(x3_spost),len=clenss)
 par(cex = 1.5, fin = c(8, 1), mai = c(0,0, 0.5, 0), oma = c(1, 0, 0, 0))
 image(x,y,z,col=heat.colors(clenss),axes=FALSE,xlab="",ylab="")
 title("Posterior standard error")
