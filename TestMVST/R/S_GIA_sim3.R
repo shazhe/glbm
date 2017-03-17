@@ -62,9 +62,9 @@ newloc <- ll_loc[sample(1:nrow(ll_loc), 1000), ] + matrix(rnorm(2000, 10, 20), n
 newloc <- newloc[(abs(newloc[,1]) <= 90) &  (abs(newloc[,2]) <= 180) , ] #remove impossible coords
 obsloc <- do.call(cbind, Lll2xyz(lat = newloc[,1], lon = newloc[,2]))
 ## use new locations as vertice to generate meshed triangles as the polygons
-MeshS3 <- inla.mesh.2d(loc = obsloc, cutoff = 0.5, max.edge = 0.5)
+MeshS3 <- inla.mesh.2d(loc = obsloc, cutoff = 0.1, max.edge = 0.1)
 summary(MeshS3)
-#plot(MeshS2, rgl = TRUE)
+#plot(MeshS3, rgl = TRUE)
 
 ## Construct the Obs_poly object, using the generated mesh grid
 ## grid value take the average of the three vertex
@@ -95,7 +95,7 @@ mglb_x3obs <- sapply(id, function(x) mean(mglb_x3v[tvid[x,]]))
 
 
 sd3 <- 0.1
-df_val <- data.frame(z = mglb_x3obs + rnorm(length(mglb_x3obs))*sd3)
+df_val <- data.frame(z = mglb_x3obs)
 dfS3 <- cbind(id = id, df_xy, df_val, std = sd3, t = 0)
 Obs3 <- Obs_poly(df = dfS3, pol_df = poly_df)
 Obs3_area <- sapply(Obs3@pol, gpclib::area.poly)
@@ -114,8 +114,8 @@ Results3 <- Infer(G_reduced3)
 
 mglb_x3_post <- Results3$Post_GMRF@rep
 x3_mpost<- mglb_x3_post$x_mean
-max3 <- round(mglb_x3all)
-min3 <- round(mglb_x3all)
+max3 <- max(mglb_x3all) 
+min3 <- min(mglb_x3all)
 x3_mpostc <- ifelse(x3_mpost> max3, max3 , x3_mpost)
 x3_mpostc <- ifelse(x3_mpostc < min3, min3, x3_mpostc)
 
@@ -126,13 +126,14 @@ x3_spost <- sqrt(mglb_x3_post$x_margvar)
 err3 <- x3_mpost - mglb_x3
 mean(err3^2)
 
-par(mfrow=c(2,3))
+par(mfrow=c(3,3))
 plot(mglb_x3)
-plot(mglb_x3obs)
-plot(x3_mpostc, mglb_x3)
+plot(x3_mpost)
+plot(x3_mpostc)
+plot(x3_mpost, mglb_x3)
 plot(err3)
 plot(x3_spost)
-
+plot(x3_mpostc, mglb_x3)
 
 ### 3.c Plot and save results
 ## 3.c.1 Compare the true process and the observed values
@@ -178,8 +179,8 @@ image(x,y,z,col = terrain.colors(clens), axes = FALSE,xlab = "",ylab = "")
 title("Observed values")
 axis(1)})
 ## Finish plotting and save the plot as an html
+writeWebGL(dir = "../Results/GIAtest", filename= "../Results/GIAtest/PvsObs2.html", width = 1500, reuse = TRUE)
 rgl.close()
-#writeWebGL(dir = "../Results/GIAtest", filename= "../Results/GIAtest/PvsObs2.html", width = 1500, reuse = TRUE)
 
 ## 3.c.2 Compare the Posterior Mean and variances
 ## reset palette
@@ -220,7 +221,7 @@ par(cex = 1.5, fin = c(8, 1), mai = c(0,0, 0.5, 0), oma = c(1, 0, 0, 0))
 image(x,y,z,col=heat.colors(clenss),axes=FALSE,xlab="",ylab="")
 title("Posterior standard error")
 axis(1)})
+writeWebGL(dir = "../Results/GIAtest", filename= "../Results/GIAtest/posterior2.html", width = 1500, reuse = TRUE)
 rgl.close()
-#writeWebGL(dir = "../Results/GIAtest", filename= "../Results/GIAtest/posterior2.html", width = 1500, reuse = TRUE)
 
 save.image(file = "C:/Users/zs16444/Local Documents/GlobalMass/TestIO/Sim3all.RData")
