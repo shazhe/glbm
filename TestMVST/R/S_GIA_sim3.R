@@ -179,7 +179,7 @@ image(x,y,z,col = terrain.colors(clens), axes = FALSE,xlab = "",ylab = "")
 title("Observed values")
 axis(1)})
 ## Finish plotting and save the plot as an html
-writeWebGL(dir = "../Results/GIAtest", filename= "../Results/GIAtest/PvsObs2.html", width = 1500, reuse = TRUE)
+writeWebGL(dir = "../Results/GIAtest", filename= "../Results/GIAtest/PvsObs3.html", width = 1500, reuse = TRUE)
 rgl.close()
 
 ## 3.c.2 Compare the Posterior Mean and variances
@@ -221,7 +221,7 @@ par(cex = 1.5, fin = c(8, 1), mai = c(0,0, 0.5, 0), oma = c(1, 0, 0, 0))
 image(x,y,z,col=heat.colors(clenss),axes=FALSE,xlab="",ylab="")
 title("Posterior standard error")
 axis(1)})
-writeWebGL(dir = "../Results/GIAtest", filename= "../Results/GIAtest/posterior2.html", width = 1500, reuse = TRUE)
+writeWebGL(dir = "../Results/GIAtest", filename= "../Results/GIAtest/posterior3.html", width = 1500, reuse = TRUE)
 rgl.close()
 
 save.image(file = "C:/Users/zs16444/Local Documents/GlobalMass/TestIO/Sim3all.RData")
