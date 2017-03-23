@@ -62,7 +62,7 @@ newloc <- ll_loc[sample(1:nrow(ll_loc), 1000), ] + matrix(rnorm(2000, 10, 20), n
 newloc <- newloc[(abs(newloc[,1]) <= 90) &  (abs(newloc[,2]) <= 180) , ] #remove impossible coords
 obsloc <- do.call(cbind, Lll2xyz(lat = newloc[,1], lon = newloc[,2]))
 ## use new locations as vertice to generate meshed triangles as the polygons
-MeshS3 <- inla.mesh.2d(loc = obsloc, cutoff = 0.1, max.edge = 0.1)
+MeshS3 <- inla.mesh.2d(loc = obsloc, cutoff = 0.1, max.edge = 0.15)
 summary(MeshS3)
 #plot(MeshS3, rgl = TRUE)
 

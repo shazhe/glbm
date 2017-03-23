@@ -1,0 +1,14 @@
+#!/bin/bash
+
+##PBS -l nodes=1:ppn=1,walltime=00:30:00  
+
+
+# Ensure that we have the correct version of R loaded
+module load languages/R-3.0.2
+module load openmpi/gcc/64/1.6.4
+
+# change the working directory (default is home directory)
+cd "/panfs/panasas01/geog/zs16444/TestBHM/R"
+
+# Run the R script
+R CMD BATCH -no-save --no-restore --slave testblue.R res.out
