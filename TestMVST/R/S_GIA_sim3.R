@@ -24,6 +24,7 @@
 setwd("O:/glbm/TestMVST/R")
 load("C:/Users/zs16444/Local Documents/GlobalMass/TestIO/sim_1.RData")
 library(INLA)
+## INLA:::inla.dynload.workaround() ## uncomment when using nuuk
 library(rgdal)
 library(maptools)
 library(GEOmap)
