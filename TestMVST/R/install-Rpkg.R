@@ -25,7 +25,7 @@ install.packages(pkgs1, Sys.getenv("R_LIBS_USER"), repos = "http://www.stats.bri
 dependencies = TRUE)
 
 ## Packages MVST depends on
-pkgs2 <- c("spam", "deldir", "SDMTools", "network", "fields", "matlab", "actuar", "akima", "geometry")
+pkgs2 <- c("spam", "deldir", "SDMTools", "network", "fields", "matlab", "actuar", "akima", "geometry", "GEOmap")
 install.packages(pkgs2, Sys.getenv("R_LIBS_USER"), repos = "http://www.stats.bris.ac.uk/R/", 
 dependencies = TRUE)
 
