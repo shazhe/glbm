@@ -20,11 +20,7 @@
 ## * c. Plot the results and save                                               ##
 ##################################################################################
 #### 0. Set working directory, load data and packages 
-install.packages("INLA", repos="https://www.math.ntnu.no/inla/R/stable")
-library(devtools)
-install_github("andrewzm/MVST",build_vignettes=F,dependencies=T)
-
-load("../Results/Mesh/MeshB.RData")
+load("/panfs/panasas01/geog/zs16444/glbm/TestMVST/Results/Mesh/MeshB.RData")
 library(INLA)
 library(rgdal)
 library(maptools)
@@ -65,6 +61,7 @@ C1 <- Imat(nrow(mglb_tv))
 
 ## 1.b.2 use a GMRF basis and find the Cmat by FindC 
 ## Create the finite element object from the inla mesh
+INLA:::inla.dynload.workaround()
 MeshB_fem <- inla.mesh.fem(MeshB, order = 2)
 MeshBf <- initFEbasis(p=MeshB$loc,
                       t=MeshB$graph$tv,
