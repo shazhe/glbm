@@ -20,6 +20,10 @@
 ## * c. Plot the results and save                                               ##
 ##################################################################################
 #### 0. Set working directory, load data and packages 
+install.packages("INLA", repos="https://www.math.ntnu.no/inla/R/stable")
+library(devtools)
+install_github("andrewzm/MVST",build_vignettes=F,dependencies=T)
+
 load("../Results/Mesh/MeshB.RData")
 library(INLA)
 library(rgdal)

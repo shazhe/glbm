@@ -1,0 +1,16 @@
+#!/bin/bash
+
+##PBS -l nodes=1:ppn=1,walltime=00:10:00  
+
+
+# Ensure that we have the correct version of R loaded
+  module load languages/R-3.3.3-ATLAS
+  module load apps/gdal-1.11.1
+  module load libraries/gnu_builds/proj-4.9.3
+# module load openmpi/gcc/64/1.6.4
+
+# change the working directory (default is home directory)
+cd "/panfs/panasas01/geog/zs16444/TestBHM/R"
+
+# Run the R script
+R CMD BATCH install-Rpkg.R
