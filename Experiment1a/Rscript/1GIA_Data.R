@@ -40,6 +40,10 @@ image(x,y,z,col = topo.colors(t_Clens),axes=FALSE,xlab="",ylab="")
 title("The ICE6G GIA")
 axis(1)})
 
+writeWebGL(dir = "C:/Users/zs16444/Local Documents/GlobalMass/Experiment1a", 
+           filename= "C:/Users/zs16444/Local Documents/GlobalMass/Experiment1a/GIA_globe.html",  # save the plot as an html
+           width = 1000, reuse = TRUE)
+
 #### 1 Genreate a mesh by from the given points
 ###################################################################
 ## To get 1 by 1 degree resolution, we try to generate about 64800 triangles 
@@ -49,13 +53,14 @@ plot(Mesh_GIA, rgl = T)
 
 #### 2 Set up GIA priors
 ###################################################################
-GIA_mu <- GIA_ice6g$trend
+GIA_Mloc <- Mesh_GIA$loc
+GIA_mu <- matrix(apply(GIA_Mloc, 1, function(x)GIA_ice6g$trend[which.min(rdist(matrix(x,1,3), GIA_loc))]), nrow(GIA_Mloc), 1)
 ## Parameters needed for setting up the Matern covariance function
 ## nu -- mean square differentialbilty of the process -- poorly identified -- fix at 3/2
 ## var -- marginal variance
 ## kappa -- length scale -- range rho = sqrt(8nu/kappa) for correlation 0.1
 ## These can be determined by experts or data or both.
+GIA_fem <- inla.mesh.fem(Mesh_GIA, order = 2)
+Q_GIA <- Prec_from_SPDE_wrapper(M=GIA_fem$c1, K = GIA_fem$g1, nu = 2, desired_prec = 1/4, l = 0.1)
 
-GIA_cov<- MVST::Matern(as.matrix(dist()), nu = 3/2, var = 4, kappa = 0.1) # create the Matern covmat
-
-save(Mesh_GIA, GIA_mu, GIA_cov, file = "o:/glbm/Experiment1a/Mesh_GIA.RData")
+save(Mesh_GIA, GIA_mu, Q_GIA, file = "C:/Users/zs16444/Local Documents/GlobalMass/Experiment1a/Mesh_GIA.RData")
