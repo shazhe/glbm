@@ -11,6 +11,7 @@ library(rgl)
 library(GEOmap)
 library(INLA)
 library(MVST)
+library(gstat)
 #### 0 Read in GIA data
 ###################################################################
 GIA_ice6g <- read.table("Z:/ExperimentsBHM/Experiment1a/inputs/GIA_truth.txt", header = T)
@@ -60,7 +61,18 @@ GIA_mu <- matrix(apply(GIA_Mloc, 1, function(x)GIA_ice6g$trend[which.min(rdist(m
 ## var -- marginal variance
 ## kappa -- length scale -- range rho = sqrt(8nu/kappa) for correlation 0.1
 ## These can be determined by experts or data or both.
-GIA_fem <- inla.mesh.fem(Mesh_GIA, order = 2)
-Q_GIA <- Prec_from_SPDE_wrapper(M=GIA_fem$c1, K = GIA_fem$g1, nu = 2, desired_prec = 1/4, l = 0.1)
 
+## plot and calculate the sample variogram
+GIAdata <- data.frame(trend = GIA_ice6g$trend, x=GIA_loc[,1], y = GIA_loc[,2], w = GIA_loc[,3])
+coordinates(GIAdata) = ~ x+y+w
+v0 <- variogram(trend ~ 1, data = GIAdata)
+f0 <- fit.variogram(v0, vgm("Mat"))
+plot(v0, f0)
+
+
+## Build the GMRF precision matrix for GIA
+GIA_fem <- inla.mesh.fem(Mesh_GIA, order = 2)
+Q_GIA <- Prec_from_SPDE_wrapper(M=GIA_fem$c1, K = GIA_fem$g1, nu = 1, desired_prec = 1/4, l = 540)
+
+## Save all initial built up objects
 save(Mesh_GIA, GIA_mu, Q_GIA, file = "C:/Users/zs16444/Local Documents/GlobalMass/Experiment1a/Mesh_GIA.RData")
