@@ -11,6 +11,7 @@ library(rgl)
 library(GEOmap)
 library(INLA)
 library(MVST)
+library(fields)
 library(gstat)
 #### 0 Read in GIA data
 ###################################################################
@@ -66,13 +67,18 @@ GIA_mu <- matrix(apply(GIA_Mloc, 1, function(x)GIA_ice6g$trend[which.min(rdist(m
 GIAdata <- data.frame(trend = GIA_ice6g$trend, x=GIA_loc[,1], y = GIA_loc[,2], w = GIA_loc[,3])
 coordinates(GIAdata) = ~ x+y+w
 v0 <- variogram(trend ~ 1, data = GIAdata)
-f0 <- fit.variogram(v0, vgm("Mat"))
-plot(v0, f0)
+plot(v0)
+v1 <- variogram(trend ~ 1, cutoff = 0.5, data = GIAdata)
+plot(v1) 
+## From the plot, sill = sigma = 5, range = 0.2. choose kappa = 1 nugget = 0 (assume)
+f1 <- fit.variogram(v1, vgm(5, model = "Mat", kappa = 1, range = 0.2))
+summary(f1)
+plot(v1, f1)
 
 
 ## Build the GMRF precision matrix for GIA
 GIA_fem <- inla.mesh.fem(Mesh_GIA, order = 2)
-Q_GIA <- Prec_from_SPDE_wrapper(M=GIA_fem$c1, K = GIA_fem$g1, nu = 1, desired_prec = 1/4, l = 540)
+Q_GIA <- Prec_from_SPDE_wrapper(M=GIA_fem$c1, K = GIA_fem$g1, nu = 1, desired_prec = 1/5, l = 0.06)
 
 ## Save all initial built up objects
 save(Mesh_GIA, GIA_mu, Q_GIA, file = "C:/Users/zs16444/Local Documents/GlobalMass/Experiment1a/Mesh_GIA.RData")

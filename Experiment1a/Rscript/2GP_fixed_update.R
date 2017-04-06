@@ -31,7 +31,7 @@ GIA_mpost<- GIA_post$x_mean
 GIA_spost <- sqrt(GIA_post$x_margvar)
 GIA_diff <- GIA_mpost - GIA_mu
 ## Plot the GIA prior
-vals <- GIA_mpost
+vals <- GIA_diff
 open3d()
 par3d(windowRect = c(100, 100, 900, 900))
 layout3d(matrix(1:2, 2,1), heights = c(4,2), sharedMouse = TRUE)
