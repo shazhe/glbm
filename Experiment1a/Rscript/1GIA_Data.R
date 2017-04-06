@@ -13,6 +13,7 @@ library(INLA)
 library(MVST)
 library(fields)
 library(gstat)
+library(geoR)
 #### 0 Read in GIA data
 ###################################################################
 GIA_ice6g <- read.table("Z:/ExperimentsBHM/Experiment1a/inputs/GIA_truth.txt", header = T)
@@ -56,10 +57,14 @@ plot(Mesh_GIA, rgl = T)
 #### 2 Set up GIA priors
 ###################################################################
 GIA_Mloc <- Mesh_GIA$loc
+
+## Use the GIA data as the prior mean
 GIA_mu <- matrix(apply(GIA_Mloc, 1, function(x)GIA_ice6g$trend[which.min(rdist(matrix(x,1,3), GIA_loc))]), nrow(GIA_Mloc), 1)
+
+## Use the GIA data to learn initial values for the covariance parameters
 ## Parameters needed for setting up the Matern covariance function
-## nu -- mean square differentialbilty of the process -- poorly identified -- fix at 3/2
-## var -- marginal variance
+## nu -- mean square differentialbilty of the process -- poorly identified -- fix at 1 or 2
+## var -- marginal variance  -- use the sample estimated sill and assuming no nugget
 ## kappa -- length scale -- range rho = sqrt(8nu/kappa) for correlation 0.1
 ## These can be determined by experts or data or both.
 
@@ -74,6 +79,10 @@ plot(v1)
 f1 <- fit.variogram(v1, vgm(5, model = "Mat", kappa = 1, range = 0.2))
 summary(f1)
 plot(v1, f1)
+
+f2 <- spatialProcess(x=GIA_Mloc[1:1000,], y = GIA_mu[1:1000], cov.args = list(Covariance = "Matern", smoothness= 1), 
+                     Distance = "rdist.earth")
+## rdist.earth needs long lat coords
 
 
 ## Build the GMRF precision matrix for GIA
