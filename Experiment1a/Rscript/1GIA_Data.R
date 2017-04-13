@@ -57,7 +57,8 @@ plot(Mesh_GIA, rgl = T)
 #### 2 Set up GIA priors
 ###################################################################
 GIA_Mloc <- Mesh_GIA$loc
-
+## Convert to longlat coords
+GIA_Mlocll <- do.call(cbind, Lxyz2ll(list(x=GIA_Mloc[,1], y = GIA_Mloc[,2], z = GIA_Mloc[,3])))
 ## Use the GIA data as the prior mean
 GIA_mu <- matrix(apply(GIA_Mloc, 1, function(x)GIA_ice6g$trend[which.min(rdist(matrix(x,1,3), GIA_loc))]), nrow(GIA_Mloc), 1)
 
@@ -68,26 +69,40 @@ GIA_mu <- matrix(apply(GIA_Mloc, 1, function(x)GIA_ice6g$trend[which.min(rdist(m
 ## kappa -- length scale -- range rho = sqrt(8nu/kappa) for correlation 0.1
 ## These can be determined by experts or data or both.
 
-## plot and calculate the sample variogram
-GIAdata <- data.frame(trend = GIA_ice6g$trend, x=GIA_loc[,1], y = GIA_loc[,2], w = GIA_loc[,3])
-coordinates(GIAdata) = ~ x+y+w
+## plot and calculate the sample variogram from longlat coords
+GIAdata <- data.frame(trend = GIA_ice6g$trend, lat = GIA_ice6g$y_center, long = GIA_ice6g$x_center)
+coordinates(GIAdata) <- c("long", "lat")
+proj4string(GIAdata) <- CRS("+proj=longlat")
+## calculate the great circle distance from long lat so set projection to be FALSE
 v0 <- variogram(trend ~ 1, data = GIAdata)
 plot(v0)
-v1 <- variogram(trend ~ 1, cutoff = 0.5, data = GIAdata)
-plot(v1) 
-## From the plot, sill = sigma = 5, range = 0.2. choose kappa = 1 nugget = 0 (assume)
-f1 <- fit.variogram(v1, vgm(5, model = "Mat", kappa = 1, range = 0.2))
-summary(f1)
-plot(v1, f1)
+## From the plot, sill = sigma = 5, range = 500. choose kappa = 1 nugget = 0 (assume)
+f0 <- fit.variogram(v0, vgm(5, model = "Mat", kappa = 1, range = 500))
+summary(f0)  ## fitted range = 343, convert to unit ball assumming earth radius 6371km = 0.0538
+plot(v0, f0)
 
-f2 <- spatialProcess(x=GIA_Mloc[1:1000,], y = GIA_mu[1:1000], cov.args = list(Covariance = "Matern", smoothness= 1), 
-                     Distance = "rdist.earth")
-## rdist.earth needs long lat coords
-
+GIAgeo <- as.geodata(GIAdata)
+vv0 <- likfit(GIAgeo, ini.cov.pars = c(5, 500), kappa = 1, fix.nugget = TRUE, nugget = 0, 
+              cov.model = "matern", lik.method = "REML")
 
 ## Build the GMRF precision matrix for GIA
+## if inla.mesh.fem which calls inla.fmesher.smorg detects S2, we can use
 GIA_fem <- inla.mesh.fem(Mesh_GIA, order = 2)
-Q_GIA <- Prec_from_SPDE_wrapper(M=GIA_fem$c1, K = GIA_fem$g1, nu = 1, desired_prec = 1/5, l = 0.06)
+Q_GIA <- Prec_from_SPDE_wrapper(M=GIA_fem$c1, K = GIA_fem$g1, nu = 1, desired_prec = 1/4.72, l = 0.0538)
+## if not, we can only use inla function to build Q
+## Setting pars in inla.matern
+# d = 2 for S2
+# alpha = nu + d/2, fractional operator, 0< alpha < 2, choose nu = 1, alpha = 1
+# range -- initial set to be minimum of the mesh grid size
+# log (tau) = theta1
+# log (kappa) = theta2
+#size0 <- min(c(diff(range(Mesh_GIA$loc[, 1])), diff(range(Mesh_GIA$loc[, 2])), diff(range(Mesh_GIA$loc[, 3]))))
+range0 <- 0.0538
+sigma0 <- sqrt(4.72)
+kappa0 <- sqrt(8)/range0
+tau0 <- 1/(4*pi*kappa0^2*sigma0^2)
+GIA_spde <- inla.spde2.matern(Mesh_GIA)
+GIA_Q0 <- inla.spde.precision(GIA_spde, theta=c(log(sqrt(tau0)), log(kappa0)))
 
 ## Save all initial built up objects
-save(Mesh_GIA, GIA_mu, Q_GIA, file = "C:/Users/zs16444/Local Documents/GlobalMass/Experiment1a/Mesh_GIA.RData")
+save(Mesh_GIA, GIA_mu, Q_GIA, GIA_spde, GIA_Q0, file = "C:/Users/zs16444/Local Documents/GlobalMass/Experiment1a/Mesh_GIA.RData")
