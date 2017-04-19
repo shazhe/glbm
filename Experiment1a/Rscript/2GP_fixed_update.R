@@ -42,7 +42,7 @@ CMat <- inla.spde.make.A(mesh = Mesh_GIA, loc = GPS_loc)
 
 #### Fixed parameters for the precision matrix
 ## 1 Use Priors only
-GIA_GMRF<- GMRF(mu = GIA_mu, Q = GIA_Q) 
+GIA_GMRF<- GMRF(mu = GIA_mu, Q = GIA_Q0) 
 GPS_obsDF <- Obs(df=data.frame(x = GPS_loc[,1], y = GPS_loc[,2], w = GPS_loc[,3], z = GPS_obs$trend, 
                           std = GPS_obs$std, t = rep(0, nrow(GPS_loc))))
 L <- link(GIA_GMRF, GPS_obsDF, Cmat = CMat)
@@ -65,7 +65,7 @@ kappa1 <- sqrt(8)/range0
 tau1 <- 1/(4*pi*kappa1^2*sigma1^2)
 GIA_Q1 <- inla.spde.precision(GIA_spde, theta=c(log(sqrt(tau1)), log(kappa1)))
 
-GIA_GMRF1<- GMRF(mu = GIA_mu, Q = GIA_Q1) 
+GIA_GMRF1<- GMRF(Q = GIA_Q1) 
 L1 <- link(GIA_GMRF1, GPS_obsDF, Cmat = CMat)
 e1 <- new("link_list",list(L1))
 v1 <- new("block_list",list(G1 = GIA_GMRF1, O = GPS_obsDF))
@@ -100,7 +100,7 @@ y=1
 x=seq(t_lim[1],t_lim[2],len = t_Clens)
 par(cex = 1.5, fin = c(8, 1), mai = c(0,0, 0.5, 0), oma = c(1, 0, 0, 0))
 image(x,y,z,col = topo.colors(t_Clens),axes=FALSE,xlab="",ylab="")
-title("The ICE6G GIA")
+title("Posterior ICE6G GIA variance -- mu = 0")
 axis(1)})
 
 writeWebGL(dir = "C:/Users/zs16444/Local Documents/GlobalMass/Experiment1a", 
