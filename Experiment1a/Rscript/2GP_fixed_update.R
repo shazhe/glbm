@@ -10,6 +10,9 @@ library(rgl)
 library(GEOmap)
 library(INLA)
 library(MVST)
+library(fields)
+library(gstat)
+library(geoR)
 load("C:/Users/zs16444/Local Documents/GlobalMass/Experiment1a/Mesh_GIA.RData")
 GPS_obs <- read.table("Z:/ExperimentsBHM/Experiment1a/inputs/GPS_synthetic.txt", header = T)
 GPS_obsU <- GPS_obs[!duplicated(GPS_obs[,2:3]), ]
@@ -17,10 +20,11 @@ GPS_loc <- do.call(cbind, Lll2xyz(lat = GPS_obs$y_center, lon = GPS_obs$x_center
 
 ## Screening of data
 ## plot and calculate the sample variogram from longlat coords
-coordinates(GPS_obs) <- c("x_center", "y_center")
-proj4string(GPS_obs) <- CRS("+proj=longlat")
+coordinates(GPS_obsU) <- c("x_center", "y_center")
+proj4string(GPS_obsU) <- CRS("+proj=longlat")
 ## calculate the great circle distance from long lat so set projection to be FALSE
-v1 <- variogram(trend ~ 1, data = GPS_obs)
+GPS_obsU$trendc <- GPS_obsU$trend - fitted(lm(GPS_obsU$trend~x_center + y_center, data = GPS_obsU))
+v1 <- variogram(trendc ~ 1, data = GPS_obsU)
 plot(v1)
 ## From the plot, sill = sigma = 5, range = 500. choose kappa = 1 nugget = 0 (assume)
 f1 <- fit.variogram(v1, vgm(5, model = "Mat", kappa = 1, range = 500))

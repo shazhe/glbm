@@ -17,7 +17,7 @@ library(MVST)
 load("C:/Users/zs16444/Local Documents/GlobalMass/Experiment1a/Mesh_GIA.RData")
 GPS_obs <- read.table("Z:/ExperimentsBHM/Experiment1a/inputs/GPS_synthetic.txt", header = T)
 GPS_obsU <- GPS_obs[!duplicated(GPS_obs[,2:3]), ]
-GPS_loc <- do.call(cbind, Lll2xyz(lat = GPS_obs$y_center, lon = GPS_obs$x_center))
+GPS_loc <- do.call(cbind, Lll2xyz(lat = GPS_obsU$y_center, lon = GPS_obsU$x_center))
 
 ## Find the mapping between observations and processes basis
 CMat <- inla.spde.make.A(mesh = Mesh_GIA, loc = GPS_loc)
@@ -36,37 +36,42 @@ GIA_spde <- inla.spde2.matern(Mesh_GIA)
 GIA_Q0 <- inla.spde.precision(GIA_spde, theta=c(log(sqrt(tau0)), log(kappa0)))
 
 x <- as.vector(GIA_mu)
-y <- as.vector(GPS_obs$trend)
+y <- as.vector(GPS_obsU$trend)
 intc <- rep(NA, length(y))
 covs <- rep(NA, length(y))
-## Y = Ax + error 
-mesh.index <- inla.spde.make.index(name = "field", n.spde = GIA_spde$n.spde, n.repl = 1)
-st.est <- inla.stack(data = list(y=y), A = list(CMat,1), 
-                     effects = list(c(list(intercept = GIA_mu), mesh.index),  list(cov = covs)), tag = "est")
 
-st.pred <- inla.stack(data = list(y=NA), A = list(CMat), 
-                     effects = list(c(list(intercept = GIA_mu), mesh.index)), tag = "pred")
+st.est <- inla.stack(data = list(y=y), A = list(CMat,CMat), 
+                     effects = list(mi = 1:GIA_spde$n.spde, pmu= GIA_mu), tag = "est")
+formula = y ~ 0 + pmu + f(mi, model = GIA_spde)
+result.est <- inla(formula, data = inla.stack.data(st.est, spde = GIA_spde),
+                control.predictor = list(A = inla.stack.A(st.est)))
+
+
+st.pred <- inla.stack(data = list(y=NA), A = list(diag(1, 32546),diag(1,32546)), 
+                     effects = list(mi=1:GIA_spde$n.spde, pmu = GIA_mu), tag = "pred")
 
 stGIA <- inla.stack(st.est, st.pred)
+formula = y ~ 0 + pmu + f(mi, model = GIA_spde)
+result.pred <- inla(formula, data = inla.stack.data(stGIA, spde = GIA_spde),
+               control.predictor = list(A = inla.stack.A(stGIA), compute = TRUE))
 
-formula = y ~ -1 + f(field, model = GIA_spde)
-resultI <- inla(formula, data = inla.stack.data(stGIA, spde = GIA_spde),
-                family = "normal", control.predictor = list(A = inla.stack.A(stGIA), compute = TRUE))
 
-res1 <- inla.spde2.result(resultI, "field", spde=GIA_spde)
 par(mfrow = c(2,2))
+res1 <- inla.spde2.result(result.est, "mi", GIA_spde)
 plot(res1[["marginals.range.nominal"]][[1]], type = "l", main = "range")
 plot(res1[["marginals.variance.nominal"]][[1]], type = "l", main = "variance")
 plot(res1[["marginals.kappa"]][[1]], type = "l", main = "kappa")
 plot(res1[["marginals.tau"]][[1]], type = "l", main = "tau")
 
-GIA_mpostC <- resultI$summary.random$field$mean
-GIA_mpost <- resultI$summary.random$field$mean + GIA_mu
-GIA_spost <- resultI$summary.random$field$mean
 
+GIA_mpost <- result.est$summary.random$mi$mean
+GIA_spost <- result.est$summary.random$mi$sd
+GIA_mmpost <- result.est$marginals.random$mi$index.1
+
+GIA_mpost2 <- result.pred$summary.linear.predictor$mean
 
 ## Plot the results
-vals <- GIA_mpostC
+vals <- GIA_mu
 open3d()
 par3d(windowRect = c(100, 100, 900, 900))
 layout3d(matrix(1:2, 2,1), heights = c(4,2), sharedMouse = TRUE)
