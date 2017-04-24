@@ -103,6 +103,7 @@ kappa0 <- sqrt(8)/range0
 tau0 <- 1/(4*pi*kappa0^2*sigma0^2)
 GIA_spde <- inla.spde2.matern(Mesh_GIA)
 GIA_Q0 <- inla.spde.precision(GIA_spde, theta=c(log(sqrt(tau0)), log(kappa0)))
-
+GIA_Q1 <- inla.spde.precision(GIA_spde, theta=c(-1, 1.7))
+xx <- inla.qsample(Q=GIA_Q1)
 ## Save all initial built up objects
 save(Mesh_GIA, GIA_mu, Q_GIA, GIA_spde, GIA_Q0, file = "C:/Users/zs16444/Local Documents/GlobalMass/Experiment1a/Mesh_GIA.RData")
