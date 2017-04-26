@@ -21,6 +21,7 @@ GIA_ice6g <- read.table("Z:/ExperimentsBHM/Experiment1a/inputs/GIA_truth.txt", h
 ## Treat the gridded data as point data sampled at the centre of the grid
 ## converte the LonLat to xyz coordinates
 GIA_loc <- do.call(cbind, Lll2xyz(lat = GIA_ice6g$y_center, lon = GIA_ice6g$x_center))
+GIA_mu <- GIA_ice6g$trend
 
 ## Plot the GIA prior
 open3d()
@@ -56,12 +57,6 @@ plot(Mesh_GIA, rgl = T)
 
 #### 2 Set up GIA priors
 ###################################################################
-GIA_Mloc <- Mesh_GIA$loc
-## Convert to longlat coords
-GIA_Mlocll <- do.call(cbind, Lxyz2ll(list(x=GIA_Mloc[,1], y = GIA_Mloc[,2], z = GIA_Mloc[,3])))
-## Use the GIA data as the prior mean
-GIA_mu <- matrix(apply(GIA_Mloc, 1, function(x)GIA_ice6g$trend[which.min(rdist(matrix(x,1,3), GIA_loc))]), nrow(GIA_Mloc), 1)
-
 ## Use the GIA data to learn initial values for the covariance parameters
 ## Parameters needed for setting up the Matern covariance function
 ## nu -- mean square differentialbilty of the process -- poorly identified -- fix at 1 or 2
@@ -106,4 +101,4 @@ GIA_Q0 <- inla.spde.precision(GIA_spde, theta=c(log(sqrt(tau0)), log(kappa0)))
 GIA_Q1 <- inla.spde.precision(GIA_spde, theta=c(-1, 1.7))
 xx <- inla.qsample(Q=GIA_Q1)
 ## Save all initial built up objects
-save(Mesh_GIA, GIA_mu, Q_GIA, GIA_spde, GIA_Q0, file = "C:/Users/zs16444/Local Documents/GlobalMass/Experiment1a/Mesh_GIA.RData")
+save(Mesh_GIA, GIA_mu, GIA_loc, GIA_spde, file = "C:/Users/zs16444/Local Documents/GlobalMass/Experiment1a/Mesh_GIA.RData")
