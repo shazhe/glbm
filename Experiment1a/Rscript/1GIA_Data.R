@@ -17,11 +17,38 @@ library(geoR)
 #### 0 Read in GIA data
 ###################################################################
 GIA_ice6g <- read.table("Z:/ExperimentsBHM/Experiment1a/inputs/GIA_truth.txt", header = T)
+polycoords <- GIA_ice6g[,c(6:13, 6,7)]
+plist <- lapply(GIA_ice6g$ID, function(x) Polygons(list(Polygon(cbind(lon = as.numeric(polycoords[x, c(1,3,5,7,9)]), 
+                                                                      lat = as.numeric(polycoords[x, c(2,4,6,8,10)])))), ID = x))
+                                      
+Plist <- SpatialPolygons(plist, proj4string = CRS("+proj=longlat"))
+GIA_ice6g_sp <- SpatialPolygonsDataFrame(Plist, data = GIA_ice6g[,c("trend", "std")])
 
 ## Treat the gridded data as point data sampled at the centre of the grid
 ## converte the LonLat to xyz coordinates
-GIA_loc <- do.call(cbind, Lll2xyz(lat = GIA_ice6g$y_center, lon = GIA_ice6g$x_center))
-GIA_mu <- GIA_ice6g$trend
+GIA_loc6 <- do.call(cbind, Lll2xyz(lat = GIA_ice6g$y_center, lon = GIA_ice6g$x_center))
+GIA_mu6 <- GIA_ice6g$trend
+
+#### 1 Genreate a mesh by from the given points
+###################################################################
+## To get 1 by 1 degree resolution, we try to generate about 64800 triangles 
+Mesh_GIA <- inla.mesh.2d(loc = GIA_loc6, cutoff = 0.0167, max.edge = 0.038)
+GIA_spde <- inla.spde2.matern(Mesh_GIA)
+summary(Mesh_GIA)
+plot(Mesh_GIA, rgl = T)
+
+MlocLL <- Lxyz2ll(list(x=Mesh_GIA$loc[,1], y = Mesh_GIA$loc[,2], z = Mesh_GIA$loc[,3]))
+MlocLL$lon <- ifelse(MlocLL$lon <0, MlocLL$lon + 360, MlocLL$lon)
+M_sp <- SpatialPoints(data.frame(lon = MlocLL$lon, lat = MlocLL$lat), proj4string = CRS("+proj=longlat")) #This convert GIA_ice6g a SpatialPointDataFrame
+Midx <- over(M_sp, Plist)
+GIA_muM <- GIA_mu6[Midx]
+
+Mesh_GIA_sp <- SpatialPointsDataFrame(M_sp, data.frame(GIA_m = GIA_muM))
+
+
+## Save all initial built up objects
+save(GIA_ice6g_sp, Mesh_GIA, Mesh_GIA_sp, GIA_spde, file = "C:/Users/zs16444/Local Documents/GlobalMass/Experiment1a/Mesh_GIA.RData")
+
 
 ## Plot the GIA prior
 open3d()
@@ -32,7 +59,7 @@ t_lim <- range(GIA_ice6g$trend)
 t_Clens <- round((t_lim[2] - t_lim[1])*100) + 1
 t_Cpal <- topo.colors(t_Clens, alpha=0)
 t_Cols<- t_Cpal[round((GIA_ice6g$trend - t_lim[1])*100) + 1]
-plot3d(GIA_loc, col= t_Cols)
+plot3d(GIA_loc6, col= t_Cols)
 
 ## plot the color bar
 next3d(reuse = FALSE)
@@ -47,13 +74,6 @@ axis(1)})
 writeWebGL(dir = "C:/Users/zs16444/Local Documents/GlobalMass/Experiment1a", 
            filename= "C:/Users/zs16444/Local Documents/GlobalMass/Experiment1a/GIA_globe.html",  # save the plot as an html
            width = 1000, reuse = TRUE)
-
-#### 1 Genreate a mesh by from the given points
-###################################################################
-## To get 1 by 1 degree resolution, we try to generate about 64800 triangles 
-Mesh_GIA <- inla.mesh.2d(loc = GIA_loc, cutoff = 0.0167, max.edge = 0.038)
-summary(Mesh_GIA)
-plot(Mesh_GIA, rgl = T)
 
 #### 2 Set up GIA priors
 ###################################################################
@@ -96,9 +116,6 @@ range0 <- 0.0538
 sigma0 <- sqrt(4.72)
 kappa0 <- sqrt(8)/range0
 tau0 <- 1/(4*pi*kappa0^2*sigma0^2)
-GIA_spde <- inla.spde2.matern(Mesh_GIA)
 GIA_Q0 <- inla.spde.precision(GIA_spde, theta=c(log(sqrt(tau0)), log(kappa0)))
 GIA_Q1 <- inla.spde.precision(GIA_spde, theta=c(-1, 1.7))
 xx <- inla.qsample(Q=GIA_Q1)
-## Save all initial built up objects
-save(Mesh_GIA, GIA_mu, GIA_loc, GIA_spde, file = "C:/Users/zs16444/Local Documents/GlobalMass/Experiment1a/Mesh_GIA.RData")

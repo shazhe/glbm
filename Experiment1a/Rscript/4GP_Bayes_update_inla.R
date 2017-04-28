@@ -26,21 +26,22 @@ GPS_loc <- do.call(cbind, Lll2xyz(lat = GPS_obsU$y_center, lon = GPS_obsU$x_cent
 Ay <- inla.spde.make.A(mesh = Mesh_GIA, loc = GPS_loc)
 y <- as.vector(GPS_obsU$trend)
 
-## Find the mappying between the ice6g mean adjustment and the processes basis
-Am <- inla.spde.make.A(mesh = Mesh_GIA, loc = GIA_loc)
 
-
-#### 1: no GIA_ice6g prior mean info
-st.est1 <- inla.stack(data = list(y=y), A = list(Ay), 
-                      effects = list(GIA = 1:GIA_spde$n.spde), tag = "est")
-st.pred1 <- inla.stack(data = list(y=NA), A = Ip, 
-                       effects = list(mi=1:GIA_spde$n.spde), tag = "pred")
+#### 1: GIA_ice6g prior mean info
+st.est1 <- inla.stack(data = list(y=y), A = list(Ay,Ay), 
+                     effects = list(GIA = 1:GIA_spde$n.spde, offset = Mesh_GIA_sp@data$GIA_m), tag = "est")
+Ip <- Matrix(0, GIA_spde$n.spde, GIA_spde$n.spde)
+diag(Ip) <- 1
+st.pred1 <- inla.stack(data = list(y=NA), A = list(Ip, Ip), 
+                      effects = list(mi=1:GIA_spde$n.spde, offset = Mesh_GIA_sp@data$GIA_m), tag = "pred")
 stGIA1 <- inla.stack(st.est1, st.pred1)
-formula1 = y ~  -1 + f(GIA, model = GIA_spde)
+
+formula1 = y ~ -1 + offset + f(GIA, model = GIA_spde)
 res_inla1 <- inla(formula1, data = inla.stack.data(stGIA1, spde = GIA_spde),
-                    control.predictor=list(A=inla.stack.A(stGIA1), compute = TRUE))
-save(res_inla1, file = "res_inla1.RData")
-#load("C:/Users/zs16444/Local Documents/GlobalMass/Experiment1a/res_inla1.RData")
+                   control.predictor=list(A=inla.stack.A(stGIA1), compute =TRUE))
+
+save(res_inla1, file = "res_inla1a.RData")
+#load("C:/Users/zs16444/Local Documents/GlobalMass/Experiment1a/res_inla2.RData")
 
 ## Plot hyperparameters
 res_GIA1 <- inla.spde2.result(res_inla1, "GIA", GIA_spde, do.transf=TRUE)
@@ -57,26 +58,39 @@ dev.off()
 ##plot results
 GIA1_mpost <- res_inla1$summary.random$GIA$mean
 GIA1_spost <- res_inla1$summary.random$GIA$sd
-diff1 <- GIA1_mpost - GIA_mu
+
+pidx <- inla.stack.index(stGIA1, tag = "pred")
+GIA1_mpred <- res_inla1$summary.fitted.values$mean[pidx$data]
+GIA1_spred <- res_inla1$summary.fitted.values$sd[pidx$data]
+  
+diff1 <- GIA1_mpred - Mesh_GIA_sp@data$GIA_m
 
 proj1 <- inla.mesh.projector(Mesh_GIA, projection = "longlat", dims = c(361,181))
-GPSX <- ifelse(GPS_obs$x_center > 180, -GPS_obs$x_center+180, GPS_obs$x_center)
+GPSX <- ifelse(GPS_obs$x_center > 180, GPS_obs$x_center-360, GPS_obs$x_center)
 GPSY <- GPS_obs$y_center
 #proj2 <- inla.mesh.projector(Mesh_GIA, projection = "mollweide", dims = c(361,181))
 pdf(file = "C:/Users/zs16444/Local Documents/GlobalMass/Experiment1a/inla1Mean.pdf", width = 8.5, height = 11)
-par(mfrow = c(2,1))
+par(mfrow = c(3,1))
 image.plot(proj1$x, proj1$y, inla.mesh.project(proj1, as.vector(GIA1_mpost)), col = topo.colors(20),
            xlab = "Longitude", ylab = "Latitude", main = "Posterier marginals -- mean")
 points(GPSX, GPSY, pch = 20)
 
-image.plot(proj1$x, proj1$y, inla.mesh.project(proj1, as.vector(GIA_mu)), col = topo.colors(20),
+image.plot(proj1$x, proj1$y, inla.mesh.project(proj1, as.vector(GIA1_mpred)), col = topo.colors(20),
+           xlab = "Longitude", ylab = "Latitude", main = "Posterier marginals -- mean")
+points(GPSX, GPSY, pch = 20)
+
+image.plot(proj1$x, proj1$y, inla.mesh.project(proj1, as.vector(Mesh_GIA_sp@data$GIA_m)), col = topo.colors(20),
            xlab = "Longitude", ylab = "Latitude", main = "ICE6G GIA")
 points(GPSX, GPSY, pch = 20)
 dev.off()
 
 pdf(file = "C:/Users/zs16444/Local Documents/GlobalMass/Experiment1a/inla1Var.pdf", width = 8.5, height =11)
-par(mfrow = c(2,1))
+par(mfrow = c(3,1))
 image.plot(proj1$x, proj1$y, inla.mesh.project(proj1, as.vector(GIA1_spost)), col = topo.colors(20),
+           xlab = "Longitude", ylab = "Latitude", main = "Posterier marginal standard error")
+points(GPSX, GPSY, pch = 20)
+
+image.plot(proj1$x, proj1$y, inla.mesh.project(proj1, as.vector(GIA1_spred)), col = topo.colors(20),
            xlab = "Longitude", ylab = "Latitude", main = "Posterier marginal standard error")
 points(GPSX, GPSY, pch = 20)
 
@@ -86,21 +100,89 @@ points(GPSX, GPSY, pch = 20)
 dev.off()
 
 
-#### 2: GIA_ice6g prior mean info
-st.est2 <- inla.stack(data = list(y=y), A = list(Ay,Am), 
-                     effects = list(GIA = 1:GIA_spde$n.spde, offset = GIA_mu), tag = "est")
-Ip <- Matrix(0, GIA_spde$n.spde, GIA_spde$n.spde)
-diag(Ip) <- 1
-st.pred2 <- inla.stack(data = list(y=NA), A = list(Am,Am), 
-                      effects = list(mi=1:GIA_spde$n.spde, offset = GIA_mu), tag = "pred")
-stGIA2 <- inla.stack(st.est2, st.pred2)
+par(mfrow = c(3,2))
+image.plot(proj1$x, proj1$y, inla.mesh.project(proj1, as.vector(GIA1_mpost)), col = topo.colors(20),
+           xlab = "Longitude", ylab = "Latitude", main = "Posterier marginals -- mean")
+points(GPSX, GPSY, pch = 20)
 
-formula2 = y ~ -1 + offset + f(GIA, model = GIA_spde)
-res_inla2 <- inla(formula2, data = inla.stack.data(stGIA2, spde = GIA_spde),
-                   control.predictor=list(A=inla.stack.A(stGIA2), compute =TRUE))
+image.plot(proj1$x, proj1$y, inla.mesh.project(proj1, as.vector(GIA1_spost)), col = topo.colors(20),
+           xlab = "Longitude", ylab = "Latitude", main = "Posterier marginal standard error")
+points(GPSX, GPSY, pch = 20)
 
-save(res_inla2, file = "res_inla2.RData")
-#load("C:/Users/zs16444/Local Documents/GlobalMass/Experiment1a/res_inla2.RData")
+
+
+image.plot(proj1$x, proj1$y, inla.mesh.project(proj1, as.vector(GIA1_mpred)), col = topo.colors(20),
+           xlab = "Longitude", ylab = "Latitude", main = "Posterier prediction -- mean")
+points(GPSX, GPSY, pch = 20)
+
+image.plot(proj1$x, proj1$y, inla.mesh.project(proj1, as.vector(GIA1_spred)), col = topo.colors(20),
+           xlab = "Longitude", ylab = "Latitude", main = "Posterier prediction standard error")
+points(GPSX, GPSY, pch = 20)
+
+
+image.plot(proj1$x, proj1$y, inla.mesh.project(proj1, as.vector(Mesh_GIA_sp@data$GIA_m)), col = topo.colors(20),
+           xlab = "Longitude", ylab = "Latitude", main = "ICE6G GIA")
+points(GPSX, GPSY, pch = 20)
+
+image.plot(proj1$x, proj1$y, inla.mesh.project(proj1, as.vector(diff1)), col = topo.colors(20),
+           xlab = "Longitude", ylab = "Latitude", main = "Difference between posterier prediction and ICE6G")
+points(GPSX, GPSY, pch = 20)
+
+
+#### 2 Test when GPS error ---> 0
+## 2.1 produce sythetic GSPS data
+GPS_sp <- SpatialPoints(data.frame(lon = GPS_obsU$x_center, lat = GPS_obsU$y_center), proj4string = CRS("+proj=longlat")) #This convert GIA_ice6g a SpatialPointDataFrame
+GPS_data_new <- over(GPS_sp, GIA_ice6g_sp)$trend + rnorm(455)*0.01
+
+## new redo previous by setting y = GPS_data_new
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#### 2: no GIA_ice6g prior mean info
+st.est1 <- inla.stack(data = list(y=y), A = list(Ay), 
+                      effects = list(GIA = 1:GIA_spde$n.spde), tag = "est")
+st.pred1 <- inla.stack(data = list(y=NA), A = Ip, 
+                       effects = list(mi=1:GIA_spde$n.spde), tag = "pred")
+stGIA1 <- inla.stack(st.est1, st.pred1)
+formula1 = y ~  -1 + f(GIA, model = GIA_spde)
+res_inla1 <- inla(formula1, data = inla.stack.data(stGIA1, spde = GIA_spde),
+                  control.predictor=list(A=inla.stack.A(stGIA1), compute = TRUE))
+save(res_inla1, file = "res_inla1.RData")
+#load("C:/Users/zs16444/Local Documents/GlobalMass/Experiment1a/res_inla1.RData")
+
+
+
 
 ## Plot hyperparameters
 res_GIA2 <- inla.spde2.result(res_inla2, "GIA", GIA_spde, do.transf=TRUE)
@@ -175,10 +257,6 @@ axis(1)})
 
 #writeWebGL(filename= "GIA_globe.html",  # save the plot as an html
 #           width = 1000, reuse = TRUE)
-
-
-
-
 
 
 
