@@ -26,16 +26,16 @@
 #### INLA Approximation
 library(GEOmap)
 library(INLA)
-INLA:::inla.dynload.workaround() 
+#INLA:::inla.dynload.workaround() 
 library(MVST)
 library(fields)
 library(slice)
 library(actuar)
 library(spam)
-load("experimentBHM/Mesh_GIA.RData")
-GPS_obs <- read.table("experimentBHM/GPS_synthetic.txt", header = T)
-#load("C:/Users/zs16444/Local Documents/GlobalMass/Experiment1a/Mesh_GIA.RData")
-#GPS_obs <- read.table("Z:/ExperimentsBHM/Experiment1a/inputs/GPS_synthetic.txt", header = T)
+#load("experimentBHM/Mesh_GIA.RData")
+#GPS_obs <- read.table("experimentBHM/GPS_synthetic.txt", header = T)
+load("C:/Users/zs16444/Local Documents/GlobalMass/Experiment1a/Mesh_GIA.RData")
+GPS_obs <- read.table("Z:/ExperimentsBHM/Experiment1a/inputs/GPS_synthetic.txt", header = T)
 GPS_obsU <- GPS_obs[!duplicated(GPS_obs[,2:3]), ]
 GPS_loc <- do.call(cbind, Lll2xyz(lat = GPS_obsU$y_center, lon = GPS_obsU$x_center))
 
@@ -50,14 +50,14 @@ nMesh <- length(x_mu)
 nObs <- length(y_obs)
 ## 1.1.2 hyper-parameters for the priors
 ## measurment errors e ~ IG (alpha0, beta0), very vague
-alpha0 <-  0.01
-beta0 <- 1e3
+alpha0 <-  0.1
+beta0 <- 1
 alpha_new <- alpha0 + nObs/2
 ## theta1, theta2 for latent precision, very vague zero mean Gaussian
 t_mu <- c(0,0)
-t_sd <- 10
+t_sd <- c(5, 0.5)
 ## 1.2.3  MCMC parameters
-numsamples = 200  # number of samples
+numsamples = 50  # number of samples
 burnin = 500 
 ## thinning = 5
 
@@ -118,7 +118,7 @@ for(m in 1:numsamples){
   ### 3 Update the SPDE parameters
   log_postcond_theta <- function(theta){
     z_GIA <- x_new - x_mu
-    as.numeric(-0.5*(crossprod(z_GIA, Q_GIA) %*% z_GIA + crossprod(theta - t_mu)/t_sd^2))
+    as.numeric(-0.5*(crossprod(z_GIA, Q_GIA) %*% z_GIA + crossprod((theta - t_mu)/t_sd)))
   }
   if(m <= nlearn){
     theta_new <- slice_theta(theta_old, log_postcond_theta, learn = TRUE)
