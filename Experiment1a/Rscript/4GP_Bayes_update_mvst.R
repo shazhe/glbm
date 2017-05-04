@@ -54,7 +54,7 @@ beta0 <- 1
 alpha_new <- alpha0 + nObs/2
 ## theta1, theta2 for latent precision, very vague zero mean Gaussian
 t_mu <- c(0,0)
-t_sd <- c(5, 0.5)
+t_sd <- c(1, 1)
 ## 1.2.3  MCMC parameters
 numsamples = 20000  # number of samples
 burnin = 500 
@@ -68,8 +68,8 @@ diag(Q_obs) <- (1/GPS_obsU$std)^2
 ## 1.2.2 precision matrix for the latent field
 ## Use the inla parameterization -- why? inla use greate circle distance for S2
 ## assuming nu = 1, then alpha = 2 when d = 2.
-rho0 <- 400/6371
-sigma0 <- sqrt(0.0001)
+rho0 <- 2000/6371
+sigma0 <- 0.01
 ## theta20 = log(kappa0) = log(8*nu)/2 - log(rho0)
 lkappa0 <- log(8)/2 - log(rho0)
 ## theta10 = log(tau0) = 1/2*log(gamma(nu)/(gamma(alpha)*(4*pi)^(d/2))) - log(sigma0) - nu*log(kappa0)
@@ -104,9 +104,10 @@ mmchol <- summary(chol(as.spam.dgCMatrix(Q_GIA)))
 
 #### The Slice within Gibbs Sampler
 ### Setup a progress bar
+set.seed(15)
+
 t1 <- proc.time()
 pb <- txtProgressBar(min = 0, max = numsamples, style = 3)
-set.seed(15)
 for(m in 1:numsamples){
   ### 1 Update the latent process
   Q_new <- as.spam.dgCMatrix(crossprod(CMat, Q_obs) %*% CMat + Q_GIA)
@@ -135,9 +136,11 @@ for(m in 1:numsamples){
   x_samp[,m] <- x_new
   e_samp[m] <- e_new
   theta12_samp[,m] <- theta_new
+ 
   
   Q_GIA <- inla.spde.precision(GIA_spde, theta=theta_new)
   diag(Q_obs) <- 1/e_new
+  theta_old <- theta_new
   
   ### Print the Progression Bar
   setTxtProgressBar(pb, m)
@@ -149,4 +152,4 @@ close(pb)
 
 t2 <- proc.time()
 ttime <- t2-t1
-save(x_samp, e_samp, theta12_samp, lscale, ttime, file = "mcmc2e4.RData")
+save(x_samp, e_samp, theta12_samp, lscale, ttime, file = "mcmc2e4b.RData")
