@@ -26,16 +26,16 @@
 #### INLA Approximation
 library(GEOmap)
 library(INLA)
-#INLA:::inla.dynload.workaround() 
+INLA:::inla.dynload.workaround() 
 library(MVST)
 library(fields)
 library(slice)
 library(actuar)
 library(spam)
-#load("experimentBHM/Mesh_GIA.RData")
-#GPS_obs <- read.table("experimentBHM/GPS_synthetic.txt", header = T)
-load("C:/Users/zs16444/Local Documents/GlobalMass/Experiment1a/Mesh_GIA.RData")
-GPS_obs <- read.table("Z:/ExperimentsBHM/Experiment1a/inputs/GPS_synthetic.txt", header = T)
+load("experimentBHM/Mesh_GIA.RData")
+GPS_obs <- read.table("experimentBHM/GPS_synthetic.txt", header = T)
+#load("C:/Users/zs16444/Local Documents/GlobalMass/Experiment1a/Mesh_GIA.RData")
+#GPS_obs <- read.table("Z:/ExperimentsBHM/Experiment1a/inputs/GPS_synthetic.txt", header = T)
 GPS_obsU <- GPS_obs[!duplicated(GPS_obs[,2:3]), ]
 GPS_loc <- do.call(cbind, Lll2xyz(lat = GPS_obsU$y_center, lon = GPS_obsU$x_center))
 
@@ -43,7 +43,6 @@ GPS_loc <- do.call(cbind, Lll2xyz(lat = GPS_obsU$y_center, lon = GPS_obsU$x_cent
 ### 1.1 Contants
 ## 1.1.1 data constants
 CMat <- inla.spde.make.A(mesh = Mesh_GIA, loc = GPS_loc)
-GIA_spde <- inla.spde2.matern(Mesh_GIA)
 y_obs <- GPS_obsU$trend
 x_mu <- matrix(Mesh_GIA_sp@data$GIA_m, nrow = Mesh_GIA$n, ncol = 1)
 nMesh <- length(x_mu)
@@ -57,7 +56,7 @@ alpha_new <- alpha0 + nObs/2
 t_mu <- c(0,0)
 t_sd <- c(5, 0.5)
 ## 1.2.3  MCMC parameters
-numsamples = 50  # number of samples
+numsamples = 20000  # number of samples
 burnin = 500 
 ## thinning = 5
 
@@ -69,21 +68,26 @@ diag(Q_obs) <- (1/GPS_obsU$std)^2
 ## 1.2.2 precision matrix for the latent field
 ## Use the inla parameterization -- why? inla use greate circle distance for S2
 ## assuming nu = 1, then alpha = 2 when d = 2.
-## we want:
-## log(sigma) = log(sigma0) + theta1
-## log(rho) = log(rho0) + theta2
 rho0 <- 400/6371
 sigma0 <- sqrt(0.0001)
 ## theta20 = log(kappa0) = log(8*nu)/2 - log(rho0)
-theta20 <- log(8)/2 - log(rho0)
+lkappa0 <- log(8)/2 - log(rho0)
 ## theta10 = log(tau0) = 1/2*log(gamma(nu)/(gamma(alpha)*(4*pi)^(d/2))) - log(sigma0) - nu*log(kappa0)
-theta10 <- 0.5*log(1/(4*pi)) - log(sigma0) - theta20
+ltau0 <- 0.5*log(1/(4*pi)) - log(sigma0) - lkappa0
 ## after transformation the parameters becomes
 ## log(tau) = log(tau0) - theta1 + nu * theta2
 ## log(kappa) = log(kappa0) - theta2
 ## put vague gaussian prior on theta1 and theta2
-theta_old <- c(theta10, theta20)
+theta_old <- c(0,0)
+## parameterisation 1
+## theta1 controls change in log(sigma), theta2 controls change in log(rho)
+GIA_spde <- inla.spde2.matern(Mesh_GIA, B.tau = matrix(c(ltau0, -1, 1),1,3), B.kappa = matrix(c(lkappa0, 0, -1), 1,3))
 Q_GIA <- inla.spde.precision(GIA_spde, theta=theta_old)
+
+## parameterisation 2 same as one at the beginning
+#GIA_spde2 <- inla.spde2.matern(Mesh_GIA)
+#Q_GIA2 <- inla.spde.precision(GIA_spde2, theta=c(ltau0, lkappa0))
+
 
 
 ### 1.3 Initializing the MCMC sampler
@@ -102,7 +106,7 @@ mmchol <- summary(chol(as.spam.dgCMatrix(Q_GIA)))
 ### Setup a progress bar
 t1 <- proc.time()
 pb <- txtProgressBar(min = 0, max = numsamples, style = 3)
-
+set.seed(15)
 for(m in 1:numsamples){
   ### 1 Update the latent process
   Q_new <- as.spam.dgCMatrix(crossprod(CMat, Q_obs) %*% CMat + Q_GIA)
@@ -145,4 +149,4 @@ close(pb)
 
 t2 <- proc.time()
 ttime <- t2-t1
-save(x_samp, e_samp, theta12_samp, lscale, ttime, file = "mcmc2e2.RData")
+save(x_samp, e_samp, theta12_samp, lscale, ttime, file = "mcmc2e4.RData")
