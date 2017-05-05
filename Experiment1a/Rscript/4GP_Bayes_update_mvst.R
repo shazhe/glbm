@@ -56,7 +56,7 @@ alpha_new <- alpha0 + nObs/2
 t_mu <- c(0,0)
 t_sd <- c(1, 1)
 ## 1.2.3  MCMC parameters
-numsamples = 20000  # number of samples
+numsamples = 1e4  # number of samples
 burnin = 500 
 ## thinning = 5
 
@@ -64,11 +64,11 @@ burnin = 500
 ## 1.2.1 measurement errors for obs
 Q_obs <- Matrix(0, nrow = length(y_obs), ncol = length(y_obs), sparse = TRUE)
 diag(Q_obs) <- (1/GPS_obsU$std)^2
-
+#diag(Q_obs) <- 1/100
 ## 1.2.2 precision matrix for the latent field
 ## Use the inla parameterization -- why? inla use greate circle distance for S2
 ## assuming nu = 1, then alpha = 2 when d = 2.
-rho0 <- 2000/6371
+rho0 <- 400/6371
 sigma0 <- 0.01
 ## theta20 = log(kappa0) = log(8*nu)/2 - log(rho0)
 lkappa0 <- log(8)/2 - log(rho0)
@@ -112,9 +112,10 @@ for(m in 1:numsamples){
   ### 1 Update the latent process
   Q_new <- as.spam.dgCMatrix(crossprod(CMat, Q_obs) %*% CMat + Q_GIA)
   bt <- crossprod(CMat, Q_obs)%*%y_obs + Q_GIA %*% x_mu
-  mz_new <- solve(Q_new, cbind(bt, rnorm(nMesh)), memory = list(nnzR= mmchol$nnzR ,nnzcolindices = mmchol$nnzcolindices))
-  x_new <- rowSums(mz_new) 
-  
+  cholQ_new <- chol(Q_new,memory = list(nnzR= mmchol$nnzR ,nnzcolindices = mmchol$nnzcolindices))
+  zm_new <- backsolve(cholQ_new, cbind(rnorm(nMesh), forwardsolve(cholQ_new, bt)))
+  x_new <- rowSums(zm_new)
+ 
   ### 2 Update the measurement error
   res <- y_obs - CMat%*%x_new
   beta_new <- as.numeric(beta0 + crossprod(res)/2)
@@ -152,4 +153,48 @@ close(pb)
 
 t2 <- proc.time()
 ttime <- t2-t1
-save(x_samp, e_samp, theta12_samp, lscale, ttime, file = "mcmc2e4b.RData")
+save(x_samp, e_samp, theta12_samp, lscale, ttime, file = "mcmc1e4b.RData")
+
+
+
+
+
+
+
+
+
+
+
+
+#### Sample analysis
+## traceplot
+par(mfrow = c(2,3))
+plot(e_samp, type = "l")
+plot(theta12_samp[1,], type  ="l")
+plot(theta12_samp[2,], type  ="l")
+
+plot(x_samp[1,], type = "l")
+plot(x_samp[5000,], type = "l")
+plot(x_samp[20000,], type = "l")
+
+
+## sample correlations
+par(mfrow = c(2,3))
+acf(e_samp)
+acf(theta12_samp[1,])
+acf(theta12_samp[2,])
+
+acf(x_samp[1,])
+acf(x_samp[5000,])
+acf(x_samp[20000,])
+
+
+## density plot
+par(mfrow = c(2,3))
+plot(density(e_samp))
+plot(density(theta12_samp[1,]))
+plot(density(theta12_samp[2,]))
+
+plot(density(x_samp[1,]))
+plot(density(x_samp[5000,]))
+plot(density(x_samp[20000,]))
