@@ -22,6 +22,12 @@ GPS_obs <- read.table("experimentBHM/GPS_synthetic.txt", header = T)
 GPS_obsU <- GPS_obs[!duplicated(GPS_obs[,2:3]), ]
 GPS_loc <- do.call(cbind, Lll2xyz(lat = GPS_obsU$y_center, lon = GPS_obsU$x_center))
 
+rho0 <- 400/6371
+sigma0 <- 0.01
+lkappa0 <- log(8)/2 - log(rho0)
+ltau0 <- 0.5*log(1/(4*pi)) - log(sigma0) - lkappa0
+GIA_spde <- inla.spde2.matern(Mesh_GIA, B.tau = matrix(c(ltau0, -1, 1),1,3), B.kappa = matrix(c(lkappa0, 0, -1), 1,3))
+
 ## Find the mapping between observations and processes basis
 Ay <- inla.spde.make.A(mesh = Mesh_GIA, loc = GPS_loc)
 y <- as.vector(GPS_obsU$trend)

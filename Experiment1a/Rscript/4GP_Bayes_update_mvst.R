@@ -44,7 +44,8 @@ GPS_loc <- do.call(cbind, Lll2xyz(lat = GPS_obsU$y_center, lon = GPS_obsU$x_cent
 ## 1.1.1 data constants
 CMat <- inla.spde.make.A(mesh = Mesh_GIA, loc = GPS_loc)
 y_obs <- GPS_obsU$trend
-x_mu <- matrix(Mesh_GIA_sp@data$GIA_m, nrow = Mesh_GIA$n, ncol = 1)
+#x_mu <- matrix(Mesh_GIA_sp@data$GIA_m, nrow = Mesh_GIA$n, ncol = 1)
+x_mu <- matrix(0, nrow = Mesh_GIA$n, ncol = 1)
 nMesh <- length(x_mu)
 nObs <- length(y_obs)
 ## 1.1.2 hyper-parameters for the priors
@@ -56,7 +57,7 @@ alpha_new <- alpha0 + nObs/2
 t_mu <- c(0,0)
 t_sd <- c(1, 1)
 ## 1.2.3  MCMC parameters
-numsamples = 1e4  # number of samples
+numsamples = 1000  # number of samples
 burnin = 500 
 ## thinning = 5
 
@@ -68,8 +69,8 @@ diag(Q_obs) <- (1/GPS_obsU$std)^2
 ## 1.2.2 precision matrix for the latent field
 ## Use the inla parameterization -- why? inla use greate circle distance for S2
 ## assuming nu = 1, then alpha = 2 when d = 2.
-rho0 <- 400/6371
-sigma0 <- 0.01
+rho0 <- 1000/6371
+sigma0 <- 0.1
 ## theta20 = log(kappa0) = log(8*nu)/2 - log(rho0)
 lkappa0 <- log(8)/2 - log(rho0)
 ## theta10 = log(tau0) = 1/2*log(gamma(nu)/(gamma(alpha)*(4*pi)^(d/2))) - log(sigma0) - nu*log(kappa0)
@@ -97,7 +98,8 @@ x_samp <- matrix(0,nMesh,numsamples)  #post process samples in one matrix row = 
 ## The prameters
 e_samp <- rep(0, numsamples)
 theta12_samp <- matrix(0,2,numsamples)
-slice_theta <- slice(d=2)
+slice_theta <- slice(d = 2)
+#slice_theta <- slice(d = 1)
 nlearn <- 100 # learning step for the slice sampler
 lscale <- rep(0, nlearn)
 mmchol <- summary(chol(as.spam.dgCMatrix(Q_GIA)))
@@ -122,9 +124,11 @@ for(m in 1:numsamples){
   e_new <- rinvgamma(1,shape=alpha_new, scale = beta_new)
   
   ### 3 Update the SPDE parameters
+  z_GIA <- x_new - x_mu
   log_postcond_theta <- function(theta){
-    z_GIA <- x_new - x_mu
-    as.numeric(-0.5*(crossprod(z_GIA, Q_GIA) %*% z_GIA + crossprod((theta - t_mu)/t_sd)))
+    Q_G <- as.spam.dgCMatrix(inla.spde.precision(GIA_spde, theta=theta))
+    ldetQ <- sum(log(diag(chol(Q_G, memory = list(nnzR= mmchol$nnzR ,nnzcolindices = mmchol$nnzcolindices)))))
+    as.numeric(-0.5*(crossprod(z_GIA, Q_G) %*% z_GIA + crossprod(theta/t_sd)) + ldetQ)
   }
   if(m <= nlearn){
     theta_new <- slice_theta(theta_old, log_postcond_theta, learn = TRUE)
@@ -132,6 +136,7 @@ for(m in 1:numsamples){
   }else{
     theta_new <- slice_theta(theta_old, log_postcond_theta, learn = FALSE)
   }
+  
   
   ### 4 Store samples and new values
   x_samp[,m] <- x_new
@@ -153,7 +158,7 @@ close(pb)
 
 t2 <- proc.time()
 ttime <- t2-t1
-save(x_samp, e_samp, theta12_samp, lscale, ttime, file = "mcmc1e4b.RData")
+save(x_samp, e_samp, theta12_samp, lscale, ttime, file = "mcmc1e4n.RData")
 
 
 
