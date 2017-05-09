@@ -22,7 +22,7 @@ GPS_obs <- read.table("experimentBHM/GPS_synthetic.txt", header = T)
 GPS_obsU <- GPS_obs[!duplicated(GPS_obs[,2:3]), ]
 GPS_loc <- do.call(cbind, Lll2xyz(lat = GPS_obsU$y_center, lon = GPS_obsU$x_center))
 
-rho0 <- 400/6371
+rho0 <- 100/6371
 sigma0 <- 0.01
 lkappa0 <- log(8)/2 - log(rho0)
 ltau0 <- 0.5*log(1/(4*pi)) - log(sigma0) - lkappa0
@@ -46,7 +46,7 @@ formula1 = y ~ -1 + offset + f(GIA, model = GIA_spde)
 res_inla1 <- inla(formula1, data = inla.stack.data(stGIA1, spde = GIA_spde),
                    control.predictor=list(A=inla.stack.A(stGIA1), compute =TRUE))
 
-save(res_inla1, file = "res_inla1a.RData")
+save(res_inla1, GIA_spde, file = "res_inla2L.RData")
 #load("C:/Users/zs16444/Local Documents/GlobalMass/Experiment1a/res_inla2.RData")
 
 ## Plot hyperparameters

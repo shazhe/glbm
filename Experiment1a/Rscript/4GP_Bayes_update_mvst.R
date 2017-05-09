@@ -44,8 +44,8 @@ GPS_loc <- do.call(cbind, Lll2xyz(lat = GPS_obsU$y_center, lon = GPS_obsU$x_cent
 ## 1.1.1 data constants
 CMat <- inla.spde.make.A(mesh = Mesh_GIA, loc = GPS_loc)
 y_obs <- GPS_obsU$trend
-#x_mu <- matrix(Mesh_GIA_sp@data$GIA_m, nrow = Mesh_GIA$n, ncol = 1)
-x_mu <- matrix(0, nrow = Mesh_GIA$n, ncol = 1)
+x_mu <- matrix(Mesh_GIA_sp@data$GIA_m, nrow = Mesh_GIA$n, ncol = 1)
+#x_mu <- matrix(0, nrow = Mesh_GIA$n, ncol = 1)
 nMesh <- length(x_mu)
 nObs <- length(y_obs)
 ## 1.1.2 hyper-parameters for the priors
@@ -57,9 +57,9 @@ alpha_new <- alpha0 + nObs/2
 t_mu <- c(0,0)
 t_sd <- c(1, 1)
 ## 1.2.3  MCMC parameters
-numsamples = 1000  # number of samples
-burnin = 500 
-## thinning = 5
+numsamples = 5000  # number of samples
+#burnin = 500 
+thinning = 25
 
 ### 1.2 Initial values for the parameters
 ## 1.2.1 measurement errors for obs
@@ -69,8 +69,8 @@ diag(Q_obs) <- (1/GPS_obsU$std)^2
 ## 1.2.2 precision matrix for the latent field
 ## Use the inla parameterization -- why? inla use greate circle distance for S2
 ## assuming nu = 1, then alpha = 2 when d = 2.
-rho0 <- 1000/6371
-sigma0 <- 0.1
+rho0 <- 2000/6371
+sigma0 <- 1
 ## theta20 = log(kappa0) = log(8*nu)/2 - log(rho0)
 lkappa0 <- log(8)/2 - log(rho0)
 ## theta10 = log(tau0) = 1/2*log(gamma(nu)/(gamma(alpha)*(4*pi)^(d/2))) - log(sigma0) - nu*log(kappa0)
@@ -98,19 +98,20 @@ x_samp <- matrix(0,nMesh,numsamples)  #post process samples in one matrix row = 
 ## The prameters
 e_samp <- rep(0, numsamples)
 theta12_samp <- matrix(0,2,numsamples)
-slice_theta <- slice(d = 2)
-#slice_theta <- slice(d = 1)
+#slice_theta <- slice(d = 2)
+slice_theta1 <- slice_theta2 <- slice(d = 1)
 nlearn <- 100 # learning step for the slice sampler
-lscale <- rep(0, nlearn)
+#lscale <- rep(0, nlearn)
+lscale1 <- lscale2 <- rep(0, nlearn)
 mmchol <- summary(chol(as.spam.dgCMatrix(Q_GIA)))
-
+m <- mm <- 0
 #### The Slice within Gibbs Sampler
 ### Setup a progress bar
-set.seed(15)
+set.seed(12)
 
 t1 <- proc.time()
 pb <- txtProgressBar(min = 0, max = numsamples, style = 3)
-for(m in 1:numsamples){
+while (m  <= numsamples){
   ### 1 Update the latent process
   Q_new <- as.spam.dgCMatrix(crossprod(CMat, Q_obs) %*% CMat + Q_GIA)
   bt <- crossprod(CMat, Q_obs)%*%y_obs + Q_GIA %*% x_mu
@@ -125,25 +126,74 @@ for(m in 1:numsamples){
   
   ### 3 Update the SPDE parameters
   z_GIA <- x_new - x_mu
+  
+  ## Rejection
   log_postcond_theta <- function(theta){
     Q_G <- as.spam.dgCMatrix(inla.spde.precision(GIA_spde, theta=theta))
     ldetQ <- sum(log(diag(chol(Q_G, memory = list(nnzR= mmchol$nnzR ,nnzcolindices = mmchol$nnzcolindices)))))
     as.numeric(-0.5*(crossprod(z_GIA, Q_G) %*% z_GIA + crossprod(theta/t_sd)) + ldetQ)
   }
-  if(m <= nlearn){
-    theta_new <- slice_theta(theta_old, log_postcond_theta, learn = TRUE)
-    lscale[m] <- getscales(slice_theta)
-  }else{
-    theta_new <- slice_theta(theta_old, log_postcond_theta, learn = FALSE)
+
+  r <- 1
+  a <- 0
+  while(r > a){
+    theta_p <- theta_old + rnorm(2, sd = 0.07)
+    a <- exp(log_postcond_theta(theta_p) - log_postcond_theta(theta_old))
+    r <- runif(1)
   }
+  theta_new <- theta_p
+
+  # ## slice sampler
+  # log_postcond_theta <- function(theta){
+  #  Q_G <- as.spam.dgCMatrix(inla.spde.precision(GIA_spde, theta=theta))
+  #  ldetQ <- sum(log(diag(chol(Q_G, memory = list(nnzR= mmchol$nnzR ,nnzcolindices = mmchol$nnzcolindices)))))
+  #  as.numeric(-0.5*(crossprod(z_GIA, Q_G) %*% z_GIA + crossprod(theta/t_sd)) + ldetQ)
+  # }
+  # if(m <= nlearn){
+  #  theta_new <- slice_theta(theta_old, log_postcond_theta, learn = TRUE)
+  #  lscale[m] <- getscales(slice_theta)
+  # }else{
+  #  theta_new <- slice_theta(theta_old, log_postcond_theta, learn = FALSE)
+  # }
+  # 
   
+  
+  # log_postcond_theta1 <- function(theta1){
+  #   Q_G <- as.spam.dgCMatrix(inla.spde.precision(GIA_spde, theta=c(theta1, theta_old[2])))
+  #   ldetQ <- sum(log(diag(chol(Q_G, memory = list(nnzR= mmchol$nnzR ,nnzcolindices = mmchol$nnzcolindices)))))
+  #   as.numeric(-0.5*(crossprod(z_GIA, Q_G) %*% z_GIA + (theta1/t_sd[1])^2) + ldetQ)
+  # }
+  # if(m <= nlearn){
+  #   theta1_new <- slice_theta1(theta_old[1], log_postcond_theta1, learn = TRUE)
+  #   lscale1[m] <- getscales(slice_theta1)
+  # }else{
+  #   theta1_new <- slice_theta1(theta_old[1], log_postcond_theta1, learn = FALSE)
+  # }
+  # 
+  # 
+  # log_postcond_theta2 <- function(theta2){
+  #   Q_G <- as.spam.dgCMatrix(inla.spde.precision(GIA_spde, theta=c(theta1_new, theta2)))
+  #  ldetQ <- sum(log(diag(chol(Q_G, memory = list(nnzR= mmchol$nnzR ,nnzcolindices = mmchol$nnzcolindices)))))
+  #   as.numeric(-0.5*(crossprod(z_GIA, Q_G) %*% z_GIA + (theta2/t_sd[2])^2) + ldetQ)
+  # }
+  # if(m <= nlearn){
+  #   theta2_new <- slice_theta2(theta_old[2], log_postcond_theta2, learn = TRUE)
+  #   lscale2[m] <- getscales(slice_theta2)
+  # }else{
+  #   theta2_new <- slice_theta2(theta_old[2], log_postcond_theta2, learn = FALSE)
+  # }
+  # theta_new <- c(theta1_new, theta2_new)
+
   
   ### 4 Store samples and new values
-  x_samp[,m] <- x_new
-  e_samp[m] <- e_new
-  theta12_samp[,m] <- theta_new
- 
+  if(mm%%thinning == 0){
+    m <- m +1
+    x_samp[,m] <- x_new
+    e_samp[m] <- e_new
+    theta12_samp[,m] <- theta_new
+  }
   
+  mm <- mm +1
   Q_GIA <- inla.spde.precision(GIA_spde, theta=theta_new)
   diag(Q_obs) <- 1/e_new
   theta_old <- theta_new
@@ -158,7 +208,7 @@ close(pb)
 
 t2 <- proc.time()
 ttime <- t2-t1
-save(x_samp, e_samp, theta12_samp, lscale, ttime, file = "mcmc1e4n.RData")
+save(rho0, sigma0, x_samp, e_samp, theta12_samp, lscale, ttime, file = "rejectL1.RData")
 
 
 
@@ -179,8 +229,8 @@ plot(theta12_samp[1,], type  ="l")
 plot(theta12_samp[2,], type  ="l")
 
 plot(x_samp[1,], type = "l")
-plot(x_samp[5000,], type = "l")
-plot(x_samp[20000,], type = "l")
+plot(x_samp[500,], type = "l")
+plot(x_samp[1000,], type = "l")
 
 
 ## sample correlations
@@ -190,8 +240,8 @@ acf(theta12_samp[1,])
 acf(theta12_samp[2,])
 
 acf(x_samp[1,])
-acf(x_samp[5000,])
-acf(x_samp[20000,])
+acf(x_samp[500,])
+acf(x_samp[1000,])
 
 
 ## density plot
@@ -201,5 +251,5 @@ plot(density(theta12_samp[1,]))
 plot(density(theta12_samp[2,]))
 
 plot(density(x_samp[1,]))
-plot(density(x_samp[5000,]))
-plot(density(x_samp[20000,]))
+plot(density(x_samp[500,]))
+plot(density(x_samp[1000,]))
