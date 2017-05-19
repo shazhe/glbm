@@ -9,13 +9,14 @@
 ## 3. GIA forward model mean adjustment                          ##
 ###################################################################
 #### INLA Approximation
-library(rgl)
+## require
 library(GEOmap)
 library(INLA)
 INLA:::inla.dynload.workaround() #Use this on server with old gcc library
-library(MVST)
 library(fields)
-load("experimentBHM/Mesh_GIA.RData")
+library(maps)
+library(maptools)
+load("experimentBHM/Mesh_GIAs.RData")
 GPS_obs <- read.table("experimentBHM/GPS_synthetic.txt", header = T)
 #load("C:/Users/zs16444/Local Documents/GlobalMass/Experiment1a/Mesh_GIA.RData")
 #GPS_obs <- read.table("Z:/ExperimentsBHM/Experiment1a/inputs/GPS_synthetic.txt", header = T)
@@ -30,11 +31,43 @@ GIA_spde <- inla.spde2.matern(Mesh_GIA, B.tau = matrix(c(ltau0, -1, 1),1,3), B.k
 
 ## Find the mapping between observations and processes basis
 Ay <- inla.spde.make.A(mesh = Mesh_GIA, loc = GPS_loc)
-y <- as.vector(GPS_obsU$trend)
+
+## create new synthetic data, plot and compare
+y0 <- as.vector(Ay %*% Mesh_GIA_sp@data$GIA_m)
+yd <- as.vector(GPS_obsU$trend)
+err1 <- rnorm(length(y0), sd = 1.5)
+y1 <- y0 + err1
+
+idx0 <- which(GPSX >10 &GPSX <30)
+err2 <- err1
+err2[idx0] <- 1e-4
+y2 <- y0 + err2
+
+GPSX <- ifelse(GPS_obsU$x_center > 180, GPS_obsU$x_center-360, GPS_obsU$x_center)
+GPSY <- GPS_obsU$y_center
+GPS_sd <- SpatialPointsDataFrame(coords = cbind(GPSX, GPSY), data = data.frame(GPS=yd))
+
+## plot the "truth"
+map(interior = FALSE)
+plot(GPS_sd, pch = 19, cex = sqrt(abs(y0)), col = sign(y0)+6, add = TRUE)
+
+## plot the errors
+map(interior = FALSE)
+plot(GPS_sd, pch = 19, cex = sqrt(abs(err1)), col = sign(err1)+6, add = TRUE)
+points(GPSX[idx0], GPSY[idx0], pch = 1, col = 2, cex = 2)
+
+
+## plot the "data"
+map(interior = FALSE)
+plot(GPS_sd, pch = 19, cex = sqrt(abs(y1)), col = sign(y1)+6, add = TRUE)
+
+
+map(interior = FALSE)
+plot(GPS_sd, pch = 1, cex = sqrt(abs(y1-y0))*30, col = sign(y1-y0)+6, add = TRUE)
 
 
 #### 1: GIA_ice6g prior mean info
-st.est1 <- inla.stack(data = list(y=y), A = list(Ay,Ay), 
+st.est1 <- inla.stack(data = list(y=y1), A = list(Ay,Ay), 
                      effects = list(GIA = 1:GIA_spde$n.spde, offset = Mesh_GIA_sp@data$GIA_m), tag = "est")
 Ip <- Matrix(0, GIA_spde$n.spde, GIA_spde$n.spde)
 diag(Ip) <- 1
@@ -46,8 +79,24 @@ formula1 = y ~ -1 + offset + f(GIA, model = GIA_spde)
 res_inla1 <- inla(formula1, data = inla.stack.data(stGIA1, spde = GIA_spde),
                    control.predictor=list(A=inla.stack.A(stGIA1), compute =TRUE))
 
-save(res_inla1, GIA_spde, file = "res_inla2L.RData")
-#load("C:/Users/zs16444/Local Documents/GlobalMass/Experiment1a/res_inla2.RData")
+
+
+
+st.est2 <- inla.stack(data = list(y=y2), A = list(Ay,Ay), 
+                      effects = list(GIA = 1:GIA_spde$n.spde, offset = Mesh_GIA_sp@data$GIA_m), tag = "est")
+Ip <- Matrix(0, GIA_spde$n.spde, GIA_spde$n.spde)
+diag(Ip) <- 1
+st.pred2 <- inla.stack(data = list(y=NA), A = list(Ip, Ip), 
+                       effects = list(mi=1:GIA_spde$n.spde, offset = Mesh_GIA_sp@data$GIA_m), tag = "pred")
+stGIA2 <- inla.stack(st.est2, st.pred2)
+
+formula1 = y ~ -1 + offset + f(GIA, model = GIA_spde)
+res_inla2 <- inla(formula1, data = inla.stack.data(stGIA2, spde = GIA_spde),
+                  control.predictor=list(A=inla.stack.A(stGIA2), compute =TRUE))
+
+
+save(res_inla1, GIA_spde, file = "res_inlaC.RData")
+#load("C:/Users/zs16444/Local Documents/GlobalMass/Experiment1a/res_inla1.RData")
 
 ## Plot hyperparameters
 res_GIA1 <- inla.spde2.result(res_inla1, "GIA", GIA_spde, do.transf=TRUE)
@@ -71,15 +120,33 @@ GIA1_spred <- res_inla1$summary.fitted.values$sd[pidx$data]
   
 diff1 <- GIA1_mpred - Mesh_GIA_sp@data$GIA_m
 
+
+
+
+GIA2_mpost <- res_inla2$summary.random$GIA$mean
+GIA2_spost <- res_inla2$summary.random$GIA$sd
+
+pidx2 <- inla.stack.index(stGIA2, tag = "pred")
+GIA2_mpred <- res_inla2$summary.fitted.values$mean[pidx2$data]
+GIA2_spred <- res_inla2$summary.fitted.values$sd[pidx2$data]
+
+diff2 <- GIA2_mpred - Mesh_GIA_sp@data$GIA_m
+
+
 proj1 <- inla.mesh.projector(Mesh_GIA, projection = "longlat", dims = c(361,181))
-GPSX <- ifelse(GPS_obs$x_center > 180, GPS_obs$x_center-360, GPS_obs$x_center)
-GPSY <- GPS_obs$y_center
+
 #proj2 <- inla.mesh.projector(Mesh_GIA, projection = "mollweide", dims = c(361,181))
 pdf(file = "C:/Users/zs16444/Local Documents/GlobalMass/Experiment1a/inla1Mean.pdf", width = 8.5, height = 11)
-par(mfrow = c(3,1))
+par(mfrow = c(2,1))
 image.plot(proj1$x, proj1$y, inla.mesh.project(proj1, as.vector(GIA1_mpost)), col = topo.colors(20),
            xlab = "Longitude", ylab = "Latitude", main = "Posterier marginals -- mean")
 points(GPSX, GPSY, pch = 20)
+points(GPSX[idx0], GPSY[idx0], cex = 2, pch = 1, col = 2)
+
+image.plot(proj1$x, proj1$y, inla.mesh.project(proj1, as.vector(GIA2_mpost)), col = topo.colors(20),
+           xlab = "Longitude", ylab = "Latitude", main = "Posterier marginals -- mean")
+points(GPSX, GPSY, pch = 20)
+points(GPSX[idx0], GPSY[idx0], cex = 2, pch = 1, col = 2)
 
 image.plot(proj1$x, proj1$y, inla.mesh.project(proj1, as.vector(GIA1_mpred)), col = topo.colors(20),
            xlab = "Longitude", ylab = "Latitude", main = "Posterier marginals -- mean")
@@ -91,16 +158,23 @@ points(GPSX, GPSY, pch = 20)
 dev.off()
 
 pdf(file = "C:/Users/zs16444/Local Documents/GlobalMass/Experiment1a/inla1Var.pdf", width = 8.5, height =11)
-par(mfrow = c(3,1))
+par(mfrow = c(2,1))
 image.plot(proj1$x, proj1$y, inla.mesh.project(proj1, as.vector(GIA1_spost)), col = topo.colors(20),
            xlab = "Longitude", ylab = "Latitude", main = "Posterier marginal standard error")
 points(GPSX, GPSY, pch = 20)
+points(GPSX[idx0], GPSY[idx0], cex = 2, pch = 1, col = 2)
+
+image.plot(proj1$x, proj1$y, inla.mesh.project(proj1, as.vector(GIA2_spost)), col = topo.colors(20),
+           xlab = "Longitude", ylab = "Latitude", main = "Posterier marginal standard error")
+points(GPSX, GPSY, pch = 20)
+points(GPSX[idx0], GPSY[idx0], cex = 2, pch = 1, col = 2)
+
 
 image.plot(proj1$x, proj1$y, inla.mesh.project(proj1, as.vector(GIA1_spred)), col = topo.colors(20),
            xlab = "Longitude", ylab = "Latitude", main = "Posterier marginal standard error")
 points(GPSX, GPSY, pch = 20)
 
-image.plot(proj1$x, proj1$y, inla.mesh.project(proj1, as.vector(diff1)), col = topo.colors(20),
+image.plot(proj1$x, proj1$y, inla.mesh.project(proj1, as.vector(diff2)), col = topo.colors(20),
            xlab = "Longitude", ylab = "Latitude", main = "Difference between posterier marginal mean and ICE6G")
 points(GPSX, GPSY, pch = 20)
 dev.off()

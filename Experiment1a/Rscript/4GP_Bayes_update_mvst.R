@@ -32,7 +32,7 @@ library(fields)
 library(slice)
 library(actuar)
 library(spam)
-load("experimentBHM/Mesh_GIA.RData")
+load("experimentBHM/Mesh_GIAs.RData")
 GPS_obs <- read.table("experimentBHM/GPS_synthetic.txt", header = T)
 #load("C:/Users/zs16444/Local Documents/GlobalMass/Experiment1a/Mesh_GIA.RData")
 #GPS_obs <- read.table("Z:/ExperimentsBHM/Experiment1a/inputs/GPS_synthetic.txt", header = T)
@@ -57,7 +57,7 @@ alpha_new <- alpha0 + nObs/2
 t_mu <- c(0,0)
 t_sd <- c(1, 1)
 ## 1.2.3  MCMC parameters
-numsamples = 5000  # number of samples
+numsamples = 5e4  # number of samples
 #burnin = 500 
 thinning = 25
 
@@ -69,8 +69,8 @@ diag(Q_obs) <- (1/GPS_obsU$std)^2
 ## 1.2.2 precision matrix for the latent field
 ## Use the inla parameterization -- why? inla use greate circle distance for S2
 ## assuming nu = 1, then alpha = 2 when d = 2.
-rho0 <- 2000/6371
-sigma0 <- 1
+rho0 <- 1000/6371
+sigma0 <- 0.5
 ## theta20 = log(kappa0) = log(8*nu)/2 - log(rho0)
 lkappa0 <- log(8)/2 - log(rho0)
 ## theta10 = log(tau0) = 1/2*log(gamma(nu)/(gamma(alpha)*(4*pi)^(d/2))) - log(sigma0) - nu*log(kappa0)
@@ -107,7 +107,7 @@ mmchol <- summary(chol(as.spam.dgCMatrix(Q_GIA)))
 m <- mm <- 0
 #### The Slice within Gibbs Sampler
 ### Setup a progress bar
-set.seed(12)
+set.seed(2)
 
 t1 <- proc.time()
 pb <- txtProgressBar(min = 0, max = numsamples, style = 3)
@@ -208,7 +208,7 @@ close(pb)
 
 t2 <- proc.time()
 ttime <- t2-t1
-save(rho0, sigma0, x_samp, e_samp, theta12_samp, lscale, ttime, file = "rejectL1.RData")
+save(rho0, sigma0, x_samp, e_samp, theta12_samp, ttime, file = "rejectLon2.RData")
 
 
 
@@ -250,6 +250,56 @@ plot(density(e_samp))
 plot(density(theta12_samp[1,]))
 plot(density(theta12_samp[2,]))
 
-plot(density(x_samp[1,]))
-plot(density(x_samp[500,]))
-plot(density(x_samp[1000,]))
+plot(density(x_samp[1, ]))
+plot(density(x_samp[500, ]))
+plot(density(x_samp[1000, ]))
+
+
+#### The GIA field
+## Posterior mean
+GIApost_mean <- rowMeans(x_samp[,])
+GIApost_sd <- apply(x_samp[,], 1, sd)
+
+proj1 <- inla.mesh.projector(Mesh_GIA, projection = "longlat", dims = c(361,181))
+GPSX <- ifelse(GPS_obsU$x_center > 180, GPS_obsU$x_center-360, GPS_obsU$x_center)
+GPSY <- GPS_obsU$y_center
+
+pdf(file = "reject1GIA.pdf", width = 8.5, height = 11)
+par(mfrow = c(3,1))
+image.plot(proj1$x, proj1$y, inla.mesh.project(proj1, as.vector(Mesh_GIA_sp@data$GIA_m)), col = topo.colors(40),
+           xlab = "Longitude", ylab = "Latitude", main = "The ICE6g")
+points(GPSX, GPSY, pch = 20)
+
+image.plot(proj1$x, proj1$y, inla.mesh.project(proj1, as.vector(GIApost_mean)), col = topo.colors(40),
+           xlab = "Longitude", ylab = "Latitude", main = "Posterier marginals -- mean")
+points(GPSX, GPSY, pch = 20)
+
+image.plot(proj1$x, proj1$y, inla.mesh.project(proj1, as.vector(GIApost_sd)), col = topo.colors(40),
+           xlab = "Longitude", ylab = "Latitude", main = "Posterier marginals -- sd")
+points(GPSX, GPSY, pch = 20)
+dev.off()
+
+pdf(file = "reject1hyperpars.pdf", width = 8.5, height = 11)
+par(mfrow = c(3,3))
+plot(e_samp, type = "l")
+plot(theta12_samp[1,], type  ="l")
+plot(theta12_samp[2,], type  ="l")
+
+plot(density(e_samp), main = "error, mean = 2.27")
+plot(density(theta12_samp[1,]), main = "theta1")
+plot(density(theta12_samp[2,]), main = "theta2")
+
+range_samp <- exp(log(rho0) + theta12_samp[2,])
+plot(density(range_samp), main = "range, range = 2176km")
+
+sigma_samp <- exp(log(sigma0) + theta12_samp[1,])
+plot(density(sigma_samp), main = "sigma, sigma = 0.6079")
+dev.off()
+
+mean(e_samp)
+mean(theta12_samp[1,]) 
+mean(theta12_samp[2,])
+mean(range_samp)
+mean(sigma_samp)
+
+## Posterior sd
