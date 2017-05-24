@@ -2,6 +2,7 @@
 #### INLA test error       ####
 #### plug-in approximation ####
 ###############################
+runserver = TRUE
 wkdir <- getwd()
 exname <- "/experimentBHM/LargeMesh_smallError_"
 ## Priors mean and variance for rho and sigma
