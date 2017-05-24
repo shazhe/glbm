@@ -12,7 +12,7 @@
 ## require
 library(GEOmap)
 library(INLA)
-if(runserver=TRUE){
+if(runserver){
 INLA:::inla.dynload.workaround()
   }#Use this on server with old gcc library
 library(fields)
