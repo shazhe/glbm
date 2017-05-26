@@ -32,7 +32,10 @@ GIA_mu6 <- GIA_ice6g$trend
 #### 1 Genreate a mesh by from the given points
 ###################################################################
 ## To get 1 by 1 degree resolution, we try to generate about 64800 triangles 
-Mesh_GIA <- inla.mesh.2d(loc = GIA_loc6, cutoff = 0.1, max.edge = 0.38)
+Mesh_GIA <- inla.mesh.2d(loc = GIA_loc6, cutoff = 0.1, max.edge = 0.38) ## small
+Mesh_GIA <- inla.mesh.2d(loc = GIA_loc6, cutoff = 0.04, max.edge = 0.19) ## Medium
+Mesh_GIA <- inla.mesh.2d(loc = GIA_loc6, cutoff = 0.0167, max.edge = 0.15) ## Large
+
 GIA_spde <- inla.spde2.matern(Mesh_GIA)
 summary(Mesh_GIA)
 plot(Mesh_GIA, rgl = T)
@@ -47,7 +50,7 @@ Mesh_GIA_sp <- SpatialPointsDataFrame(M_sp, data.frame(GIA_m = GIA_muM))
 
 
 ## Save all initial built up objects
-save(GIA_ice6g_sp, Mesh_GIA, Mesh_GIA_sp, GIA_spde, file = "C:/Users/zs16444/Local Documents/GlobalMass/Experiment1a/Mesh_GIAs.RData")
+save(GIA_ice6g_sp, Mesh_GIA, Mesh_GIA_sp, GIA_spde, file = "C:/Users/zs16444/Local Documents/GlobalMass/Experiment1a/Mesh_GIAl.RData")
 
 
 ## Plot the GIA prior
