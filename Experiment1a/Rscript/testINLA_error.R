@@ -13,7 +13,25 @@ v_s <- 40^2
 GPS_obs <- read.table("experimentBHM/GPS_synthetic.txt", header = T)
 GPS_obsU <- GPS_obs[!duplicated(GPS_obs[,2:3]), ]
 
-### 1 Test general error size
+## set seed
+set.seed(6)
+
+
+### 1 Test pointwise error size
+runserver = TRUE
+exname <- "/experimentBHM/PointErr_"
+err <- rnorm(nrow(GPS_obsU), sd = 1)
+load("experimentBHM/Mesh_GIAs.RData")
+## Find a single and isolated point to test on with large and small error 
+## cho0se by eye -- no. 417 and to illustrate the effect choose it to have the same sign 
+## as the nearest points --no.128
+err1 <- err2 <- err
+err1[417] <- sign(err[128])*0.001
+err2[417] <- sign(err[128])*5
+source("glbm/Experiment1a/Rscript/4GP_inla_testErr.R")
+
+
+### 2 Test general error size
 runserver = TRUE
 meshSize <- c("s", "m", "l")
 errSize <- c("s", "L")
@@ -29,20 +47,7 @@ for(j in 1:2){
 }
 
 
-### 2 Test pointwise error size
-runserver = FALSE
-exname <- "/experimentBHM/PointErr_"
-err <- rnorm(nrow(GPS_obsU), sd = 1)
-load("experimentBHM/Mesh_GIAs.RData")
-## Find a single and isolated point to test on with large and small error 
-## cho0se by eye -- no. 417 and to illustrate the effect choose it to have the same sign 
-## as the nearest points --no.128
-err1 <- err2 <- err
-err1[417] <- sign(err[128])*0.001
-err2[417] <- sign(err[128])*5
-source("glbm/Experiment1a/Rscript/4GP_inla_testErr.R")
-
-### Test effect of mesh size
+### 3 Test effect of mesh size
 ## Assume has alreading run scripts for different mesh sizes in Test 1
 runserver = TRUE
 exname <- "/experimentBHM/MeshSize_"

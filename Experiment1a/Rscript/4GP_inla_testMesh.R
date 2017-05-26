@@ -57,8 +57,9 @@ lines(pars_GIAs[[2+L]]$marginals.log.range.nominal[[1]], type = "l", col = 2) # 
 lines(pars_GIAs[[3+L]]$marginals.log.range.nominal[[1]], type = "l", col = 3)
 
 ## plot rho
-plot(pars_GIAs[[1+L]]$marginals.range.nominal[[1]], type = "l", 
-     main = expression(bold(log(rho)))) # The posterior from inla output
+maxd <- max(pars_GIAs[[3+L]]$marginals.range.nominal[[1]][,2])
+plot(pars_GIAs[[1+L]]$marginals.range.nominal[[1]], type = "l", ylim = c(0,round(maxd)),
+     main = expression(bold(rho))) # The posterior from inla output
 lines(pars_GIAs[[2+L]]$marginals.range.nominal[[1]], type = "l", col = 2) 
 lines(pars_GIAs[[3+L]]$marginals.range.nominal[[1]], type = "l", col = 3)
 
@@ -70,19 +71,21 @@ lines(pars_GIAs[[2+L]]$marginals.log.variance.nominal[[1]], type = "l", col = 2)
 lines(pars_GIAs[[3+L]]$marginals.log.variance.nominal[[1]], type = "l", col = 3) # The posterior from inla output
 
 ## plot sigma
-plot(pars_GIAs[[1+L]]$marginals.variance.nominal[[1]], type = "l", xlim = c(0, 20), 
+maxd <- max(pars_GIAs[[3+L]]$marginals.variance.nominal[[1]][,2])
+plot(pars_GIAs[[1+L]]$marginals.variance.nominal[[1]], type = "l", xlim = c(0, 0.3), ylim = c(0, round(maxd)),
      main = expression(bold(sigma))) # The posterior from inla output
 lines(pars_GIAs[[2+L]]$marginals.variance.nominal[[1]], type = "l", col = 2) # The posterior from inla output
 lines(pars_GIAs[[3+L]]$marginals.variance.nominal[[1]], type = "l", col = 3) # The posterior from inla output
 
 ## plot the measurement error sigma_e
-sigma_e_marginals1 <- inla.tmarginal(function(x) 1/x, res_inlas[[1+L]]$marginals.hyperpar[[1]])
-sigma_e_marginals2 <- inla.tmarginal(function(x) 1/x, res_inlas[[2+L]]$marginals.hyperpar[[1]])
-sigma_e_marginals3 <- inla.tmarginal(function(x) 1/x, res_inlas[[3+L]]$marginals.hyperpar[[1]])
-plot(sigma_e_marginals1, 
-     main = expression(bold({sigma[e]^2})), type = "l")
+sigma_e_marginals1 <- inla.tmarginal(function(x) sqrt(1/x), res_inlas[[1+L]]$marginals.hyperpar[[1]])
+sigma_e_marginals2 <- inla.tmarginal(function(x) sqrt(1/x), res_inlas[[2+L]]$marginals.hyperpar[[1]])
+sigma_e_marginals3 <- inla.tmarginal(function(x) sqrt(1/x), res_inlas[[3+L]]$marginals.hyperpar[[1]])
+plot(sigma_e_marginals1, xlim = c(0.0085, 0.0115),
+     main = expression(bold({sigma[e]})), type = "l")
 lines(sigma_e_marginals2, type = "l", col = 2) # The posterior from inla output
 lines(sigma_e_marginals3, type = "l", col = 3) 
+
 dev.off()
 
 

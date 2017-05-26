@@ -49,16 +49,15 @@ ydata <- y0 + err
 GPS_sd <- SpatialPointsDataFrame(coords = cbind(GPSX, GPSY), data = data.frame(GPS=y0))
 
 ## plot the "prior mean" and synthetic data
-pdf(file = paste0(wkdir, exname, "data.pdf"), width = 6, height = 8)
-par(mfrow = c(2,1))
-map(interior = FALSE)
-plot(GPS_sd, pch = 19, cex = sqrt(abs(y0)), col = sign(y0)+6, add = TRUE)
+#pdf(file = paste0(wkdir, exname, "data.pdf"), width = 6, height = 8)
 
-map(interior = FALSE)
-plot(GPS_sd, pch = 19, cex = sqrt(abs(ydata)), col = sign(ydata)+6, add = TRUE)
+#par(mfrow = c(2,1))
+#map(interior = FALSE)
+#plot(GPS_sd, pch = 19, cex = sqrt(abs(y0)), col = sign(y0)+6, add = TRUE)
+#map(interior = FALSE)
+#plot(GPS_sd, pch = 19, cex = sqrt(abs(ydata)), col = sign(ydata)+6, add = TRUE)
 
-
-dev.off()
+#dev.off()
 
 
 #### 1: GIA_ice6g prior mean info
@@ -130,9 +129,9 @@ lines(x = xx, y = yy0, col = 2)
 
 ## plot the measurement error sigma_e
 sigma_e_mode <- 1/res_inla$summary.hyperpar$mean[1]
-sigma_e_marginals <- inla.tmarginal(function(x) 1/x, res_inla$marginals.hyperpar[[1]])
+sigma_e_marginals <- inla.tmarginal(function(x) sqrt(1/x), res_inla$marginals.hyperpar[[1]])
 plot(sigma_e_marginals, 
-     main = bquote(bold({sigma[e]^2}("mode") == .(round(sigma_e_mode, 4)))), type = "l")
+     main = bquote(bold({sigma[e]}("mode") == .(round(sqrt(sigma_e_mode), 4)))), type = "l")
 
 ## The default prior in inla is log gamma for the precision, details see from
 res_inla$all.hyper$family

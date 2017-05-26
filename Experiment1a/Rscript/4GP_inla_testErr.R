@@ -88,7 +88,7 @@ lines(pars_GIA2$marginals.log.range.nominal[[1]], type = "l", col = 2) # The pos
 
 ## plot rho
 plot(pars_GIA1$marginals.range.nominal[[1]], type = "l", 
-     main = expression(bold(log(rho)))) # The posterior from inla output
+     main = expression(bold(rho))) # The posterior from inla output
 lines(pars_GIA2$marginals.range.nominal[[1]], type = "l", col = 2) 
 
 ## plot log(sigma)
@@ -102,10 +102,12 @@ plot(pars_GIA1$marginals.variance.nominal[[1]], type = "l", xlim = c(0, 20),
 lines(pars_GIA2$marginals.variance.nominal[[1]], type = "l", col = 2) # The posterior from inla output
 
 ## plot the measurement error sigma_e
-sigma_e_marginals1 <- inla.tmarginal(function(x) 1/x, res_inla1$marginals.hyperpar[[1]])
-sigma_e_marginals2 <- inla.tmarginal(function(x) 1/x, res_inla2$marginals.hyperpar[[1]])
-plot(sigma_e_marginals1, 
-     main = expression(bold({sigma[e]^2})), type = "l")
+sigma_e_marginals1 <- inla.tmarginal(function(x) sqrt(1/x), res_inla1$marginals.hyperpar[[1]])
+sigma_e_marginals2 <- inla.tmarginal(function(x) sqrt(1/x), res_inla2$marginals.hyperpar[[1]])
+xx <- range(c(sigma_e_marginals1[,1],sigma_e_marginals2[,1]))
+yy <- range(c(sigma_e_marginals1[,2],sigma_e_marginals2[,2]))
+plot(sigma_e_marginals1, xlim = xx, ylim = yy,
+     main = expression(bold({sigma[e]})), type = "l")
 lines(sigma_e_marginals2, type = "l", col = 2) # The posterior from inla output
 
 dev.off()
