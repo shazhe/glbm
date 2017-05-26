@@ -31,16 +31,16 @@ pars_GIAs <- list()
 meshSize <- c("s", "m", "l")
 errSize <- c("s", "L")
 for (i in 1:3){
-    exname <- paste0("/experimentBHM/",meshSize[i], "Mesh_sErr_")
-    load(paste0(exname, "inla.RData"))
+    exnames <- paste0("/experimentBHM/",meshSize[i], "Mesh_sErr_")
+    load(paste0(wkdir, exnames, "inla.RData"))
     res_inlas[[i]] <- res_inla
     pars_GIAs[[i]] <- inla.spde2.result(res_inla, "GIA", GIA_spde, do.transf=TRUE)
     projs[[i]] <- inla.mesh.projector(Mesh_GIA, projection = "longlat", dims = c(361,181))
 }
 
 for (i in 4:6){
-  exname <- paste0("/experimentBHM/",meshSize[i-3], "Mesh_LErr_")
-  load(paste0(exname, "inla.RData"))
+  exnames <- paste0("/experimentBHM/",meshSize[i-3], "Mesh_LErr_")
+  load(paste0(wkdir, exnames, "inla.RData"))
   res_inlas[[i]] <- res_inla
   pars_GIAs[[i]] <- inla.spde2.result(res_inla, "GIA", GIA_spde, do.transf=TRUE)
 }
@@ -53,8 +53,8 @@ par(mfrow = c(3,2))
 ## plot log(rho)
 plot(pars_GIAs[[1+L]]$marginals.log.range.nominal[[1]], type = "l", 
      main =expression(bold(log(rho)))) # The posterior from inla output
-lines(pars_GIA[[2+L]]$marginals.log.range.nominal[[1]], type = "l", col = 2) # The posterior from inla output
-lines(pars_GIA[[3+L]]$marginals.log.range.nominal[[1]], type = "l", col = d)
+lines(pars_GIAs[[2+L]]$marginals.log.range.nominal[[1]], type = "l", col = 2) # The posterior from inla output
+lines(pars_GIAs[[3+L]]$marginals.log.range.nominal[[1]], type = "l", col = 3)
 
 ## plot rho
 plot(pars_GIAs[[1+L]]$marginals.range.nominal[[1]], type = "l", 
@@ -66,19 +66,19 @@ lines(pars_GIAs[[3+L]]$marginals.range.nominal[[1]], type = "l", col = 3)
 ## plot log(sigma)
 plot(pars_GIAs[[1+L]]$marginals.log.variance.nominal[[1]], type = "l",
      main = expression(bold(log(sigma)))) # The posterior from inla output
-lines(pars_GIA[[2+L]]$marginals.log.variance.nominal[[1]], type = "l", col = 2) # The posterior from inla output
-lines(pars_GIA[[3+L]]$marginals.log.variance.nominal[[1]], type = "l", col = 3) # The posterior from inla output
+lines(pars_GIAs[[2+L]]$marginals.log.variance.nominal[[1]], type = "l", col = 2) # The posterior from inla output
+lines(pars_GIAs[[3+L]]$marginals.log.variance.nominal[[1]], type = "l", col = 3) # The posterior from inla output
 
 ## plot sigma
-plot(pars_GIA[[1+L]]$marginals.variance.nominal[[1]], type = "l", xlim = c(0, 20), 
+plot(pars_GIAs[[1+L]]$marginals.variance.nominal[[1]], type = "l", xlim = c(0, 20), 
      main = expression(bold(sigma))) # The posterior from inla output
-lines(pars_GIA[[2+L]]$marginals.variance.nominal[[1]], type = "l", col = 2) # The posterior from inla output
-lines(pars_GIA[[3+L]]$marginals.variance.nominal[[1]], type = "l", col = 3) # The posterior from inla output
+lines(pars_GIAs[[2+L]]$marginals.variance.nominal[[1]], type = "l", col = 2) # The posterior from inla output
+lines(pars_GIAs[[3+L]]$marginals.variance.nominal[[1]], type = "l", col = 3) # The posterior from inla output
 
 ## plot the measurement error sigma_e
 sigma_e_marginals1 <- inla.tmarginal(function(x) 1/x, res_inlas[[1+L]]$marginals.hyperpar[[1]])
-sigma_e_marginals2 <- inla.tmarginal(function(x) 1/x, res_inla[[2+L]]$marginals.hyperpar[[1]])
-sigma_e_marginals3 <- inla.tmarginal(function(x) 1/x, res_inla[[3+L]]$marginals.hyperpar[[1]])
+sigma_e_marginals2 <- inla.tmarginal(function(x) 1/x, res_inlas[[2+L]]$marginals.hyperpar[[1]])
+sigma_e_marginals3 <- inla.tmarginal(function(x) 1/x, res_inlas[[3+L]]$marginals.hyperpar[[1]])
 plot(sigma_e_marginals1, 
      main = expression(bold({sigma[e]^2})), type = "l")
 lines(sigma_e_marginals2, type = "l", col = 2) # The posterior from inla output
@@ -94,15 +94,15 @@ GIA_spost3 <- res_inlas[[3+L]]$summary.random$GIA$sd
 pdf(file = paste0(wkdir, exname, ee, "GIAfield.pdf"), width = 8, height = 10)
 par(mfrow = c(3,1))
 ## The standard error
-image.plot(projs[[1]]$x, proj[[1]]$y, inla.mesh.project(projs[[1]], as.vector(GIA_spost1)), col = topo.colors(40),
+image.plot(projs[[1]]$x, projs[[1]]$y, inla.mesh.project(projs[[1]], as.vector(GIA_spost1)), col = topo.colors(40),
            xlab = "Longitude", ylab = "Latitude", main = "Posterior marginal standard error -- Small mesh grid")
 points(GPSX, GPSY)
 
-image.plot(projs[[2]]$x, proj[[2]]$y, inla.mesh.project(projs[[2]], as.vector(GIA_spost2)), col = topo.colors(40),
+image.plot(projs[[2]]$x, projs[[2]]$y, inla.mesh.project(projs[[2]], as.vector(GIA_spost2)), col = topo.colors(40),
            xlab = "Longitude", ylab = "Latitude", main = "Posterior marginal standard error -- Medium mesh grid")
 points(GPSX, GPSY)
 
-image.plot(projs[[3]]$x, proj[[3]]$y, inla.mesh.project(projs[[3]], as.vector(GIA_spost3)), col = topo.colors(40),
+image.plot(projs[[3]]$x, projs[[3]]$y, inla.mesh.project(projs[[3]], as.vector(GIA_spost3)), col = topo.colors(40),
            xlab = "Longitude", ylab = "Latitude", main = "Posterior marginal standard error -- Large mesh grid")
 points(GPSX, GPSY)
 dev.off()

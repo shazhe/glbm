@@ -18,11 +18,12 @@ runserver = TRUE
 meshSize <- c("s", "m", "l")
 errSize <- c("s", "L")
 errors <- c(0.01, 2)
-for (i in 1:3){
-  for(j in 1:2){
+
+for(j in 1:2){
+  err <- rnorm(nrow(GPS_obsU), sd = errors[j])
+  for (i in 1:3){
     exname <- paste0("/experimentBHM/",meshSize[i], "Mesh_", errSize[j], "Err_")
     load(paste0("experimentBHM/Mesh_GIA", meshSize[i], ".RData"))
-    err <- rnorm(nrow(GPS_obsU), sd = errors[j])
     source("glbm/Experiment1a/Rscript/4GP_Bayes_update_inla.R")
   }
 }
@@ -43,5 +44,6 @@ source("glbm/Experiment1a/Rscript/4GP_inla_testErr.R")
 
 ### Test effect of mesh size
 ## Assume has alreading run scripts for different mesh sizes in Test 1
+runserver = TRUE
 exname <- "/experimentBHM/MeshSize_"
 source("glbm/Experiment1a/Rscript/4GP_inla_testMesh.R")
