@@ -231,7 +231,7 @@ mcmcGIA <- function(initial_vals){
 
 
 
-res <- mclapply(ini_vals, mcmcGIA)
+res <- mclapply.hack(ini_vals, mcmcGIA, mc.cores = n.chains)
 
 sigma_e <- mcmc.list(lapply(res, function(x) as.mcmc(x$samples$sigma_e, start = burnin+1, 
                                                      end = burnin+numsamples*thin, thin = thin)))
