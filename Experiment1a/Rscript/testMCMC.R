@@ -4,7 +4,7 @@
 ###############################
 #### Load mesh and GPS data
 wkdir <- getwd()
-runserver = FALSE
+runserver = TRUE
 load("experimentBHM/Mesh_GIAs.RData")
 GPS_obs <- read.table("experimentBHM/GPS_synthetic.txt", header = T)
 GPS_obsU <- GPS_obs[!duplicated(GPS_obs[,2:3]), ]
