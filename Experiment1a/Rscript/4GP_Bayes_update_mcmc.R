@@ -231,7 +231,8 @@ mcmcGIA <- function(initial_vals){
 
 
 
-res <- mclapply.hack(ini_vals, mcmcGIA)
+res <- mclapply(ini_vals, mcmcGIA)
+
 sigma_e <- mcmc.list(lapply(res, function(x) as.mcmc(x$samples$sigma_e, start = burnin+1, 
                                                      end = burnin+numsamples*thin, thin = thin)))
 theta_1 <- mcmc.list(lapply(res, function(x) as.mcmc(x$samples$theta1, start = burnin+1, 
