@@ -229,7 +229,7 @@ mcmcGIA <- function(initial_vals){
   
 }
 
-
+source("glbm/Experiment1a/Rscript/mc_hack.R")
 
 res <- mclapply.hack(ini_vals, mcmcGIA, mc.cores = n.chains)
 
