@@ -36,10 +36,16 @@ library(fields)
 library(slice)
 library(actuar)
 library(spam)
+library(parallel)
+library(coda)
+library(lattice)
 source("glbm/Experiment1a/Rscript/MVSTplus.R")
 
 ### set constants
 GPS_loc <- do.call(cbind, Lll2xyz(lat = GPS_obsU$y_center, lon = GPS_obsU$x_center))
+GPSX <- ifelse(GPS_obsU$x_center > 180, GPS_obsU$x_center-360, GPS_obsU$x_center)
+GPSY <- GPS_obsU$y_center
+
 CMat <- inla.spde.make.A(mesh = Mesh_GIA, loc = GPS_loc)
 nObs <- nrow(CMat)
 nMesh <- ncol(CMat)
@@ -74,229 +80,251 @@ GIA_spde <- inla.spde2.matern(Mesh_GIA, B.tau = matrix(c(ltau0, -1, 1),1,3), B.k
                               theta.prior.mean = c(0,0), theta.prior.prec = c(sqrt(1/lv_s), sqrt(1/lv_r)))
 
 
-### Initial values
-## Observations
-sigma_e0 <- 1
-Q_obs0 <- Matrix(0, nrow = nObs, ncol = nObs, sparse = TRUE)
-diag(Q_obs0) <- 1/sigma_e0
-## Latent GMRF
-theta0 <- c(0,0)
-Q_GIA0 <- inla.spde.precision(GIA_spde, theta=theta0)
 
-
-### Allocate storage
-x_samp <- matrix(0,nMesh,numsamples)
-e_samp <- rep(0, numsamples)
-theta12_samp <- matrix(0,2,numsamples)
-
-
-### MCMC alogrithms
-if(sampler == "MH_RW"){
-  rwsd <- 1
-}
-
-if(sampler == "slice1"){
-  slice_theta1 <- slice_theta2 <- slice(d = 1)
-  nlearn <- 100
-  lscale1 <- lscale2 <- rep(0, nlearn)
-}
-
-if(sampler == "slice2"){
-  slice_theta <- slice(d = 2)
-  nlearn <- 100 # learning step for the slice sampler
-  lscale <- rep(0, nlearn)
-}
-
-### Start MCMC simulation
-Q_obs <- Q_obs0
-Q_GIA <- Q_GIA0
-theta_t <- theta0
-mmchol <- summary(chol(as.spam.dgCMatrix(Q_GIA)))
-m <- mm <- 0
-t1 <- proc.time()
-pb <- txtProgressBar(min = 0, max = numsamples, style = 3)
-while (m  < numsamples){
-  ### 1 Update the latent process
-  Q_new <- as.spam.dgCMatrix(crossprod(CMat, Q_obs) %*% CMat + Q_GIA)
-  bt <- crossprod(CMat, Q_obs)%*%ydata + Q_GIA %*% x_mu
-  cholQ_new <- chol(Q_new,memory = list(nnzR= mmchol$nnzR ,nnzcolindices = mmchol$nnzcolindices))
-  zm_new <- backsolve(cholQ_new, cbind(rnorm(nMesh), forwardsolve(cholQ_new, bt)))
-  x_new <- rowSums(zm_new)
- 
-  ### 2 Update the measurement error
-  res <- ydata - CMat%*%x_new
-  igscale_new <- as.numeric(igscale0 + crossprod(res)/2)
-  e_new <- rinvgamma(1,shape=igshape_new, scale = igscale_new)
+mcmcGIA <- function(initial_vals){
+  ### Initial values
+  ## Observations
+  sigma_e0 <- initial_vals[1]
+  Q_obs0 <- Matrix(0, nrow = nObs, ncol = nObs, sparse = TRUE)
+  diag(Q_obs0) <- 1/sigma_e0
+  ## Latent GMRF
+  theta0 <- initial_vals[2:3]
+  Q_GIA0 <- inla.spde.precision(GIA_spde, theta=theta0)
   
-  ### 3 Update the SPDE parameters
-  z_GIA <- x_new - x_mu
+  ### Allocate storage
+  x_samp <- matrix(0,numsamples, nMesh)
+  e_samp <- rep(0, numsamples)
+  theta12_samp <- matrix(0, numsamples,2)
   
+  
+  ### MCMC alogrithms
   if(sampler == "MH_RW"){
-  log_postcond_theta <- function(theta){
-    Q_G <- as.spam.dgCMatrix(inla.spde.precision(GIA_spde, theta=theta))
-    ldetQ <- sum(log(diag(chol(Q_G, memory = list(nnzR= mmchol$nnzR ,nnzcolindices = mmchol$nnzcolindices)))))
-    as.numeric(-0.5*(crossprod(z_GIA, Q_G) %*% z_GIA + crossprod(theta/c(sqrt(lv_s), sqrt(lv_r)))) + ldetQ)
-  }
-
-  r <- 1
-  a <- 0
-  while(r > a){
-    theta_p <- theta_t + rnorm(2, sd = 0.07)
-    a <- exp(log_postcond_theta(theta_p) - log_postcond_theta(theta_t))
-    r <- runif(1)
-  }
-  theta_t <- theta_p
-  }
-
-  ## bivariate slice sampler
-  if(sampler == "slice2"){
-  log_postcond_theta <- function(theta){
-   Q_G <- as.spam.dgCMatrix(inla.spde.precision(GIA_spde, theta=theta))
-   ldetQ <- sum(log(diag(chol(Q_G, memory = list(nnzR= mmchol$nnzR ,nnzcolindices = mmchol$nnzcolindices)))))
-   as.numeric(-0.5*(crossprod(z_GIA, Q_G) %*% z_GIA + crossprod(theta/c(sqrt(lv_s), sqrt(lv_r)))) + ldetQ)
-  }
-  if(m <= nlearn){
-   theta_p <- slice_theta(theta_t, log_postcond_theta, learn = TRUE)
-   lscale[m] <- getscales(slice_theta)
-  }else{
-   theta_p <- slice_theta(theta_t, log_postcond_theta, learn = FALSE)
-  }
-  theta_t <- theta_p
+    rwsd <- 1
   }
   
-  ## univariate slice sampler
   if(sampler == "slice1"){
-  log_postcond_theta1 <- function(theta1){
-    Q_G <- as.spam.dgCMatrix(inla.spde.precision(GIA_spde, theta=c(theta1, theta_t[2])))
-    ldetQ <- sum(log(diag(chol(Q_G, memory = list(nnzR= mmchol$nnzR ,nnzcolindices = mmchol$nnzcolindices)))))
-    as.numeric(-0.5*(crossprod(z_GIA, Q_G) %*% z_GIA + theta1^2/lv_s) + ldetQ)
+    slice_theta1 <- slice_theta2 <- slice(d = 1)
+    nlearn <- 100
+    lscale1 <- lscale2 <- rep(0, nlearn)
   }
-  if(m <= nlearn){
-    theta1_p <- slice_theta1(theta_t[1], log_postcond_theta1, learn = TRUE)
-    lscale1[m] <- getscales(slice_theta1)
-  }else{
-    theta1_p <- slice_theta1(theta_t[1], log_postcond_theta1, learn = FALSE)
+  
+  if(sampler == "slice2"){
+    slice_theta <- slice(d = 2)
+    nlearn <- 100 # learning step for the slice sampler
+    lscale <- rep(0, nlearn)
   }
-
-
-  log_postcond_theta2 <- function(theta2){
-    Q_G <- as.spam.dgCMatrix(inla.spde.precision(GIA_spde, theta=c(theta1_p, theta2)))
-   ldetQ <- sum(log(diag(chol(Q_G, memory = list(nnzR= mmchol$nnzR ,nnzcolindices = mmchol$nnzcolindices)))))
-    as.numeric(-0.5*(crossprod(z_GIA, Q_G) %*% z_GIA + theta2^2/lv_r) + ldetQ)
+  
+  ### Start MCMC simulation
+  Q_obs <- Q_obs0
+  Q_GIA <- Q_GIA0
+  theta_t <- theta0
+  mmchol <- summary(chol(as.spam.dgCMatrix(Q_GIA)))
+  m <- mm <- 0
+  t1 <- proc.time()
+  pb <- txtProgressBar(min = 0, max = numsamples, style = 3)
+  while (m  < numsamples){
+    ### 1 Update the latent process
+    Q_new <- as.spam.dgCMatrix(crossprod(CMat, Q_obs) %*% CMat + Q_GIA)
+    bt <- crossprod(CMat, Q_obs)%*%ydata + Q_GIA %*% x_mu
+    cholQ_new <- chol(Q_new,memory = list(nnzR= mmchol$nnzR ,nnzcolindices = mmchol$nnzcolindices))
+    zm_new <- backsolve(cholQ_new, cbind(rnorm(nMesh), forwardsolve(cholQ_new, bt)))
+    x_new <- rowSums(zm_new)
+    
+    ### 2 Update the measurement error
+    res <- ydata - CMat%*%x_new
+    igscale_new <- as.numeric(igscale0 + crossprod(res)/2)
+    e_new <- rinvgamma(1,shape=igshape_new, scale = igscale_new)
+    
+    ### 3 Update the SPDE parameters
+    z_GIA <- x_new - x_mu
+    
+    if(sampler == "MH_RW"){
+      log_postcond_theta <- function(theta){
+        Q_G <- as.spam.dgCMatrix(inla.spde.precision(GIA_spde, theta=theta))
+        ldetQ <- sum(log(diag(chol(Q_G, memory = list(nnzR= mmchol$nnzR ,nnzcolindices = mmchol$nnzcolindices)))))
+        as.numeric(-0.5*(crossprod(z_GIA, Q_G) %*% z_GIA + crossprod(theta/c(sqrt(lv_s), sqrt(lv_r)))) + ldetQ)
+      }
+      
+      r <- 1
+      a <- 0
+      while(r > a){
+        theta_p <- theta_t + rnorm(2, sd = 0.07)
+        a <- exp(log_postcond_theta(theta_p) - log_postcond_theta(theta_t))
+        r <- runif(1)
+      }
+      theta_t <- theta_p
+    }
+    
+    ## bivariate slice sampler
+    if(sampler == "slice2"){
+      log_postcond_theta <- function(theta){
+        Q_G <- as.spam.dgCMatrix(inla.spde.precision(GIA_spde, theta=theta))
+        ldetQ <- sum(log(diag(chol(Q_G, memory = list(nnzR= mmchol$nnzR ,nnzcolindices = mmchol$nnzcolindices)))))
+        as.numeric(-0.5*(crossprod(z_GIA, Q_G) %*% z_GIA + crossprod(theta/c(sqrt(lv_s), sqrt(lv_r)))) + ldetQ)
+      }
+      if(m <= nlearn){
+        theta_p <- slice_theta(theta_t, log_postcond_theta, learn = TRUE)
+        lscale[m] <- getscales(slice_theta)
+      }else{
+        theta_p <- slice_theta(theta_t, log_postcond_theta, learn = FALSE)
+      }
+      theta_t <- theta_p
+    }
+    
+    ## univariate slice sampler
+    if(sampler == "slice1"){
+      log_postcond_theta1 <- function(theta1){
+        Q_G <- as.spam.dgCMatrix(inla.spde.precision(GIA_spde, theta=c(theta1, theta_t[2])))
+        ldetQ <- sum(log(diag(chol(Q_G, memory = list(nnzR= mmchol$nnzR ,nnzcolindices = mmchol$nnzcolindices)))))
+        as.numeric(-0.5*(crossprod(z_GIA, Q_G) %*% z_GIA + theta1^2/lv_s) + ldetQ)
+      }
+      if(m <= nlearn){
+        theta1_p <- slice_theta1(theta_t[1], log_postcond_theta1, learn = TRUE)
+        lscale1[m] <- getscales(slice_theta1)
+      }else{
+        theta1_p <- slice_theta1(theta_t[1], log_postcond_theta1, learn = FALSE)
+      }
+      
+      
+      log_postcond_theta2 <- function(theta2){
+        Q_G <- as.spam.dgCMatrix(inla.spde.precision(GIA_spde, theta=c(theta1_p, theta2)))
+        ldetQ <- sum(log(diag(chol(Q_G, memory = list(nnzR= mmchol$nnzR ,nnzcolindices = mmchol$nnzcolindices)))))
+        as.numeric(-0.5*(crossprod(z_GIA, Q_G) %*% z_GIA + theta2^2/lv_r) + ldetQ)
+      }
+      if(m <= nlearn){
+        theta2_p <- slice_theta2(theta_t[2], log_postcond_theta2, learn = TRUE)
+        lscale2[m] <- getscales(slice_theta2)
+      }else{
+        theta2_p <- slice_theta2(theta_t[2], log_postcond_theta2, learn = FALSE)
+      }
+      theta_t <- c(theta1_p, theta2_p)
+    }
+    
+    ### 4 Store samples and new values
+    if(mm >= burnin){
+      if((mm-burnin)%%thinning == 0){
+        m <- m +1
+        x_samp[m,] <- x_new
+        e_samp[m] <- e_new
+        theta12_samp[m,] <- theta_t
+      }
+    }
+    mm <- mm +1
+    Q_GIA <- inla.spde.precision(GIA_spde, theta=theta_t)
+    diag(Q_obs) <- 1/e_new
+    
+    ### Print the Progression Bar
+    setTxtProgressBar(pb, m)
+    
   }
-  if(m <= nlearn){
-    theta2_p <- slice_theta2(theta_t[2], log_postcond_theta2, learn = TRUE)
-    lscale2[m] <- getscales(slice_theta2)
-  }else{
-    theta2_p <- slice_theta2(theta_t[2], log_postcond_theta2, learn = FALSE)
-  }
-  theta_t <- c(theta1_p, theta2_p)
+  
+  ### close the progress bar on finishing
+  close(pb)
+  
+  t2 <- proc.time()
+  ttime <- t2-t1
+  
+  return(list(time = ttime, samples = list(sigma_e = e_samp, theta1 = theta12_samp[,1],
+                                           theta2 = theta12_samp[,2], xGIA = x_samp)))
+  
 }
-  
-  ### 4 Store samples and new values
-  if(mm >= burnin){
-  if((mm-burnin)%%thinning == 0){
-    m <- m +1
-    x_samp[,m] <- x_new
-    e_samp[m] <- e_new
-    theta12_samp[,m] <- theta_t
-  }
-  }
-  mm <- mm +1
-  Q_GIA <- inla.spde.precision(GIA_spde, theta=theta_t)
-  diag(Q_obs) <- 1/e_new
-  
-  ### Print the Progression Bar
-  setTxtProgressBar(pb, m)
- 
-  }
- 
-### close the progress bar on finishing
-close(pb)
 
-t2 <- proc.time()
-ttime <- t2-t1
 
+
+res <- mclapply.hack(ini_vals, mcmcGIA)
+sigma_e <- mcmc.list(lapply(res, function(x) as.mcmc(x$samples$sigma_e, start = burnin+1, 
+                                                     end = burnin+numsamples*thin, thin = thin)))
+theta_1 <- mcmc.list(lapply(res, function(x) as.mcmc(x$samples$theta1, start = burnin+1, 
+                                                     end = burnin+numsamples*thin, thin = thin)))
+theta_2 <- mcmc.list(lapply(res, function(x) as.mcmc(x$samples$theta2, start = burnin+1, 
+                                                     end = burnin+numsamples*thin, thin = thin)))
+xGIA <- list()
+for (i in c(1, 50, 800)){
+  xGIA[[i]] <- mcmc.list(lapply(res, function(x) as.mcmc(x$samples$xGIA[,i], start = burnin+1, 
+                                                         end = burnin+numsamples*thin, thin = thin)))
+}
 
 #### plot Sample analysis
 ## traceplot
 pdf(file = paste0(wkdir, exname, "_MCMCanalysis.pdf"), width = 8, height = 6)
 par(mfrow = c(2,3))
-plot(e_samp, type = "l")
-plot(theta12_samp[1,], type  ="l")
-plot(theta12_samp[2,], type  ="l")
+traceplot(sigma_e, main = expression(sigma[e]^2))
+traceplot(theta_1, main = expression(theta[1]))
+traceplot(theta_2, main = expression(theta[2]))
 
-plot(x_samp[1,], type = "l")
-plot(x_samp[500,], type = "l")
-plot(x_samp[1000,], type = "l")
+traceplot(xGIA[[1]], main = expression(x[1]))
+traceplot(xGIA[[50]], main = expression(x[50]))
+traceplot(xGIA[[800]], main = expression(x[800]))
+
 
 #plot.new()
 ## sample correlations
-par(mfrow = c(2,3))
-acf(e_samp)
-acf(theta12_samp[1,])
-acf(theta12_samp[2,])
+#par(mfrow = c(2,3))
+acfplot(sigma_e, main = expression(sigma[e]^2))
+acfplot(theta_1, main = expression(theta[1]))
+acfplot(theta_2, main = expression(theta[2]))
 
-acf(x_samp[1,])
-acf(x_samp[500,])
-acf(x_samp[1000,])
+acfplot(xGIA[[1]], main = expression(x[1]))
+acfplot(xGIA[[50]], main = expression(x[50]))
+acfplot(xGIA[[800]], main = expression(x[800]))
 
 #plot.new()
 ## density plot
-par(mfrow = c(2,3))
-plot(density(e_samp))
-plot(density(theta12_samp[1,]))
-plot(density(theta12_samp[2,]))
+#par(mfrow = c(2,3))
+densityplot(sigma_e, expression(sigma[e]^2))
+densityplot(theta_1, main = expression(theta[1]))
+densityplot(theta_2, main = expression(theta[2]))
 
-plot(density(x_samp[1, ]))
-plot(density(x_samp[500, ]))
-plot(density(x_samp[1000, ]))
+densityplot(xGIA[[1]], main = expression(x[1]))
+densityplot(xGIA[[50]], main = expression(x[50]))
+densityplot(xGIA[[800]], main = expression(x[800]))
 dev.off()
 
 #### The GIA field
 ## Posterior mean
-GIApost_mean <- rowMeans(x_samp[,])
-GIApost_sd <- apply(x_samp[,], 1, sd)
+GIApost_mean <- lapply(res, function(x) colMeans(x$samples$xGIA))
+GIApost_sd <- lapply(res, function(x) apply( x$samples$xGIA, 2, sd))
 
 proj1 <- inla.mesh.projector(Mesh_GIA, projection = "longlat", dims = c(361,181))
-GPSX <- ifelse(GPS_obsU$x_center > 180, GPS_obsU$x_center-360, GPS_obsU$x_center)
-GPSY <- GPS_obsU$y_center
 
-pdf(file = paste0(wkdir, exname, "_GIAfield.pdf"), width = 12, height = 12)
+for (i in (1:n.chains)){
+pdf(file = paste0(wkdir, exname, "_GIAfield", i, ".pdf"), width = 12, height = 12)
 par(mfrow = c(3,1))
 image.plot(proj1$x, proj1$y, inla.mesh.project(proj1, as.vector(Mesh_GIA_sp@data$GIA_m)), col = topo.colors(40),
            xlab = "Longitude", ylab = "Latitude", main = "The ICE6g")
 points(GPSX, GPSY, pch = 20)
 
-image.plot(proj1$x, proj1$y, inla.mesh.project(proj1, as.vector(GIApost_mean)), col = topo.colors(40),
+image.plot(proj1$x, proj1$y, inla.mesh.project(proj1, as.vector(GIApost_mean[[i]])), col = topo.colors(40),
            xlab = "Longitude", ylab = "Latitude", main = "Posterier marginals -- mean")
 points(GPSX, GPSY, pch = 20)
 
-image.plot(proj1$x, proj1$y, inla.mesh.project(proj1, as.vector(GIApost_sd)), col = topo.colors(40),
+image.plot(proj1$x, proj1$y, inla.mesh.project(proj1, as.vector(GIApost_sd[[i]])), col = topo.colors(40),
            xlab = "Longitude", ylab = "Latitude", main = "Posterier marginals -- sd")
 points(GPSX, GPSY, pch = 20)
 dev.off()
-
+}
 
 getmode <- function(v) {
   uniqv <- unique(v)
   uniqv[which.max(tabulate(match(v, uniqv)))]
 }
 
-e_samp_sqrt <- sqrt(e_samp)
+pdf(file = paste0(wkdir, exname, "_hyperpars.pdf"), width = 8, height = 4)
+for (i in (1:n.chains)){
+e_samp_sqrt <- sqrt(sigma_e[[i]])
 sigma_e_mode <- getmode(e_samp_sqrt)
-range_samp <- exp(lmu_r + theta12_samp[2,])
+range_samp <- exp(lmu_r + theta_2[[i]])
 rho_mode <- getmode(range_samp)
-sigma_samp <- exp(lmu_s + theta12_samp[1,])
+sigma_samp <- exp(lmu_s + theta_1[[i]])
 sigma_mode <- getmode(sigma_samp)
 
-pdf(file = paste0(wkdir, exname, "_hyperpars.pdf"), width = 8, height = 4)
 par(mfrow=c(1,3))
 plot(density(e_samp_sqrt), main = bquote(bold(sigma[e]("mode") == .(round(sigma_e_mode, 4)))))
 plot(density(range_samp), main = bquote(bold(rho("mode") == .(round(rho_mode, 4)))))
 plot(density(sigma_samp), main = bquote(bold(sigma("mode") == .(round(sigma_mode, 4)))))
-dev.off()
 
+}
+dev.off()
 
 save.image(file = paste0(wkdir, exname, ".RData"))
 

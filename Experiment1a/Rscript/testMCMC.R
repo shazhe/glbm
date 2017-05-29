@@ -13,11 +13,12 @@ err <- rnorm(nrow(GPS_obsU), sd = 2)
 
 #### MCMC parameters
 set.seed(7)
-numsamples = 1e3  
+numsamples = 20  
 burnin = 0 
-thinning = 20
+thinning = 1
 sampler = "slice1"
-
+n.chains = 3
+ini_vals <- list(vals1 = c(1, 0, 0), vals2 = c(0.5, 1, 1), vals3 = c(2, -1, -1))
 
 #### Set priors for the hyper parameters
 ### Measurement error sigma_e
