@@ -13,9 +13,9 @@ err <- rnorm(nrow(GPS_obsU), sd = 2)
 
 #### MCMC parameters
 set.seed(7)
-numsamples = 20  
-burnin = 0 
-thinning = 1
+numsamples = 5e3  
+burnin = 1e3
+thinning = 20
 sampler = "slice1"
 n.chains = 3
 ini_vals <- list(vals1 = c(1, 0, 0), vals2 = c(0.5, 1, 1), vals3 = c(2, -1, -1))
