@@ -9,7 +9,7 @@ v_r <- (1000/6371)^2
 mu_s <- 20
 v_s <- 40^2
 
-#### Set up text experiment inputs
+#### Set up experiment inputs
 GPS_obs <- read.table("experimentBHM/GPS_synthetic.txt", header = T)
 GPS_obsU <- GPS_obs[!duplicated(GPS_obs[,2:3]), ]
 
