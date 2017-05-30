@@ -12,14 +12,14 @@ GPS_obsU <- GPS_obs[!duplicated(GPS_obs[,2:3]), ]
 err <- rnorm(nrow(GPS_obsU), sd = 2)
 
 #### MCMC parameters
-set.seed(7)#short chain
-#set.seed(20)#long chain
+#set.seed(7)#short chain
+set.seed(20)#long chain
 numsamples = 500  
-burnin = 1000
-thinning = 5
+burnin = 5000
+thinning = 25
 sampler = "slice1"
 n.chains = 3
-ini_vals <- list(vals1 = c(1, 0, 0), vals2 = c(0.5, 1, 1), vals3 = c(2, -1, -1))
+ini_vals <- list(vals1 = c(2, 0, 0), vals2 = c(1, 0.5, -0.5), vals3 = c(4, -0.5, 0.5))
 
 #### Set priors for the hyper parameters
 ### Measurement error sigma_e

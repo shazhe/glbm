@@ -5,15 +5,15 @@
 library(coda)
 library(lattice)
 library(fields)
-sigma_e <- mcmc.list(lapply(res, function(x) as.mcmc(x$samples$sigma_e, start = burnin+1, 
-                                                     end = burnin+numsamples*thin, thin = thin)))
-theta_1 <- mcmc.list(lapply(res, function(x) as.mcmc(x$samples$theta1, start = burnin+1, 
-                                                     end = burnin+numsamples*thin, thin = thin)))
-theta_2 <- mcmc.list(lapply(res, function(x) as.mcmc(x$samples$theta2, start = burnin+1, 
-                                                     end = burnin+numsamples*thin, thin = thin)))
+sigma_e <- mcmc.list(lapply(res, function(x) mcmc(x$samples$sigma_e, start = burnin+1, 
+                                                     end = burnin+numsamples*thinning, thin = thinning)))
+theta_1 <- mcmc.list(lapply(res, function(x) mcmc(x$samples$theta1, start = burnin+1, 
+                                                     end = burnin+numsamples*thinning, thin = thinning)))
+theta_2 <- mcmc.list(lapply(res, function(x) mcmc(x$samples$theta2, start = burnin+1, 
+                                                     end = burnin+numsamples*thinning, thin = thinning)))
 xGIA <- list()
 for (i in c(1, 50, 800)){
-  xGIA[[i]] <- mcmc.list(lapply(res, function(x) as.mcmc(x$samples$xGIA[,i], start = burnin+1, 
+  xGIA[[i]] <- mcmc.list(lapply(res, function(x) mcmc(x$samples$xGIA[,i], start = burnin+1, 
                                                          end = burnin+numsamples*thin, thin = thin)))
 }
 
