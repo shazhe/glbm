@@ -31,11 +31,9 @@ traceplot(theta_2, main = expression(theta[2]))
 traceplot(xGIA[[1]], main = expression(x[1]))
 traceplot(xGIA[[50]], main = expression(x[50]))
 traceplot(xGIA[[800]], main = expression(x[800]))
+dev.off()
 
-
-#plot.new()
-## sample correlations
-#par(mfrow = c(2,3))
+pdf(file = paste0(wkdir, exname, "_MCMCanalysis2.pdf"), width = 8, height = 6)
 acfplot(sigma_e, main = expression(sigma[e]^2))
 acfplot(theta_1, main = expression(theta[1]))
 acfplot(theta_2, main = expression(theta[2]))
@@ -44,9 +42,6 @@ acfplot(xGIA[[1]], main = expression(x[1]))
 acfplot(xGIA[[50]], main = expression(x[50]))
 acfplot(xGIA[[800]], main = expression(x[800]))
 
-#plot.new()
-## density plot
-#par(mfrow = c(2,3))
 densityplot(sigma_e, expression(sigma[e]^2))
 densityplot(theta_1, main = expression(theta[1]))
 densityplot(theta_2, main = expression(theta[2]))
