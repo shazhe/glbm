@@ -70,24 +70,24 @@ for (i in (1:n.chains)){
   dev.off()
 }
 
-getmode <- function(v) {
-  uniqv <- unique(v)
-  uniqv[which.max(tabulate(match(v, uniqv)))]
-}
-
 pdf(file = paste0(wkdir, exname, "_hyperpars.pdf"), width = 8, height = 4)
 for (i in (1:n.chains)){
   e_samp_sqrt <- sqrt(sigma_e[[i]])
-  sigma_e_mode <- getmode(e_samp_sqrt)
+  dens_e <- density(e_samp_sqrt)
+  sigma_e_mode <- dens_e$x[dens_e$y==max(dens_e$y)]
+  
   range_samp <- exp(lmu_r + theta_2[[i]])
-  rho_mode <- getmode(range_samp)
+  dens_rho <- density(range_samp)
+  rho_mode <- dens_rho$x[dens_rho$y==max(dens_rho$y)]
+  
   sigma_samp <- exp(lmu_s + theta_1[[i]])
-  sigma_mode <- getmode(sigma_samp)
+  dens_s <- density(sigma_samp)
+  sigma_mode <- dens_s$x[dens_s$y==max(dens_s$y)]
   
   par(mfrow=c(1,3))
-  plot(density(e_samp_sqrt), main = bquote(bold(sigma[e]("mode") == .(round(sigma_e_mode, 4)))))
-  plot(density(range_samp), main = bquote(bold(rho("mode") == .(round(rho_mode, 4)))))
-  plot(density(sigma_samp), main = bquote(bold(sigma("mode") == .(round(sigma_mode, 4)))))
+  plot(dens_e, main = bquote(bold(sigma[e]("mode") == .(round(sigma_e_mode, 4)))))
+  plot(dens_rho, main = bquote(bold(rho("mode") == .(round(rho_mode, 4)))))
+  plot(dens_s,  main = bquote(bold(sigma("mode") == .(round(sigma_mode, 4)))))
   
 }
 dev.off()
