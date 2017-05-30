@@ -12,10 +12,11 @@ GPS_obsU <- GPS_obs[!duplicated(GPS_obs[,2:3]), ]
 err <- rnorm(nrow(GPS_obsU), sd = 2)
 
 #### MCMC parameters
-set.seed(7)
-numsamples = 100  
-burnin = 0
-thinning = 1
+set.seed(7)#short chain
+#set.seed(20)#long chain
+numsamples = 500  
+burnin = 1000
+thinning = 5
 sampler = "slice1"
 n.chains = 3
 ini_vals <- list(vals1 = c(1, 0, 0), vals2 = c(0.5, 1, 1), vals3 = c(2, -1, -1))
@@ -35,5 +36,8 @@ mu_r <- 500/6371
 v_r <- (1000/6371)^2
 
 exname <- paste0("/experimentBHM/", sampler, "_", as.character(numsamples))
+
 source("glbm/Experiment1a/Rscript/4GP_Bayes_update_mcmc.R")
+
 source("glbm/Experiment1a/Rscript/4GP_Bayes_plot_mcmc.R")
+

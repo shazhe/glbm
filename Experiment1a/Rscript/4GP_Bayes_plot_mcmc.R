@@ -1,6 +1,7 @@
 #####################################################
 ########  Plot and analysis the MCMC results ########
 #####################################################
+
 library(coda)
 library(lattice)
 library(fields)
@@ -36,7 +37,7 @@ print(acfplot(xGIA[[1]], main = expression(x[1])))
 print(acfplot(xGIA[[50]], main = expression(x[50])))
 print(acfplot(xGIA[[800]], main = expression(x[800])))
 
-print(densityplot(sigma_e, expression(sigma[e]^2)))
+print(densityplot(sigma_e, main = expression(sigma[e]^2)))
 print(densityplot(theta_1, main = expression(theta[1])))
 print(densityplot(theta_2, main = expression(theta[2])))
 
