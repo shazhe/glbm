@@ -1,13 +1,9 @@
 #####################################################
 ########  Plot and analysis the MCMC results ########
 #####################################################
-
-
 library(coda)
 library(lattice)
 library(fields)
-
-
 sigma_e <- mcmc.list(lapply(res, function(x) as.mcmc(x$samples$sigma_e, start = burnin+1, 
                                                      end = burnin+numsamples*thin, thin = thin)))
 theta_1 <- mcmc.list(lapply(res, function(x) as.mcmc(x$samples$theta1, start = burnin+1, 
@@ -31,24 +27,22 @@ traceplot(theta_2, main = expression(theta[2]))
 traceplot(xGIA[[1]], main = expression(x[1]))
 traceplot(xGIA[[50]], main = expression(x[50]))
 traceplot(xGIA[[800]], main = expression(x[800]))
-dev.off()
 
-pdf(file = paste0(wkdir, exname, "_MCMCanalysis2.pdf"), width = 8, height = 6)
-acfplot(sigma_e, main = expression(sigma[e]^2))
-acfplot(theta_1, main = expression(theta[1]))
-acfplot(theta_2, main = expression(theta[2]))
+print(acfplot(sigma_e, main = expression(sigma[e]^2)))
+print(acfplot(theta_1, main = expression(theta[1])))
+print(acfplot(theta_2, main = expression(theta[2])))
 
-acfplot(xGIA[[1]], main = expression(x[1]))
-acfplot(xGIA[[50]], main = expression(x[50]))
-acfplot(xGIA[[800]], main = expression(x[800]))
+print(acfplot(xGIA[[1]], main = expression(x[1])))
+print(acfplot(xGIA[[50]], main = expression(x[50])))
+print(acfplot(xGIA[[800]], main = expression(x[800])))
 
-densityplot(sigma_e, expression(sigma[e]^2))
-densityplot(theta_1, main = expression(theta[1]))
-densityplot(theta_2, main = expression(theta[2]))
+print(densityplot(sigma_e, expression(sigma[e]^2)))
+print(densityplot(theta_1, main = expression(theta[1])))
+print(densityplot(theta_2, main = expression(theta[2])))
 
-densityplot(xGIA[[1]], main = expression(x[1]))
-densityplot(xGIA[[50]], main = expression(x[50]))
-densityplot(xGIA[[800]], main = expression(x[800]))
+print(densityplot(xGIA[[1]], main = expression(x[1])))
+print(densityplot(xGIA[[50]], main = expression(x[50])))
+print(densityplot(xGIA[[800]], main = expression(x[800])))
 dev.off()
 
 #### The GIA field
@@ -96,9 +90,5 @@ for (i in (1:n.chains)){
   
 }
 dev.off()
-
-
-
-
 
 
