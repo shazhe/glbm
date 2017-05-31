@@ -84,7 +84,7 @@ mcmcGIA <- function(initial_vals){
   ### Initial values
   
   ## Latent GMRF
-  theta0 <- initial_vals[2:3]
+  theta0 <- initial_vals
   Q_GIA0 <- inla.spde.precision(GIA_spde, theta=theta0)
   
   ### Allocate storage

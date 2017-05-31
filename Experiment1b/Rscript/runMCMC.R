@@ -11,7 +11,7 @@ GPS_obs <- read.table("experimentBHM/GPS_combined_20170530_final.txt", header = 
 #### MCMC parameters
 #set.seed(7)#short chain
 set.seed(20)#long chain
-numsamples = 1000  
+numsamples = 1000 
 burnin = 5000
 thinning = 50
 sampler = "slice1"
