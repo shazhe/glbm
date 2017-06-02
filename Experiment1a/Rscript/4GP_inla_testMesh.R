@@ -24,7 +24,7 @@ for (i in 1:3){
 
 
 ## Plot hyperparameters -- small errors
-pdf(file = paste0(wkdir, exname, ee, "hyperpar.pdf"), width = 6, height = 8)
+pdf(file = paste0(wkdir, exname, "_hyperpar.pdf"), width = 6, height = 8)
 par(mfrow = c(3,2))
 ## plot log(rho)
 maxd <- max(c(pars_GIAs[[1]]$marginals.log.range.nominal[[1]][,2],
@@ -86,7 +86,7 @@ GIA_spost1 <- res_inlas[[1]]$summary.random$GIA$sd
 GIA_spost2 <- res_inlas[[2]]$summary.random$GIA$sd
 GIA_spost3 <- res_inlas[[3]]$summary.random$GIA$sd
 
-pdf(file = paste0(wkdir, exname, ee, "GIAfield.pdf"), width = 8, height = 10)
+pdf(file = paste0(wkdir, exname, "_GIAfield.pdf"), width = 8, height = 10)
 par(mfrow = c(3,1))
 ## The standard error
 image.plot(projs[[1]]$x, projs[[1]]$y, inla.mesh.project(projs[[1]], as.vector(GIA_spost1)), col = topo.colors(40),

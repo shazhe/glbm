@@ -57,11 +57,13 @@ st.pred <- inla.stack(data = list(y=NA), A = list(rbind(Ay, Ip)),
                       effects = list(GIA=1:GIA_spde$n.spde), tag = "pred")
 stGIA <- inla.stack(st.est, st.pred)
 
+## Fix the sigma_e^2 to be 1 and scale them according to the data in inla(...,scale = scale)
+## Default uses log(1/sigma_e^2) to be loggamma distribution with intial value = 0.
 hyper <- list(prec = list(fixed = TRUE, initial = 0))
 formula = y ~ -1 + f(GIA, model = GIA_spde)
 
 res_inla <- inla(formula, data = inla.stack.data(stGIA, spde = GIA_spde), family = "gaussian", 
-                 scale = c(rep((1/40),2*length(ydata)), rep(1, GIA_spde$n.spde)),
+                 scale = c(rep((1/1.5),2*length(ydata)), rep(1, GIA_spde$n.spde)),
                  control.family = list(hyper = hyper),
                    control.predictor=list(A=inla.stack.A(stGIA), compute =TRUE))
 summary(res_inla)
