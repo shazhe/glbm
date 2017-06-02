@@ -70,7 +70,10 @@ st.pred <- inla.stack(data = list(y=NA), A = list(Ip),
 stGIA <- inla.stack(st.est, st.pred)
 
 formula = y ~ -1 +  f(GIA, model = GIA_spde)
-res_inla <- inla(formula, data = inla.stack.data(stGIA, spde = GIA_spde),
+hyper <- list(prec = list(fixed = TRUE, initial = 0))
+res_inla <- inla(formula, data = inla.stack.data(stGIA, spde = GIA_spde), family = "gaussian", 
+                 scale = c(1/GPS_obs$std,rep(1, GIA_spde$n.spde)),
+                 control.family = list(hyper = hyper),
                    control.predictor=list(A=inla.stack.A(stGIA), compute =TRUE))
 
 summary(res_inla)
@@ -90,7 +93,7 @@ rho_mode <- exp(lrho_mean - lrho_sd^2)
 
 
 pdf(file = paste0(wkdir, exname, "hyperpar.pdf"), width = 6, height = 8)
-par(mfrow = c(3,2))
+par(mfrow = c(2,2))
 ## plot log(rho)
 plot(pars_GIA$marginals.log.range.nominal[[1]], type = "l", 
      main = bquote(bold(log(rho)("mode") == .(round(lrho_mode, 4))))) # The posterior from inla output
@@ -121,9 +124,9 @@ yy0 <- dnorm(xx, mean = lsigma0, sd = theta1_s) # The prior
 lines(x = xx, y = yy0, col = 2)
 
 ## plot sigma
-plot(pars_GIA$marginals.variance.nominal[[1]], type = "l", xlim = c(0, 20), 
+plot(pars_GIA$marginals.variance.nominal[[1]], type = "l", xlim = c(0, 10000), 
      main = bquote(bold(sigma("mode") == .(round(sigma_mode, 4))))) # The posterior from inla output
-xx <- seq(from = 0.2, to=20, length.out = 1000)
+xx <- seq(from = 0.2, to=10000, length.out = 1000)
 yy0 <- dlnorm(xx, meanlog = lsigma0, sdlog = sqrt(theta1_s)) # The prior
 lines(x = xx, y = yy0, col = 2)
 
@@ -159,7 +162,7 @@ GPScol <- ifelse(ydata > 0, 2, 1)
 pdf(file = paste0(wkdir, exname, "GIAfield.pdf"), width = 8, height = 10)
 par(mfrow = c(2,1))
 ## The mean field
-image.plot(proj1$x, proj1$y, inla.mesh.project(proj1, as.vector(GIA_mpred)), col = topo.colors(40),
+image.plot(proj1$x, proj1$y, inla.mesh.project(proj1, as.vector(GIA_mpred)), col = topo.colors(100),
            xlab = "Longitude", ylab = "Latitude", main = "Posterior mean of the GIA field")
 points(GPSX, GPSY,  pch = 20, cex = 0.8)
 

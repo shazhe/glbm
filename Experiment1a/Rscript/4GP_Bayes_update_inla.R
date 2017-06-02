@@ -36,43 +36,34 @@ GIA_spde <- inla.spde2.matern(Mesh_GIA, B.tau = matrix(c(ltau0, -1, 1),1,3), B.k
                               theta.prior.mean = c(0,0), theta.prior.prec = c(sqrt(1/theta1_s), sqrt(1/theta2_s)))
 
 ## Get the GPS locations
-GPS_loc <- do.call(cbind, Lll2xyz(lat = GPS_obsU$y_center, lon = GPS_obsU$x_center))
-GPSX <- ifelse(GPS_obsU$x_center > 180, GPS_obsU$x_center-360, GPS_obsU$x_center)
-GPSY <- GPS_obsU$y_center
+GPS_loc <- do.call(cbind, Lll2xyz(lat = GPS_obs$y_center, lon = GPS_obs$x_center))
+GPSX <- ifelse(GPS_obs$x_center > 180, GPS_obs$x_center-360, GPS_obs$x_center)
+GPSY <- GPS_obs$y_center
 
 ## Find the mapping between observations and processes basis
 Ay <- inla.spde.make.A(mesh = Mesh_GIA, loc = GPS_loc)
 
 ## create new synthetic data, plot and compare
 y0 <- as.vector(Ay %*% Mesh_GIA_sp@data$GIA_m)
-ydata <- y0 + err
-GPS_sd <- SpatialPointsDataFrame(coords = cbind(GPSX, GPSY), data = data.frame(GPS=y0))
-
-## plot the "prior mean" and synthetic data
-#pdf(file = paste0(wkdir, exname, "data.pdf"), width = 6, height = 8)
-
-#par(mfrow = c(2,1))
-#map(interior = FALSE)
-#plot(GPS_sd, pch = 19, cex = sqrt(abs(y0)), col = sign(y0)+6, add = TRUE)
-#map(interior = FALSE)
-#plot(GPS_sd, pch = 19, cex = sqrt(abs(ydata)), col = sign(ydata)+6, add = TRUE)
-
-#dev.off()
-
+ydata <- GPS_obs$trend - y0
 
 #### 1: GIA_ice6g prior mean info
-st.est <- inla.stack(data = list(y=ydata), A = list(Ay,Ay), 
-                     effects = list(GIA = 1:GIA_spde$n.spde, offset = Mesh_GIA_sp@data$GIA_m), tag = "est")
+st.est <- inla.stack(data = list(y=ydata), A = list(Ay), 
+                     effects = list(GIA = 1:GIA_spde$n.spde), tag = "est")
+## Predict at the GPS location and mesh grid
 Ip <- Matrix(0, GIA_spde$n.spde, GIA_spde$n.spde)
 diag(Ip) <- 1
-st.pred <- inla.stack(data = list(y=NA), A = list(Ip, Ip), 
-                      effects = list(mi=1:GIA_spde$n.spde, offset = Mesh_GIA_sp@data$GIA_m), tag = "pred")
+st.pred <- inla.stack(data = list(y=NA), A = list(rbind(Ay, Ip)), 
+                      effects = list(GIA=1:GIA_spde$n.spde), tag = "pred")
 stGIA <- inla.stack(st.est, st.pred)
 
-formula = y ~ -1 + offset + f(GIA, model = GIA_spde)
-res_inla <- inla(formula, data = inla.stack.data(stGIA, spde = GIA_spde),
-                   control.predictor=list(A=inla.stack.A(stGIA), compute =TRUE))
+hyper <- list(prec = list(fixed = TRUE, initial = 0))
+formula = y ~ -1 + f(GIA, model = GIA_spde)
 
+res_inla <- inla(formula, data = inla.stack.data(stGIA, spde = GIA_spde), family = "gaussian", 
+                 scale = c(rep((1/40),2*length(ydata)), rep(1, GIA_spde$n.spde)),
+                 control.family = list(hyper = hyper),
+                   control.predictor=list(A=inla.stack.A(stGIA), compute =TRUE))
 summary(res_inla)
 
 ## Plot hyperparameters
@@ -127,44 +118,35 @@ xx <- seq(from = 0.2, to=20, length.out = 1000)
 yy0 <- dlnorm(xx, meanlog = lsigma0, sdlog = sqrt(theta1_s)) # The prior
 lines(x = xx, y = yy0, col = 2)
 
-## plot the measurement error sigma_e
-sigma_e_mode <- 1/res_inla$summary.hyperpar$mean[1]
-sigma_e_marginals <- inla.tmarginal(function(x) sqrt(1/x), res_inla$marginals.hyperpar[[1]])
-plot(sigma_e_marginals, 
-     main = bquote(bold({sigma[e]}("mode") == .(round(sqrt(sigma_e_mode), 4)))), type = "l")
-
-## The default prior in inla is log gamma for the precision, details see from
-res_inla$all.hyper$family
-se_range <- range(sigma_e_marginals[,1])
-xx <- seq(log(1/se_range[2]), log(1/se_range[1]), length.out = 100)
-yy <- dgamma(exp(xx), shape = 1, rate = 5e-5)
-xy2 <- inla.tmarginal(function(x) 1/exp(x), cbind(x=xx, y=yy))
-lines(xy2, col = 2, lwd = 3)
-
 dev.off()
 
 
 
 
 ## Plot the predicted GIA field mean and variance
-GIA_mpost <- res_inla$summary.random$GIA$mean
-GIA_spost <- res_inla$summary.random$GIA$sd
-proj1 <- inla.mesh.projector(Mesh_GIA, projection = "longlat", dims = c(361,181))
+proj <- inla.mesh.projector(Mesh_GIA, projection = "longlat", dims = c(361,181))
 
-GPScol <- ifelse(err > 0, 2, 1)
+pidx <- inla.stack.index(stGIA, tag = "pred")
+GIA_mpost <- res_inla$summary.linear.predictor$mean[pidx$data[-c(1:length(ydata))]] + Mesh_GIA_sp@data$GIA_m
+GIA_spost <- res_inla$summary.linear.predictor$sd[pidx$data[-c(1:length(ydata))]]
+
+GPS_mpost <- res_inla$summary.linear.predictor$mean[pidx$data[1:length(ydata)]]
+GPS_spost <- res_inla$summary.linear.predictor$sd[pidx$data[1:length(ydata)]]
+
+GPScol <- ifelse(ydata > 0, 2, 1)
 
 
 pdf(file = paste0(wkdir, exname, "GIAfield.pdf"), width = 8, height = 10)
 par(mfrow = c(2,1))
 ## The mean field
-image.plot(proj1$x, proj1$y, inla.mesh.project(proj1, as.vector(GIA_mpost)), col = topo.colors(40),
+image.plot(proj$x, proj$y, inla.mesh.project(proj, as.vector(GIA_mpost)), col = topo.colors(40),
            xlab = "Longitude", ylab = "Latitude", main = "Posterior marginals -- mean")
 points(GPSX, GPSY, col = GPScol, pch = 20, cex = 0.8)
 
 ## The standard error
-image.plot(proj1$x, proj1$y, inla.mesh.project(proj1, as.vector(GIA_spost)), col = topo.colors(40),
+image.plot(proj$x, proj$y, inla.mesh.project(proj, as.vector(GIA_spost)), col = topo.colors(40),
            xlab = "Longitude", ylab = "Latitude", main = "Posterior marginal standard error")
-points(GPSX, GPSY, cex = sqrt(abs(err)), col = GPScol, pch = 1)
+points(GPSX, GPSY, cex = (GPS_spost/mean(GPS_spost))^2, col = GPScol, pch = 1)
 
 dev.off()
 
