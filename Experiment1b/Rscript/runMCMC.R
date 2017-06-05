@@ -7,7 +7,7 @@ wkdir <- getwd()
 runserver = TRUE
 max_edge = 0.25
 GPS_obs <- read.table("experimentBHM/GPS_combined_20170530_final.txt", header = T)
-
+load("experimentBHM/GIA_sp_info.RData")
 #### MCMC parameters
 #set.seed(7)#short chain
 set.seed(20)#long chain
