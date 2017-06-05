@@ -23,7 +23,7 @@ plist <- lapply(GIA_ice6g$ID, function(x) Polygons(list(Polygon(cbind(lon = as.n
                                       
 Plist <- SpatialPolygons(plist, proj4string = CRS("+proj=longlat"))
 GIA_ice6g_sp <- SpatialPolygonsDataFrame(Plist, data = GIA_ice6g[,c("trend", "std")])
-
+save(Plist, GIA_ice6g_sp, file = "GIA_sp_info.RData")
 ## Treat the gridded data as point data sampled at the centre of the grid
 ## converte the LonLat to xyz coordinates
 GIA_loc6 <- do.call(cbind, Lll2xyz(lat = GIA_ice6g$y_center, lon = GIA_ice6g$x_center))

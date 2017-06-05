@@ -12,10 +12,12 @@ res_inlas <- list()
 projs <- list()
 pars_GIAs <- list()
 meshSize <- c("s", "m", "l")
+maxedges <- c(0.1, 0.08, 0.04)
+load("experimentBHM/GIA_sp_info.RData")
 
 for (i in 1:3){
   exname <- paste0("/experimentBHM/",meshSize[i],"Mesh")
-  load(paste0("experimentBHM/Mesh_GIA", meshSize[i], ".RData"))
+  max_edge <- maxedges[i]
   source("glbm/Experiment1a/Rscript/4GP_Bayes_update_inla.R")
   res_inlas[[i]] <- res_inla
   pars_GIAs[[i]] <- pars_GIA
@@ -24,6 +26,7 @@ for (i in 1:3){
 
 
 ## Plot hyperparameters -- small errors
+exname <- paste0("/experimentBHM/","Meshcompare")
 pdf(file = paste0(wkdir, exname, "_hyperpar.pdf"), width = 6, height = 8)
 par(mfrow = c(3,2))
 ## plot log(rho)

@@ -10,7 +10,7 @@ mu_s <- 20
 v_s <- 40^2
 
 #### Set up experiment inputs
-GPS_obs <- read.table("experimentBHM/GPS_synthetic.txt", header = T)
+GPS_obs <- read.table("experimentBHM/GPS_combined_20170530_final.txt", header = T)
 ## set seed
 set.seed(6)
 
