@@ -168,7 +168,7 @@ dev.off()
 
 
 
-save(res_inla, GIA_spde, ydata, mu_r, v_r, mu_s, v_s, Mesh_GIA, file = paste0(wkdir, exname, "inla.RData"))
+save(res_inla, GIA_spde, ydata, mu_r, v_r, mu_s, v_s, mesh_GIA, file = paste0(wkdir, exname, "inla.RData"))
 
 
 
