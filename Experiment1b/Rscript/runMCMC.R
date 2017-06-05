@@ -5,7 +5,7 @@
 #### Load mesh and GPS data
 wkdir <- getwd()
 runserver = TRUE
-load("experimentBHM/Mesh_GIAs.RData")
+max_edge = 0.25
 GPS_obs <- read.table("experimentBHM/GPS_combined_20170530_final.txt", header = T)
 
 #### MCMC parameters

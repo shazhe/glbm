@@ -42,10 +42,19 @@ GPS_loc <- do.call(cbind, Lll2xyz(lat = GPS_obs$lat, lon = GPS_obs$lon))
 GPSX <- ifelse(GPS_obs$lon > 180, GPS_obs$lon-360, GPS_obs$lon)
 GPSY <- GPS_obs$lat
 
+Mesh_GIA <- inla.mesh.2d(loc = GPS_loc, cutoff = 0.001,  max.edge = max_edge)
+MlocLL <- Lxyz2ll(list(x=Mesh_GIA$loc[,1], y = Mesh_GIA$loc[,2], z = Mesh_GIA$loc[,3]))
+MlocLL$lon <- ifelse(MlocLL$lon < 0, MlocLL$lon + 360, MlocLL$lon)
+MlocLL$lon <- ifelse(MlocLL$lon > 359.5, MlocLL$lon - 360, MlocLL$lon)
+M_sp <- SpatialPoints(data.frame(lon = MlocLL$lon, lat = MlocLL$lat), proj4string = CRS("+proj=longlat")) #This convert GIA_ice6g a SpatialPointDataFrame
+
+Midx <- over(M_sp, Plist)
+GIA_mu <- GIA_ice6g_sp$trend[Midx]
+
 CMat <- inla.spde.make.A(mesh = Mesh_GIA, loc = GPS_loc)
 nObs <- nrow(CMat)
 nMesh <- ncol(CMat)
-x_mu <- matrix(Mesh_GIA_sp@data$GIA_m, nrow = nMesh, ncol = 1)
+x_mu <- matrix(GIA_mu, nrow = nMesh, ncol = 1)
 igshape_new <- igshape0 + nObs/2
 
 ### Generate synthetic GPS data
