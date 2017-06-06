@@ -171,7 +171,7 @@ dev.off()
 
 
 ## plot the posterior error overlaid on posterior mean field
-pdf(file = paste0(wkdir, exname, "GIAfield.pdf"), width = 8, height = 10)
+pdf(file = paste0(wkdir, exname, "GIAfield.pdf"), width = 10, height = 8)
 image.plot(proj$x, proj$y, inla.mesh.project(proj, as.vector(GIA_mpost)), col = topo.colors(40),
            xlab = "Longitude", ylab = "Latitude", main = "Matern posterior Error field")
 points(sll$x, sll$y, cex = (err_spost/mean(err_spost))^2*2)
