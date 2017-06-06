@@ -8,22 +8,34 @@
 ## 2. subset of GPS obs                                          ##
 ## 3. GIA forward model mean adjustment                          ##
 ###################################################################
+## Create store objs
 res_inlas <- list()
 projs <- list()
 pars_GIAs <- list()
+## Define mesh size
 meshSize <- c("s", "m", "l")
-maxedges <- c(0.1, 0.08, 0.04)
+## load GPS data
 load("experimentBHM/GIA_sp_info.RData")
+GPS_obs <- read.table("experimentBHM/GPS_synthetic.txt", header = T)
+load("experimentBHM/mesh_reg.RData")
 
+## use the regular mesh
 for (i in 1:3){
-  exname <- paste0("/experimentBHM/",meshSize[i],"Mesh")
-  max_edge <- maxedges[i]
-  source("glbm/Experiment1a/Rscript/4GP_Bayes_update_inla.R")
+  exname <- paste0("/experimentBHM/reg_",meshSize[i],"Mesh")
+  mesh_temp <- mesh_regs[[i]]
+  source("glbm/Experiment1a/Rscript/INLA_Bayes_update.R")
   res_inlas[[i]] <- res_inla
   pars_GIAs[[i]] <- pars_GIA
   projs[[i]] <- proj
 }
 
+## Use the irregular mesh
+exname <- paste0("/experimentBHM/reg_",meshSize[i],"Mesh")
+mesh_temp <- mesh_GPS[[3]]
+source("glbm/Experiment1a/Rscript/INLA_Bayes_update.R")
+res_inlas[[4]] <- res_inla
+pars_GIAs[[4]] <- pars_GIA
+projs[[4]] <- proj
 
 ## Plot hyperparameters -- small errors
 exname <- paste0("/experimentBHM/","Meshcompare")
