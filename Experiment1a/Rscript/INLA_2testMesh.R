@@ -44,45 +44,53 @@ par(mfrow = c(3,2))
 ## plot log(rho)
 maxd <- max(c(pars_GIAs[[1]]$marginals.log.range.nominal[[1]][,2],
               pars_GIAs[[2]]$marginals.log.range.nominal[[1]][,2],
-              pars_GIAs[[3]]$marginals.log.range.nominal[[1]][,2]))
+              pars_GIAs[[3]]$marginals.log.range.nominal[[1]][,2],
+              pars_GIAs[[4]]$marginals.log.range.nominal[[1]][,2]))
 plot(pars_GIAs[[1]]$marginals.log.range.nominal[[1]], type = "l", ylim = c(0,signif(maxd,2)),
      main =expression(bold(log(rho)))) # The posterior from inla output
 lines(pars_GIAs[[2]]$marginals.log.range.nominal[[1]], type = "l", col = 2) # The posterior from inla output
 lines(pars_GIAs[[3]]$marginals.log.range.nominal[[1]], type = "l", col = 4)
+lines(pars_GIAs[[4]]$marginals.log.range.nominal[[1]], type = "l", col = 5)
 
 ## plot rho
 maxd <- max(c(pars_GIAs[[1]]$marginals.range.nominal[[1]][,2],
               pars_GIAs[[2]]$marginals.range.nominal[[1]][,2],
-              pars_GIAs[[3]]$marginals.range.nominal[[1]][,2]))
+              pars_GIAs[[3]]$marginals.range.nominal[[1]][,2],
+              pars_GIAs[[4]]$marginals.range.nominal[[1]][,2]))
 plot(pars_GIAs[[1]]$marginals.range.nominal[[1]], type = "l", ylim = c(0,signif(maxd,2)),
      main = expression(bold(rho))) # The posterior from inla output
 lines(pars_GIAs[[2]]$marginals.range.nominal[[1]], type = "l", col = 2) 
 lines(pars_GIAs[[3]]$marginals.range.nominal[[1]], type = "l", col = 4)
+lines(pars_GIAs[[4]]$marginals.range.nominal[[1]], type = "l", col = 5)
 
 
 ## plot log(sigma)
 maxd <- max(c(pars_GIAs[[1]]$marginals.log.variance.nominal[[1]][,2],
               pars_GIAs[[2]]$marginals.log.variance.nominal[[1]][,2],
-              pars_GIAs[[3]]$marginals.log.variance.nominal[[1]][,2]))
+              pars_GIAs[[3]]$marginals.log.variance.nominal[[1]][,2],
+              pars_GIAs[[4]]$marginals.log.variance.nominal[[1]][,2]))
 
 plot(pars_GIAs[[1]]$marginals.log.variance.nominal[[1]], type = "l", ylim = c(0,signif(maxd,2)),
      main = expression(bold(log(sigma)))) # The posterior from inla output
 lines(pars_GIAs[[2]]$marginals.log.variance.nominal[[1]], type = "l", col = 2) # The posterior from inla output
 lines(pars_GIAs[[3]]$marginals.log.variance.nominal[[1]], type = "l", col = 4) # The posterior from inla output
+lines(pars_GIAs[[4]]$marginals.log.variance.nominal[[1]], type = "l", col = 5) # The posterior from inla output
 
 ## plot sigma
 maxd <- max(c(pars_GIAs[[1]]$marginals.variance.nominal[[1]][,2],
               pars_GIAs[[2]]$marginals.variance.nominal[[1]][,2],
-              pars_GIAs[[3]]$marginals.variance.nominal[[1]][,2]))
+              pars_GIAs[[3]]$marginals.variance.nominal[[1]][,2],
+              pars_GIAs[[4]]$marginals.variance.nominal[[1]][,2]))
 maxv <- max(c(pars_GIAs[[1]]$marginals.variance.nominal[[1]][,1],
               pars_GIAs[[2]]$marginals.variance.nominal[[1]][,1],
-              pars_GIAs[[3]]$marginals.variance.nominal[[1]][,1]))
+              pars_GIAs[[3]]$marginals.variance.nominal[[1]][,1],
+              pars_GIAs[[4]]$marginals.variance.nominal[[1]][,1]))
 
 plot(pars_GIAs[[1]]$marginals.variance.nominal[[1]], type = "l",  xlim = c(0, maxv/20), ylim = c(0, signif(maxd, 2)),
      main = expression(bold(sigma))) # The posterior from inla output
 lines(pars_GIAs[[2]]$marginals.variance.nominal[[1]], type = "l", col = 2) # The posterior from inla output
 lines(pars_GIAs[[3]]$marginals.variance.nominal[[1]], type = "l", col = 4) # The posterior from inla output
-
+lines(pars_GIAs[[4]]$marginals.variance.nominal[[1]], type = "l", col = 5) # The posterior from inla output
 dev.off()
 
 
@@ -90,6 +98,7 @@ dev.off()
 GIA_spost1 <- res_inlas[[1]]$summary.random$GIA$sd
 GIA_spost2 <- res_inlas[[2]]$summary.random$GIA$sd
 GIA_spost3 <- res_inlas[[3]]$summary.random$GIA$sd
+GIA_spost4 <- res_inlas[[3]]$summary.random$GIA$sd
 
 pdf(file = paste0(wkdir, exname, "_GIAfield.pdf"), width = 8, height = 10)
 par(mfrow = c(3,1))

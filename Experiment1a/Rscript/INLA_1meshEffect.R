@@ -83,7 +83,8 @@ mesh_regs[[1]] <- inla.mesh.create(globe = 30)
 mesh_regs[[2]] <- inla.mesh.create(globe = 90)
 mesh_regs[[3]] <- inla.mesh.create(globe = 180)
 
-save(mes_regs, file = paste0(wkdir, "/experimentBHM/mesh_reg.RData"))
+save(mesh_regs, file = paste0(wkdir, "/experimentBHM/mesh_reg.RData"))
+
 pdf(file = paste0(wkdir, "/experimentBHM/prior_Globemesh.pdf"), width = 8, height = 11)
 mains <- paste("Prior marginal standard error -- ",  c("small mesh", "medium mesh", "large mesh"))
 par(mfrow = c(3,1))
