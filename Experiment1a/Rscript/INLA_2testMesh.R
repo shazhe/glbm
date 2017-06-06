@@ -38,7 +38,7 @@ for (i in 1:3){
 
 
 ## Use the irregular mesh
-exname <- paste0("/experimentBHM/reg_",meshSize[i],"Mesh")
+exname <- paste0("/experimentBHM/irreg_",meshSize[i],"Mesh")
 mesh_temp <- mesh_GPS[[3]]
 source("glbm/Experiment1a/Rscript/INLA_Bayes_update.R")
 res_inlas[[4]] <- res_inla
