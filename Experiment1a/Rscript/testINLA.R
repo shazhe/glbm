@@ -15,7 +15,8 @@ GPS_obs <- read.table("experimentBHM/GPS_combined_20170530_final.txt", header = 
 set.seed(6)
 
 
-### 1 Test mesh size effect
+### 1 Test mesh pattern 
+
 ## Assume has alreading run scripts for different mesh sizes in Test 1
 runserver = TRUE
 source("glbm/Experiment1a/Rscript/4GP_inla_testMesh.R")
