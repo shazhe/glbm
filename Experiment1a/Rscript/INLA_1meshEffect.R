@@ -80,8 +80,8 @@ dev.off()
 #### 3.2 Genreate a mesh from a globe with equidistant points from equidistant lattice
 mesh_regs <- list()
 mesh_regs[[1]] <- inla.mesh.create(globe = 30)
-mesh_regs[[2]] <- inla.mesh.create(globe = 90)
-mesh_regs[[3]] <- inla.mesh.create(globe = 180)
+mesh_regs[[2]] <- inla.mesh.create(globe = 60)
+mesh_regs[[3]] <- inla.mesh.create(globe = 90)
 
 save(mesh_regs, file = paste0(wkdir, "/experimentBHM/mesh_reg.RData"))
 

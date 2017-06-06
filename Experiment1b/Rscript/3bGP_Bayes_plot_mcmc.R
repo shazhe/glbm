@@ -51,7 +51,7 @@ proj1 <- inla.mesh.projector(Mesh_GIA, projection = "longlat", dims = c(361,181)
 for (i in (1:n.chains)){
   pdf(file = paste0(wkdir, exname, "_GIAfield", i, ".pdf"), width = 12, height = 12)
   par(mfrow = c(3,1))
-  image.plot(proj1$x, proj1$y, inla.mesh.project(proj1, as.vector(Mesh_GIA_sp@data$GIA_m)), col = topo.colors(40),
+  image.plot(proj1$x, proj1$y, inla.mesh.project(proj1, as.vector(GIA_mu)), col = topo.colors(40),
              xlab = "Longitude", ylab = "Latitude", main = "The ICE6g")
   points(GPSX, GPSY, pch = 20)
   

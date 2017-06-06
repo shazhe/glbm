@@ -37,7 +37,6 @@ for (i in 1:3){
 }
 
 
-
 ## Use the irregular mesh
 exname <- paste0("/experimentBHM/reg_",meshSize[i],"Mesh")
 mesh_temp <- mesh_GPS[[3]]
