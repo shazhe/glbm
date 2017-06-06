@@ -30,7 +30,7 @@ GPSX <- ifelse(GPS_obs$x_center > 180, GPS_obs$x_center-360, GPS_obs$x_center)
 GPSY <- GPS_obs$y_center
 GPS_loc <- do.call(cbind, Lll2xyz(lat = GPS_obs$y_center, lon = GPS_obs$x_center))
 ## GIA
-GIA_ice6g <- read.table("Z:/ExperimentsBHM/Experiment1a/inputs/GIA_truth.txt", header = T)
+GIA_ice6g <- read.table("experimentsBHM/GIA_truth.txt", header = T)
 GIA_loc6 <- do.call(cbind, Lll2xyz(lat = GIA_ice6g$y_center, lon = GIA_ice6g$x_center))
 GIA_mu6 <- GIA_ice6g$trend
 GIA_sd6 <- GIA_ice6g$std
