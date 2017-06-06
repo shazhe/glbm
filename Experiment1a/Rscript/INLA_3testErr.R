@@ -29,7 +29,7 @@ GPSY <- GPS_obs$y_center
 load("experimentBHM/GIA_sp_info.RData")
 load("experimentBHM/mesh_reg.RData")
 Mesh_GIA <- mesh_regs[[1]]
-MlocLL <- Lxyz2ll(list(x=mesh_GIA$loc[,1], y = mesh_GIA$loc[,2], z = mesh_GIA$loc[,3]))
+MlocLL <- Lxyz2ll(list(x=Mesh_GIA$loc[,1], y = Mesh_GIA$loc[,2], z = Mesh_GIA$loc[,3]))
 MlocLL$lon <- ifelse(MlocLL$lon < 0, MlocLL$lon + 360, MlocLL$lon)
 MlocLL$lon <- ifelse(MlocLL$lon > 359.5, MlocLL$lon - 360, MlocLL$lon)
 M_sp <- SpatialPoints(data.frame(lon = MlocLL$lon, lat = MlocLL$lat), proj4string = CRS("+proj=longlat")) #This convert GIA_ice6g a SpatialPointDataFrame
@@ -60,7 +60,7 @@ s_lat <- seq(-89.5, 89.5, 10)
 s_lon <- seq(-179.5, 179.5, 10)
 sll <- expand.grid(x=s_lon, y = s_lat)
 sll_loc <- do.call(cbind, Lll2xyz(lat = sll$y, lon = sll$x))
-As <- inla.spde.make.A(mesh = mesh_GIA, loc = sll_loc)
+As <- inla.spde.make.A(mesh = Mesh_GIA, loc = sll_loc)
 
 ## create new synthetic data, plot and compare
 y0 <- as.vector(Ay %*% GIA_mu)
@@ -128,7 +128,7 @@ dev.off()
 
 
 ## Plot the predicted GIA field mean and variance
-proj <- inla.mesh.projector(mesh_GIA, projection = "longlat", dims = c(500,500))
+proj <- inla.mesh.projector(Mesh_GIA, projection = "longlat", dims = c(500,500))
 
 pidx <- inla.stack.index(stGIA, tag = "pred")
 n.data <- length(ydata)
@@ -161,6 +161,6 @@ dev.off()
 
 
 
-save(res_inla1, res_inla2, GIA_spde, ydata1, ydata2, mu_r, v_r, mu_s, v_s, Mesh_GIA, file = paste0(wkdir, exname, "inla.RData"))
+save(res_inla1, res_inla2, GIA_spde, ydata, err1, err2, mu_r, v_r, mu_s, v_s, Mesh_GIA, file = paste0(wkdir, exname, "inla.RData"))
 
 

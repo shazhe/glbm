@@ -37,4 +37,4 @@ source("glbm/Experiment1a/Rscript/INLA_2testMesh.R")
 exname <- "/experimentBHM/PointErr_"
 ## Find a single and isolated point to test on with large and small error 
 ## choose by eye -- no. 459 
-source("glbm/Experiment1a/Rscript/4GP_inla_testErr.R")
+source("glbm/Experiment1a/Rscript/INLA_3testErr.R")

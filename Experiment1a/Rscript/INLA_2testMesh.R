@@ -38,6 +38,7 @@ for (i in 1:3){
 
 
 ## Use the irregular mesh
+load("experimentBHM/mesh_GPS.RData")
 exname <- paste0("/experimentBHM/irreg_",meshSize[i],"Mesh")
 mesh_temp <- mesh_GPS[[3]]
 source("glbm/Experiment1a/Rscript/INLA_Bayes_update.R")
@@ -106,25 +107,25 @@ dev.off()
 
 
 ## Plot the predicted GIA field mean and variance
-pdf(file = paste0(wkdir, exname, "_GIAfield.pdf"), width = 8, height = 12)
-par(mfrow = c(4,1))
-image.plot(projs[[1]]$x, projs[[1]]$y, inla.mesh.project(proj, as.vector(GIA_mposts[[1]])), col = topo.colors(40),
+pdf(file = paste0(wkdir, exname, "_GIAfield.pdf"), width = 10, height = 10)
+par(mfrow = c(2,1))
+image.plot(projs[[1]]$x, projs[[1]]$y, inla.mesh.project(projs[[1]], as.vector(GIA_mposts[[1]])), col = topo.colors(40),
            xlab = "Longitude", ylab = "Latitude", main = "Matern posterior Error field -- reg small")
 points(sll$x, sll$y, cex = (err_sposts[[1]]/mean(err_sposts[[1]]))^2*2)
 points(GPSX, GPSY, cex = (GPS_spost[[1]]/mean(err_sposts[[1]]))^2*2, col = 2)
 
-image.plot(projs[[2]]$x, projs[[2]]$y, inla.mesh.project(proj, as.vector(GIA_mposts[[2]])), col = topo.colors(40),
+image.plot(projs[[2]]$x, projs[[2]]$y, inla.mesh.project(projs[[2]], as.vector(GIA_mposts[[2]])), col = topo.colors(40),
            xlab = "Longitude", ylab = "Latitude", main = "Matern posterior Error field -- reg medium")
 points(sll$x, sll$y, cex = (err_sposts[[2]]/mean(err_sposts[[2]]))^2*2)
 points(GPSX, GPSY, cex = (GPS_spost[[2]]/mean(err_sposts[[2]]))^2*2, col = 2)
 
-
-image.plot(projs[[2]]$x, projs[[3]]$y, inla.mesh.project(proj, as.vector(GIA_mposts[[3]])), col = topo.colors(40),
+par(mfrow = c(2,1))
+image.plot(projs[[2]]$x, projs[[3]]$y, inla.mesh.project(projs[[3]], as.vector(GIA_mposts[[3]])), col = topo.colors(40),
            xlab = "Longitude", ylab = "Latitude", main = "Matern posterior Error field -- reg large")
 points(sll$x, sll$y, cex = (err_sposts[[3]]/mean(err_sposts[[3]]))^2*2)
 points(GPSX, GPSY, cex = (GPS_spost[[3]]/mean(err_sposts[[3]]))^2*2, col = 2)
 
-image.plot(projs[[4]]$x, projs[[4]]$y, inla.mesh.project(proj, as.vector(GIA_mposts[[4]])), col = topo.colors(40),
+image.plot(projs[[4]]$x, projs[[4]]$y, inla.mesh.project(projs[[4]], as.vector(GIA_mposts[[4]])), col = topo.colors(40),
            xlab = "Longitude", ylab = "Latitude", main = "Matern posterior Error field -- irreg large")
 points(sll$x, sll$y, cex = (err_sposts[[4]]/mean(err_sposts[[4]]))^2*2)
 points(GPSX, GPSY, cex = (GPS_spost[[4]]/mean(err_sposts[[4]]))^2*2, col = 2)
