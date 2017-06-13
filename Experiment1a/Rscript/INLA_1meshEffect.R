@@ -23,18 +23,17 @@ if(runserver){
   INLA:::inla.dynload.workaround()
 }#Use this on server with old gcc library
 library(fields)
-library(GEOmap)
 ## GPS
 GPS_obs <- read.table("experimentBHM/GPS_synthetic.txt", header = T)
 GPSX <- ifelse(GPS_obs$x_center > 180, GPS_obs$x_center-360, GPS_obs$x_center)
 GPSY <- GPS_obs$y_center
-GPS_loc <- do.call(cbind, Lll2xyz(lat = GPS_obs$y_center, lon = GPS_obs$x_center))
+GPS_loc <- inla.mesh.map(cbind(GPSX, GPSY), projection = "longlat")
 ## GIA
 GIA_ice6g <- read.table("experimentBHM/GIA_truth.txt", header = T)
-GIA_loc6 <- do.call(cbind, Lll2xyz(lat = GIA_ice6g$y_center, lon = GIA_ice6g$x_center))
+GIA_ice6g$x_center <- ifelse(GIA_ice6g$x_center > 180, GIA_ice6g$x_center-360, GIA_ice6g$x_center)
+GIA_loc6 <- inla.mesh.map(cbind(GIA_ice6g$x_center, GIA_ice6g$y_center), projection = "longlat")
 GIA_mu6 <- GIA_ice6g$trend
 GIA_sd6 <- GIA_ice6g$std
-
 
 
 #### 2 Setup for spde parameters
@@ -53,10 +52,19 @@ ltau0 <- 0.5*log(1/(4*pi)) - lsigma0 - lkappa0
 
 
 #### 3.1 Genreate a mesh by from the given GIA grid
+## Find index near equator
+## Find index near poles
+ind_eq <- which(GIA_ice6g$y_center == 0.5)
+ind_po <- which(GIA_ice6g$y_center == 89.5)
+GIA_dist1 <- dist(GIA_loc6[ind_eq,])
+GIA_dist2 <- dist(GIA_loc6[ind_po,])
+summary(GIA_dist1)
+summary(GIA_dist2)
+u_dist <- summary(GIA_dist1)[1]
 Mesh_GIAs <- list()
-Mesh_GIAs[[1]] <- inla.mesh.2d(loc = GIA_loc6, cutoff = 0.1, max.edge = 0.1) ## small
-Mesh_GIAs[[2]] <- inla.mesh.2d(loc = GIA_loc6, cutoff = 0.045, max.edge = 0.1) ## Medium
-Mesh_GIAs[[3]] <- inla.mesh.2d(loc = GIA_loc6, cutoff = 0.023, max.edge = 0.1) ## Large
+Mesh_GIAs[[1]] <- inla.mesh.2d(loc = GIA_loc6, cutoff = u_dist*8, max.edge = u_dist*12) ## small
+Mesh_GIAs[[2]] <- inla.mesh.2d(loc = GIA_loc6, cutoff = u_dist*3, max.edge = u_dist*6) ## Medium
+Mesh_GIAs[[3]] <- inla.mesh.2d(loc = GIA_loc6, cutoff = u_dist, max.edge = u_dist*3) ## Large
 ## Cutoff slightly larger than the grid width -- that's why some part of the generated grid is not regular
 save(Mesh_GIAs, file = paste0(wkdir, "/experimentBHM/mesh_GIA.RData"))
 
@@ -80,8 +88,8 @@ dev.off()
 #### 3.2 Genreate a mesh from a globe with equidistant points from equidistant lattice
 mesh_regs <- list()
 mesh_regs[[1]] <- inla.mesh.create(globe = 10)
-mesh_regs[[2]] <- inla.mesh.create(globe = 30)
-mesh_regs[[3]] <- inla.mesh.create(globe = 45)
+mesh_regs[[2]] <- inla.mesh.create(globe = 20)
+mesh_regs[[3]] <- inla.mesh.create(globe = 50)
 
 save(mesh_regs, file = paste0(wkdir, "/experimentBHM/mesh_reg.RData"))
 
@@ -104,9 +112,11 @@ dev.off()
 
 #### 3.3 Genreate a mesh from GPS location
 mesh_GPS <- list()
-mesh_GPS[[1]] <- inla.mesh.2d(loc = GPS_loc, cutoff = 0.05,  max.edge = 0.1)
-mesh_GPS[[2]] <- inla.mesh.2d(loc = GPS_loc, cutoff = 0.001, max.edge = 0.08)
-mesh_GPS[[3]] <- inla.mesh.2d(loc = GPS_loc, cutoff = 0.001, max.edge = 0.04)
+GPS_dist <- dist(GPS_loc)
+summary(GPS_dist)
+mesh_GPS[[1]] <- inla.mesh.2d(loc = GPS_loc, cutoff = u_dist*5,  max.edge = u_dist*12)
+mesh_GPS[[2]] <- inla.mesh.2d(loc = GPS_loc, cutoff = u_dist*3, max.edge = u_dist*5)
+mesh_GPS[[3]] <- inla.mesh.2d(loc = GPS_loc, cutoff = u_dist/3, max.edge = u_dist*2)
 save(mesh_GPS, file = paste0(wkdir, "/experimentBHM/mesh_GPS.RData"))
 
 pdf(file = paste0(wkdir, "/experimentBHM/prior_GPSmesh.pdf"), width = 8, height = 11)
@@ -125,25 +135,25 @@ for (i in 1:3){
 }
 dev.off()
 
-# # ## Plot the results 3D
-# vals <- GIA_sprior
-# open3d()
-# par3d(windowRect = c(100, 100, 900, 900))
-# layout3d(matrix(1:2, 2,1), heights = c(4,2), sharedMouse = TRUE)
-# par3d(zoom = 0.8)
-# t_lim <- range(vals)
-# t_Clens <- round((t_lim[2] - t_lim[1])*100) + 1
-# t_Cpal <- topo.colors(t_Clens, alpha=0)
-# t_Cols<- t_Cpal[round((vals - t_lim[1])*100) + 1]
-# plot3d(GPS_loc, pch = "20", size = 5, xlab = "", ylab = "", zlab = "", axe=FALSE)
-# plot(mesh_GPS[[1]], rgl = TRUE, col= t_Cols, edge.color = rgb(0, 0.5, 0.6, alpha =0), add = TRUE)
-# 
-# ## plot the color bar
-# next3d(reuse = FALSE)
-# bgplot3d({z=matrix(1:t_Clens, nrow = t_Clens)
-# y=1
-# x=seq(t_lim[1],t_lim[2],len = t_Clens)
-# par(cex = 1.5, fin = c(8, 1), mai = c(0,0, 0.5, 0), oma = c(1, 0, 0, 0))
-# image(x,y,z,col = topo.colors(t_Clens),axes=FALSE,xlab="",ylab="")
-# title("INLA Posterior ICE6G GIA, mu = 0")
-# axis(1)})
+# ## Plot the results 3D
+vals <- GIA_sprior
+open3d()
+par3d(windowRect = c(100, 100, 900, 900))
+layout3d(matrix(1:2, 2,1), heights = c(4,2), sharedMouse = TRUE)
+par3d(zoom = 0.8)
+t_lim <- range(vals)
+t_Clens <- round((t_lim[2] - t_lim[1])*100) + 1
+t_Cpal <- topo.colors(t_Clens, alpha=0)
+t_Cols<- t_Cpal[round((vals - t_lim[1])*100) + 1]
+plot3d(GPS_loc, pch = "20", size = 5, xlab = "", ylab = "", zlab = "", axe=FALSE)
+plot(mesh_GPS[[3]], rgl = TRUE, col= t_Cols, edge.color = rgb(0, 0.5, 0.6, alpha =0), add = TRUE)
+
+## plot the color bar
+next3d(reuse = FALSE)
+bgplot3d({z=matrix(1:t_Clens, nrow = t_Clens)
+y=1
+x=seq(t_lim[1],t_lim[2],len = t_Clens)
+par(cex = 1.5, fin = c(8, 1), mai = c(0,0, 0.5, 0), oma = c(1, 0, 0, 0))
+image(x,y,z,col = topo.colors(t_Clens),axes=FALSE,xlab="",ylab="")
+title("INLA Posterior ICE6G GIA, mu = 0")
+axis(1)})

@@ -24,7 +24,7 @@ source("glbm/Experiment1a/Rscript/MVSTplus.R")
 GPS_loc <- do.call(cbind, Lll2xyz(lat = GPS_obs$y_center, lon = GPS_obs$x_center))
 GPSX <- ifelse(GPS_obs$x_center > 180, GPS_obs$x_center-360, GPS_obs$x_center)
 GPSY <- GPS_obs$y_center
-## Generate the mesh 
+## Generate the mesh
 mesh_GIA <- mesh_temp
 MlocLL <- Lxyz2ll(list(x=mesh_GIA$loc[,1], y = mesh_GIA$loc[,2], z = mesh_GIA$loc[,3]))
 MlocLL$lon <- ifelse(MlocLL$lon < 0, MlocLL$lon + 360, MlocLL$lon)
@@ -56,31 +56,31 @@ Ay <- inla.spde.make.A(mesh = mesh_GIA, loc = GPS_loc)
 ## Create a stack of locations to plot the posterior (resolution = 5 degree apart)
 s_lat <- seq(-89.5, 89.5, 10)
 s_lon <- seq(-179.5, 179.5, 10)
-sll <- expand.grid(x=s_lon, y = s_lat)
+sll <- expand.grid(x = s_lon, y = s_lat)
 sll_loc <- do.call(cbind, Lll2xyz(lat = sll$y, lon = sll$x))
-As <- inla.spde.make.A(mesh = mesh_GIA, loc = sll_loc)
+A_all <- inla.spde.make.A(mesh = mesh_GIA, loc = rbind(GPS_loc, mesh_GIA$loc, sll_loc))
 
 ## create new synthetic data, plot and compare
 y0 <- as.vector(Ay %*% GIA_mu)
 ydata <- GPS_obs$trend - y0
 
 #### 1: GIA_ice6g prior mean info
-st.est <- inla.stack(data = list(y=ydata), A = list(Ay), 
+st.est <- inla.stack(data = list(y=ydata), A = list(Ay),
                      effects = list(GIA = 1:GIA_spde$n.spde), tag = "est")
 ## Predict at the GPS location, mesh grid and predict error location
 Ip <- Matrix(0, GIA_spde$n.spde, GIA_spde$n.spde)
 diag(Ip) <- 1
-st.pred <- inla.stack(data = list(y=NA), A = list(rbind(Ay, Ip, As)), 
+st.pred <- inla.stack(data = list(y=NA), A = list(A_all),
                       effects = list(GIA=1:GIA_spde$n.spde), tag = "pred")
 stGIA <- inla.stack(st.est, st.pred)
 
 ## Fix the sigma_e^2 to be 1 and scale them according to the data in inla(...,scale = scale)
 ## Default uses log(1/sigma_e^2) to be loggamma distribution with intial value = 0.
-hyper <- list(prec = list(fixed = TRUE, initial = 0))
+hyper <- list(prec = list(fixed = TRUE, initial = log(1/1.5)))
 formula = y ~ -1 + f(GIA, model = GIA_spde)
 prec_scale <- c(1/GPS_obs$std, rep(1, length(ydata)), rep(1, GIA_spde$n.spde), rep(1, nrow(sll_loc)))
-res_inla <- inla(formula, data = inla.stack.data(stGIA, spde = GIA_spde), family = "gaussian", 
-                 scale = prec_scale, control.family = list(hyper = hyper),
+res_inla <- inla(formula, data = inla.stack.data(stGIA, spde = GIA_spde), family = "gaussian",
+                  control.family = list(hyper = hyper),
                    control.predictor=list(A=inla.stack.A(stGIA), compute =TRUE))
 summary(res_inla)
 
@@ -99,14 +99,14 @@ lrho_sd <- pars_GIA$summary.log.range.nominal$sd
 rho_mode <- exp(lrho_mean - lrho_sd^2)
 
 ## plot log(rho)
-plot(pars_GIA$marginals.log.range.nominal[[1]], type = "l", 
+plot(pars_GIA$marginals.log.range.nominal[[1]], type = "l",
      main = bquote(bold(log(rho)("mode") == .(round(lrho_mode, 4))))) # The posterior from inla output
 xx <- pars_GIA$marginals.log.range.nominal[[1]][,1]
 yy0 <- dnorm(xx, mean = lrho0, sd = theta2_s) # The prior
 lines(x = xx, y = yy0, col = 2)
 
 ## plot rho
-plot(pars_GIA$marginals.range.nominal[[1]], type = "l", 
+plot(pars_GIA$marginals.range.nominal[[1]], type = "l",
      main = bquote(bold(rho("mode") == .(round(rho_mode, 4))))) # The posterior from inla output
 xx <- pars_GIA$marginals.range.nominal[[1]][,1]
 yy0 <- dlnorm(xx, meanlog = lrho0, sdlog = sqrt(theta2_s)) # The prior
@@ -127,7 +127,7 @@ yy0 <- dnorm(xx, mean = lsigma0, sd = theta1_s) # The prior
 lines(x = xx, y = yy0, col = 2)
 
 ## plot sigma
-plot(pars_GIA$marginals.variance.nominal[[1]], type = "l", xlim = c(0, 20), 
+plot(pars_GIA$marginals.variance.nominal[[1]], type = "l", xlim = c(0, 20),
      main = bquote(bold({sigma^2}("mode") == .(round(sigma_mode, 4))))) # The posterior from inla output
 xx <- seq(from = 0.2, to=20, length.out = 1000)
 yy0 <- dlnorm(xx, meanlog = lsigma0, sdlog = sqrt(theta1_s)) # The prior
@@ -172,46 +172,55 @@ dev.off()
 
 ## plot the posterior error overlaid on posterior mean field
 pdf(file = paste0(wkdir, exname, "GIAfield.pdf"), width = 15, height = 12)
-image.plot(proj$x, proj$y, inla.mesh.project(proj, as.vector(GIA_mpost)), col = topo.colors(40),
+image.plot(proj$x, proj$y, inla.mesh.project(proj, as.vector(GIA_spost)), col = topo.colors(40),
            xlab = "Longitude", ylab = "Latitude", main = "Matern posterior Error field")
 points(sll$x, sll$y, cex = (err_spost/mean(err_spost))^2*2)
 points(GPSX, GPSY, cex = (GPS_spost/mean(err_spost))^2*2, col = 2)
 dev.off()
 
 
+### plot zoom in
+indx <- which(proj$x > -120 & proj$x < -20)
+indy <- which(proj$y >0 & proj$y <70)
+par(mfrow = c(1,1))
+image.plot(proj$x[indx], proj$y[indy], inla.mesh.project(proj, as.vector(GIA_spost))[indx, indy], col = topo.colors(40),
+           xlab = "Longitude", ylab = "Latitude", main = "Updated posterior error field")
+points(sll$x, sll$y, cex = (err_spost/max(err_spost))^3*10)
+points(GPSX, GPSY, cex = GPS_spost^2*1.5, col = 2)
+
+
+image.plot(s_lon, s_lat, matrix(err_spost, nrow = length(s_lon), ncol = length(s_lat)), col = topo.colors(40),
+           xlab = "Longitude", ylab = "Latitude", main = "Updated posterior error field")
+#points(sll$x, sll$y, cex = err_spost*2)
+points(GPSX, GPSY, cex = (GPS.sd/mean(GPS.sd))^2, col = 2)
 
 save(res_inla, GIA_spde, ydata, mu_r, v_r, mu_s, v_s, mesh_GIA, file = paste0(wkdir, exname, "inla.RData"))
 
 
 
+## Plot the results 3D
+vals <- GIA_spost
+open3d()
+par3d(windowRect = c(100, 100, 900, 900))
+layout3d(matrix(1:2, 2,1), heights = c(4,2), sharedMouse = TRUE)
+par3d(zoom = 0.8)
+t_lim <- range(c(vals, err_spost))
+t_Clens <- round((t_lim[2] - t_lim[1])*100) + 1
+t_Cpal <- topo.colors(t_Clens, alpha=0)
+t_Cols<- t_Cpal[round((vals - t_lim[1])*100) + 1]
+GPScol <- t_Cpal[round((err_spost - t_lim[1])*100) + 1]
+plot3d(sll_loc, pch = "20", size = 5, col = GPScol, xlab = "", ylab = "", zlab = "", axe=FALSE)
+plot(mesh_GIA, rgl = TRUE, col= t_Cols, edge.color = rgb(0, 0.5, 0.6, alpha =0), add = TRUE)
 
-
-
-
-
-
-# ## Plot the results 3D
-# vals <- GIA_spost
-# open3d()
-# par3d(windowRect = c(100, 100, 900, 900))
-# layout3d(matrix(1:2, 2,1), heights = c(4,2), sharedMouse = TRUE)
-# par3d(zoom = 0.8)
-# t_lim <- range(vals)
-# t_Clens <- round((t_lim[2] - t_lim[1])*100) + 1
-# t_Cpal <- topo.colors(t_Clens, alpha=0)
-# t_Cols<- t_Cpal[round((vals - t_lim[1])*100) + 1]
-# plot3d(GPS_loc, pch = "20", size = 5, col = GPScol, xlab = "", ylab = "", zlab = "", axe=FALSE)
-# plot(Mesh_GIA, rgl = TRUE, col= t_Cols, edge.color = rgb(0, 0.5, 0.6, alpha =0), add = TRUE)
-# 
-# ## plot the color bar
-# next3d(reuse = FALSE)
-# bgplot3d({z=matrix(1:t_Clens, nrow = t_Clens)
-# y=1
-# x=seq(t_lim[1],t_lim[2],len = t_Clens)
-# par(cex = 1.5, fin = c(8, 1), mai = c(0,0, 0.5, 0), oma = c(1, 0, 0, 0))
-# image(x,y,z,col = topo.colors(t_Clens),axes=FALSE,xlab="",ylab="")
-# title("INLA Posterior ICE6G GIA, mu = 0")
-# axis(1)})
+## plot the color bar
+next3d(reuse = FALSE)
+bgplot3d({z=matrix(1:t_Clens, nrow = t_Clens)
+y=1
+x=seq(t_lim[1],t_lim[2],len = t_Clens)
+par(cex = 1.5, fin = c(8, 1), mai = c(0,0, 0.5, 0), oma = c(1, 0, 0, 0))
+image(x,y,z,col = topo.colors(t_Clens),axes=FALSE,xlab="",ylab="")
+title("INLA Posterior ICE6G GIA, mu = 0")
+axis(1)})
 
 
 
