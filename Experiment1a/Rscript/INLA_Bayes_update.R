@@ -172,7 +172,7 @@ dev.off()
 
 ## plot the posterior error overlaid on posterior mean field
 pdf(file = paste0(wkdir, exname, "GIAfield.pdf"), width = 15, height = 12)
-image.plot(proj$x, proj$y, inla.mesh.project(proj, as.vector(GIA_spost)), col = topo.colors(40),
+image.plot(proj$x, proj$y, inla.mesh.project(proj, as.vector(GIA_mpost)), col = topo.colors(40),
            xlab = "Longitude", ylab = "Latitude", main = "Matern posterior Error field")
 points(sll$x, sll$y, cex = (err_spost/mean(err_spost))^2*2)
 points(GPSX, GPSY, cex = (GPS_spost/mean(err_spost))^2*2, col = 2)
@@ -180,47 +180,47 @@ dev.off()
 
 
 ### plot zoom in
-indx <- which(proj$x > -120 & proj$x < -20)
-indy <- which(proj$y >0 & proj$y <70)
-par(mfrow = c(1,1))
-image.plot(proj$x[indx], proj$y[indy], inla.mesh.project(proj, as.vector(GIA_spost))[indx, indy], col = topo.colors(40),
-           xlab = "Longitude", ylab = "Latitude", main = "Updated posterior error field")
-points(sll$x, sll$y, cex = (err_spost/max(err_spost))^3*10)
-points(GPSX, GPSY, cex = GPS_spost^2*1.5, col = 2)
+#indx <- which(proj$x > -120 & proj$x < -20)
+#indy <- which(proj$y >0 & proj$y <70)
+#par(mfrow = c(1,1))
+#image.plot(proj$x[indx], proj$y[indy], inla.mesh.project(proj, as.vector(GIA_spost))[indx, indy], col = topo.colors(40),
+#           xlab = "Longitude", ylab = "Latitude", main = "Updated posterior error field")
+#points(sll$x, sll$y, cex = (err_spost/max(err_spost))^3*10)
+#points(GPSX, GPSY, cex = GPS_spost^2*1.5, col = 2)
 
 
-image.plot(s_lon, s_lat, matrix(err_spost, nrow = length(s_lon), ncol = length(s_lat)), col = topo.colors(40),
+#image.plot(s_lon, s_lat, matrix(err_spost, nrow = length(s_lon), ncol = length(s_lat)), col = topo.colors(40),
            xlab = "Longitude", ylab = "Latitude", main = "Updated posterior error field")
 #points(sll$x, sll$y, cex = err_spost*2)
-points(GPSX, GPSY, cex = (GPS.sd/mean(GPS.sd))^2, col = 2)
+#points(GPSX, GPSY, cex = (GPS.sd/mean(GPS.sd))^2, col = 2)
 
 save(res_inla, GIA_spde, ydata, mu_r, v_r, mu_s, v_s, mesh_GIA, file = paste0(wkdir, exname, "inla.RData"))
 
 
 
 ## Plot the results 3D
-vals <- GIA_spost
-open3d()
-par3d(windowRect = c(100, 100, 900, 900))
-layout3d(matrix(1:2, 2,1), heights = c(4,2), sharedMouse = TRUE)
-par3d(zoom = 0.8)
-t_lim <- range(c(vals, err_spost))
-t_Clens <- round((t_lim[2] - t_lim[1])*100) + 1
-t_Cpal <- topo.colors(t_Clens, alpha=0)
-t_Cols<- t_Cpal[round((vals - t_lim[1])*100) + 1]
-GPScol <- t_Cpal[round((err_spost - t_lim[1])*100) + 1]
-plot3d(sll_loc, pch = "20", size = 5, col = GPScol, xlab = "", ylab = "", zlab = "", axe=FALSE)
-plot(mesh_GIA, rgl = TRUE, col= t_Cols, edge.color = rgb(0, 0.5, 0.6, alpha =0), add = TRUE)
+#vals <- GIA_spost
+#open3d()
+#par3d(windowRect = c(100, 100, 900, 900))
+#layout3d(matrix(1:2, 2,1), heights = c(4,2), sharedMouse = TRUE)
+#par3d(zoom = 0.8)
+#t_lim <- range(c(vals, err_spost))
+#t_Clens <- round((t_lim[2] - t_lim[1])*100) + 1
+#t_Cpal <- topo.colors(t_Clens, alpha=0)
+#t_Cols<- t_Cpal[round((vals - t_lim[1])*100) + 1]
+#GPScol <- t_Cpal[round((err_spost - t_lim[1])*100) + 1]
+#plot3d(sll_loc, pch = "20", size = 5, col = GPScol, xlab = "", ylab = "", zlab = "", axe=FALSE)
+#plot(mesh_GIA, rgl = TRUE, col= t_Cols, edge.color = rgb(0, 0.5, 0.6, alpha =0), add = TRUE)
 
 ## plot the color bar
-next3d(reuse = FALSE)
-bgplot3d({z=matrix(1:t_Clens, nrow = t_Clens)
-y=1
-x=seq(t_lim[1],t_lim[2],len = t_Clens)
-par(cex = 1.5, fin = c(8, 1), mai = c(0,0, 0.5, 0), oma = c(1, 0, 0, 0))
-image(x,y,z,col = topo.colors(t_Clens),axes=FALSE,xlab="",ylab="")
-title("INLA Posterior ICE6G GIA, mu = 0")
-axis(1)})
+#next3d(reuse = FALSE)
+#bgplot3d({z=matrix(1:t_Clens, nrow = t_Clens)
+#y=1
+#x=seq(t_lim[1],t_lim[2],len = t_Clens)
+#par(cex = 1.5, fin = c(8, 1), mai = c(0,0, 0.5, 0), oma = c(1, 0, 0, 0))
+#image(x,y,z,col = topo.colors(t_Clens),axes=FALSE,xlab="",ylab="")
+#title("INLA Posterior ICE6G GIA, mu = 0")
+#axis(1)})
 
 
 

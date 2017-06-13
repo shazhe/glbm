@@ -52,7 +52,7 @@ GPS_sposts[[4]] <- GPS_spost
 ## Plot hyperparameters -- small errors
 exname <- paste0("/experimentBHM/","Meshcompare")
 pdf(file = paste0(wkdir, exname, "_hyperpar.pdf"), width = 6, height = 8)
-par(mfrow = c(3,2))
+par(mfrow = c(2,2))
 ## plot log(rho)
 maxd <- max(c(pars_GIAs[[1]]$marginals.log.range.nominal[[1]][,2],
               pars_GIAs[[2]]$marginals.log.range.nominal[[1]][,2],
@@ -103,6 +103,7 @@ plot(pars_GIAs[[1]]$marginals.variance.nominal[[1]], type = "l",  xlim = c(0, ma
 lines(pars_GIAs[[2]]$marginals.variance.nominal[[1]], type = "l", col = 2) # The posterior from inla output
 lines(pars_GIAs[[3]]$marginals.variance.nominal[[1]], type = "l", col = 4) # The posterior from inla output
 lines(pars_GIAs[[4]]$marginals.variance.nominal[[1]], type = "l", col = 5) # The posterior from inla output
+legend("topright", legend = c("reg_s", "reg_m", "reg_l", "GPS_l"), lwd = rep(1,4), lty = rep(1,4), col = c(1, 2, 4, 5))
 dev.off()
 
 

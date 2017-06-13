@@ -143,7 +143,7 @@ GPS_spost2 <- res_inla2$summary.linear.predictor$sd[pidx$data[1:n.data]]
 err_spost2 <- res_inla2$summary.linear.predictor$sd[pidx$data[-c(1:(n.data+n.GIA))]]
 
 ## plot the posterior error overlaid on posterior mean field
-pdf(file = paste0(wkdir, exname, "GIAfield.pdf"), width = 15, height = 24)
+pdf(file = paste0(wkdir, exname, "GIAfield.pdf"), width = 12, height = 18)
 par(mfrow= c(2,1))
 image.plot(proj$x, proj$y, inla.mesh.project(proj, as.vector(GIA_mpost1)), col = topo.colors(40),
            xlab = "Longitude", ylab = "Latitude", main = "Matern posterior Error field")

@@ -17,7 +17,7 @@
 
 
 #### 1 load libraries, GPS data and  GIA prior
-library(rgl)
+#library(rgl)
 library(INLA)
 if(runserver){
   INLA:::inla.dynload.workaround()
@@ -99,7 +99,7 @@ par(mfrow = c(3,1))
 for (i in 1:3){
   GIA_spde <- inla.spde2.matern(mesh_regs[[i]], B.tau = matrix(c(ltau0, -1, 1),1,3), B.kappa = matrix(c(lkappa0, 0, -1), 1,3),
                                 theta.prior.mean = c(0,0), theta.prior.prec = c(sqrt(1/theta1_s), sqrt(1/theta2_s)))
-  
+
   Q00 <- inla.spde2.precision(GIA_spde, theta = c(0,0))
   GIA_sprior <- sqrt(1/diag(Q00))
   proj<- inla.mesh.projector(mesh_regs[[i]], projection = "longlat", dims = c(361,181))
@@ -125,7 +125,7 @@ par(mfrow = c(3,1))
 for (i in 1:3){
   GIA_spde <- inla.spde2.matern(mesh_GPS[[i]], B.tau = matrix(c(ltau0, -1, 1),1,3), B.kappa = matrix(c(lkappa0, 0, -1), 1,3),
                                 theta.prior.mean = c(0,0), theta.prior.prec = c(sqrt(1/theta1_s), sqrt(1/theta2_s)))
-  
+
   Q00 <- inla.spde2.precision(GIA_spde, theta = c(0,0))
   GIA_sprior <- sqrt(1/diag(Q00))
   proj<- inla.mesh.projector(mesh_GPS[[i]], projection = "longlat", dims = c(361,181))
@@ -136,24 +136,25 @@ for (i in 1:3){
 dev.off()
 
 # ## Plot the results 3D
-vals <- GIA_sprior
-open3d()
-par3d(windowRect = c(100, 100, 900, 900))
-layout3d(matrix(1:2, 2,1), heights = c(4,2), sharedMouse = TRUE)
-par3d(zoom = 0.8)
-t_lim <- range(vals)
-t_Clens <- round((t_lim[2] - t_lim[1])*100) + 1
-t_Cpal <- topo.colors(t_Clens, alpha=0)
-t_Cols<- t_Cpal[round((vals - t_lim[1])*100) + 1]
-plot3d(GPS_loc, pch = "20", size = 5, xlab = "", ylab = "", zlab = "", axe=FALSE)
-plot(mesh_GPS[[3]], rgl = TRUE, col= t_Cols, edge.color = rgb(0, 0.5, 0.6, alpha =0), add = TRUE)
+#vals <- GIA_sprior
+#open3d()
+#par3d(windowRect = c(100, 100, 900, 900))
+#layout3d(matrix(1:2, 2,1), heights = c(4,2), sharedMouse = TRUE)
+#par3d(zoom = 0.8)
+#t_lim <- range(vals)
+#t_Clens <- round((t_lim[2] - t_lim[1])*100) + 1
+#t_Cpal <- topo.colors(t_Clens, alpha=0)
+#t_Cols<- t_Cpal[round((vals - t_lim[1])*100) + 1]
+#plot3d(GPS_loc, pch = "20", size = 5, xlab = "", ylab = "", zlab = "", axe=FALSE)
+#plot(mesh_GPS[[3]], rgl = TRUE, col= t_Cols, edge.color = rgb(0, 0.5, 0.6, alpha =0), add = TRUE)
 
 ## plot the color bar
-next3d(reuse = FALSE)
-bgplot3d({z=matrix(1:t_Clens, nrow = t_Clens)
-y=1
-x=seq(t_lim[1],t_lim[2],len = t_Clens)
-par(cex = 1.5, fin = c(8, 1), mai = c(0,0, 0.5, 0), oma = c(1, 0, 0, 0))
-image(x,y,z,col = topo.colors(t_Clens),axes=FALSE,xlab="",ylab="")
-title("INLA Posterior ICE6G GIA, mu = 0")
-axis(1)})
+#next3d(reuse = FALSE)
+#bgplot3d({z=matrix(1:t_Clens, nrow = t_Clens)
+#y=1
+#x=seq(t_lim[1],t_lim[2],len = t_Clens)
+#par(cex = 1.5, fin = c(8, 1), mai = c(0,0, 0.5, 0), oma = c(1, 0, 0, 0))
+#image(x,y,z,col = topo.colors(t_Clens),axes=FALSE,xlab="",ylab="")
+#title("INLA Posterior ICE6G GIA, mu = 0")
+#axis(1)})
+
