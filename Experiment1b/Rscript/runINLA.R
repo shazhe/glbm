@@ -3,6 +3,7 @@
 #### plug-in approximation      ####
 ####################################
 wkdir <- getwd()
+.libPaths("~/R/x86_64-redhat-linux-gnu-library/3.3/")
 ## Priors mean and variance for rho and sigma
 mu_r <- 500/6371
 v_r <- (1000/6371)^2

@@ -190,7 +190,7 @@ dev.off()
 
 
 #image.plot(s_lon, s_lat, matrix(err_spost, nrow = length(s_lon), ncol = length(s_lat)), col = topo.colors(40),
-           xlab = "Longitude", ylab = "Latitude", main = "Updated posterior error field")
+#           xlab = "Longitude", ylab = "Latitude", main = "Updated posterior error field")
 #points(sll$x, sll$y, cex = err_spost*2)
 #points(GPSX, GPSY, cex = (GPS.sd/mean(GPS.sd))^2, col = 2)
 

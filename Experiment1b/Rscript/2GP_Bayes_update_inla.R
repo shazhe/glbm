@@ -156,23 +156,33 @@ err_spost <- res_inla$summary.linear.predictor$sd[pidx$data[-c(1:(n.data+n.GIA))
 
 GPScol <- ifelse(ydata > 0, 2, 1)
 
-pdf(file = paste0(wkdir, exname, "GIAfield.pdf"), width = 8, height = 10)
+## plot the posterior error only
+pdf(file = paste0(wkdir, exname, "GIA_error_field.pdf"), width = 8, height = 10)
 par(mfrow = c(2,1))
-## The mean field
-image.plot(proj1$x, proj1$y, inla.mesh.project(proj1, as.vector(GIA_mpred)), col = topo.colors(100),
-           xlab = "Longitude", ylab = "Latitude", main = "Posterior mean of the GIA field")
-points(GPSX, GPSY,  pch = 20, cex = 0.8)
+Q2 <- inla.spde2.precision(GIA_spde, theta = theta_mean)
+image.plot(proj$x, proj$y, inla.mesh.project(proj, as.vector(sqrt(1/diag(Q2)))), col = topo.colors(40),
+           xlab = "Longitude", ylab = "Latitude", main = "Matern posterior Error field")
+points(GPSX, GPSY, cex = GPS_spost*2, pch = 1)
 
 ## The standard error
-image.plot(proj1$x, proj1$y, inla.mesh.project(proj1, as.vector(GIA_spred)), col = topo.colors(40),
-           xlab = "Longitude", ylab = "Latitude", main = "Posterior standard error of the GIA field")
-points(GPSX, GPSY, cex = sqrt(abs(ydata)), col = GPScol, pch = 1)
+image.plot(proj$x, proj$y, inla.mesh.project(proj, as.vector(GIA_spost)), col = topo.colors(40),
+           xlab = "Longitude", ylab = "Latitude", main = "Updated posterior error field")
+points(GPSX, GPSY, cex = GPS_spost*2, pch = 1)
+dev.off()
 
+
+## plot the posterior error overlaid on posterior mean field
+pdf(file = paste0(wkdir, exname, "GIAfield.pdf"), width = 15, height = 12)
+image.plot(proj$x, proj$y, inla.mesh.project(proj, as.vector(GIA_mpost)), col = topo.colors(40),
+           xlab = "Longitude", ylab = "Latitude", main = "Matern posterior Error field")
+points(sll$x, sll$y, cex = (err_spost/mean(err_spost))^2*2)
+points(GPSX, GPSY, cex = (GPS_spost/mean(err_spost))^2*2, col = 2)
 dev.off()
 
 
 
-save(res_inla, GIA_spde, ydata, mu_r, v_r, mu_s, v_s, Mesh_GIA, file = paste0(wkdir, exname, "inla.RData"))
+
+save(res_inla, GIA_spde, ydata, mu_r, v_r, mu_s, v_s, mesh_GIA, file = paste0(wkdir, exname, "inla.RData"))
 
 
 

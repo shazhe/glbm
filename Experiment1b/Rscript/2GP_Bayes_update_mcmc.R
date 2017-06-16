@@ -42,15 +42,32 @@ GPS_loc <- do.call(cbind, Lll2xyz(lat = GPS_obs$lat, lon = GPS_obs$lon))
 GPSX <- ifelse(GPS_obs$lon > 180, GPS_obs$lon-360, GPS_obs$lon)
 GPSY <- GPS_obs$lat
 
+Mesh_GIA <- inla.mesh.2d(loc = GPS_loc, cutoff = 0.001,  max.edge = max_edge)
+MlocLL <- Lxyz2ll(list(x=Mesh_GIA$loc[,1], y = Mesh_GIA$loc[,2], z = Mesh_GIA$loc[,3]))
+MlocLL$lon <- ifelse(MlocLL$lon < 0, MlocLL$lon + 360, MlocLL$lon)
+MlocLL$lon <- ifelse(MlocLL$lon > 359.5, MlocLL$lon - 360, MlocLL$lon)
+M_sp <- SpatialPoints(data.frame(lon = MlocLL$lon, lat = MlocLL$lat), proj4string = CRS("+proj=longlat")) #This convert GIA_ice6g a SpatialPointDataFrame
+
+Midx <- over(M_sp, Plist)
+GIA_mu <- GIA_ice6g_sp$trend[Midx]
+## GIA
+GIA_ice6g <- read.table("experimentBHM/GIA_truth.txt", header = T)
+GIA_ice6g$x_center <- ifelse(GIA_ice6g$x_center > 180, GIA_ice6g$x_center-360, GIA_ice6g$x_center)
+GIA_loc6 <- inla.mesh.map(cbind(GIA_ice6g$x_center, GIA_ice6g$y_center), projection = "longlat")
+
 CMat <- inla.spde.make.A(mesh = Mesh_GIA, loc = GPS_loc)
+CMat2 <- inla.spde.make.A(mesh = Mesh_GIA, loc = GIA_loc6)
 nObs <- nrow(CMat)
 nMesh <- ncol(CMat)
-x_mu <- matrix(Mesh_GIA_sp@data$GIA_m, nrow = nMesh, ncol = 1)
+x_mu <- matrix(GIA_mu, nrow = nMesh, ncol = 1)
 igshape_new <- igshape0 + nObs/2
 
 ### Generate synthetic GPS data
 y0 <- CMat %*% x_mu
 ydata <- GPS_obs$trend
+yerr <- GPS_obs$std
+Q_obs <- Matrix(0, nrow = nObs, ncol = nObs, sparse = TRUE)
+diag(Q_obs) <- (1/yerr)^2
 
 ### Transform hyper parameters 
 ## GMRF Matern covariance parameters
@@ -79,17 +96,13 @@ GIA_spde <- inla.spde2.matern(Mesh_GIA, B.tau = matrix(c(ltau0, -1, 1),1,3), B.k
 
 mcmcGIA <- function(initial_vals){
   ### Initial values
-  ## Observations
-  sigma_e0 <- initial_vals[1]
-  Q_obs0 <- Matrix(0, nrow = nObs, ncol = nObs, sparse = TRUE)
-  diag(Q_obs0) <- 1/sigma_e0
+  
   ## Latent GMRF
-  theta0 <- initial_vals[2:3]
+  theta0 <- initial_vals
   Q_GIA0 <- inla.spde.precision(GIA_spde, theta=theta0)
   
   ### Allocate storage
   x_samp <- matrix(0,numsamples, nMesh)
-  e_samp <- rep(0, numsamples)
   theta12_samp <- matrix(0, numsamples,2)
   
   
@@ -111,7 +124,6 @@ mcmcGIA <- function(initial_vals){
   }
   
   ### Start MCMC simulation
-  Q_obs <- Q_obs0
   Q_GIA <- Q_GIA0
   theta_t <- theta0
   mmchol <- summary(chol(as.spam.dgCMatrix(Q_GIA)))
@@ -126,12 +138,8 @@ mcmcGIA <- function(initial_vals){
     zm_new <- backsolve(cholQ_new, cbind(rnorm(nMesh), forwardsolve(cholQ_new, bt)))
     x_new <- rowSums(zm_new)
     
-    ### 2 Update the measurement error
-    res <- ydata - CMat%*%x_new
-    igscale_new <- as.numeric(igscale0 + crossprod(res)/2)
-    e_new <- rinvgamma(1,shape=igshape_new, scale = igscale_new)
-    
-    ### 3 Update the SPDE parameters
+  
+    ### 2 Update the SPDE parameters
     z_GIA <- x_new - x_mu
     
     if(sampler == "MH_RW"){
@@ -201,13 +209,11 @@ mcmcGIA <- function(initial_vals){
       if((mm-burnin)%%thinning == 0){
         m <- m +1
         x_samp[m,] <- x_new
-        e_samp[m] <- e_new
         theta12_samp[m,] <- theta_t
       }
     }
     mm <- mm +1
     Q_GIA <- inla.spde.precision(GIA_spde, theta=theta_t)
-    diag(Q_obs) <- 1/e_new
     
     ### Print the Progression Bar
     setTxtProgressBar(pb, m)
@@ -220,7 +226,7 @@ mcmcGIA <- function(initial_vals){
   t2 <- proc.time()
   ttime <- t2-t1
   
-  return(list(time = ttime, samples = list(sigma_e = e_samp, theta1 = theta12_samp[,1],
+  return(list(time = ttime, samples = list(theta1 = theta12_samp[,1],
                                            theta2 = theta12_samp[,2], xGIA = x_samp)))
   
 }
