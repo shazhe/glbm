@@ -20,6 +20,10 @@ library(maps)
 library(maptools)
 source("glbm/Experiment1a/Rscript/MVSTplus.R")
 
+## GIA
+GIA_ice6g <- read.table("experimentBHM/GIA_truth.txt", header = T)
+GIA_ice6g$x_center <- ifelse(GIA_ice6g$x_center > 180, GIA_ice6g$x_center-360, GIA_ice6g$x_center)
+GIA_loc6 <- inla.mesh.map(cbind(GIA_ice6g$x_center, GIA_ice6g$y_center), projection = "longlat")
 ## Get the GPS locations
 GPS_loc <- do.call(cbind, Lll2xyz(lat = GPS_obs$lat, lon = GPS_obs$lon))
 GPSX <- ifelse(GPS_obs$lon> 180, GPS_obs$lon-360, GPS_obs$lon)
@@ -33,6 +37,11 @@ M_sp <- SpatialPoints(data.frame(lon = MlocLL$lon, lat = MlocLL$lat), proj4strin
 Midx <- over(M_sp, Plist)
 GIA_mu <- GIA_ice6g_sp$trend[Midx]
 
+GPSxx <- ifelse(GPSX < 0, GPSX + 360, GPSX)
+GPSxx <- ifelse(GPSxx > 359.5, GPSxx - 360, GPSxx)
+M2_sp <- SpatialPoints(data.frame(lon = GPSxx, lat = GPSY), proj4string = CRS("+proj=longlat"))
+Midx2 <- over(M2_sp, Plist)
+GPS_mu <- GIA_ice6g_sp$trend[Midx2]
 ## Setup for spde parameters
 trho <- Tlognorm(mu_r, v_r)
 tsigma <- Tlognorm(mu_s, v_s)
@@ -54,15 +63,11 @@ GIA_spde <- inla.spde2.matern(mesh_GIA, B.tau = matrix(c(ltau0, -1, 1),1,3), B.k
 Ay <- inla.spde.make.A(mesh = mesh_GIA, loc = GPS_loc)
 
 ## Create a stack of locations to plot the posterior (resolution = 5 degree apart)
-s_lat <- seq(-89.5, 89.5, 10)
-s_lon <- seq(-179.5, 179.5, 10)
-sll <- expand.grid(x = s_lon, y = s_lat)
-sll_loc <- do.call(cbind, Lll2xyz(lat = sll$y, lon = sll$x))
-A_all <- inla.spde.make.A(mesh = mesh_GIA, loc = rbind(GPS_loc, mesh_GIA$loc, sll_loc))
+
+A_all <- inla.spde.make.A(mesh = mesh_GIA, loc = rbind(GPS_loc, GIA_loc6))
 
 ## create new synthetic data, plot and compare
-y0 <- as.vector(Ay %*% GIA_mu)
-ydata <- GPS_obs$trend - y0
+ydata <- GPS_obs$trend - GPS_mu
 
 #### 1: GIA_ice6g prior mean info
 st.est <- inla.stack(data = list(y=ydata), A = list(Ay),
@@ -75,9 +80,9 @@ stGIA <- inla.stack(st.est, st.pred)
 
 hyper <- list(prec = list(fixed = TRUE, initial = 0))
 formula = y ~ -1 +  f(GIA, model = GIA_spde)
-prec_scale <- c(1/GPS_obs$std, rep(1, length(ydata)), rep(1, GIA_spde$n.spde), rep(1, nrow(sll_loc)))
+prec_scale <- c(1/GPS_obs$std, rep(1, nrow(A_all)))
 res_inla <- inla(formula, data = inla.stack.data(stGIA, spde = GIA_spde), family = "gaussian",
-                 scale =prec <- scale, control.family = list(hyper = hyper),
+                 scale =prec_scale, control.family = list(hyper = hyper),
                    control.predictor=list(A=inla.stack.A(stGIA), compute =TRUE))
 
 summary(res_inla)
@@ -144,21 +149,32 @@ proj <- inla.mesh.projector(mesh_GIA, projection = "longlat", dims = c(500,500))
 
 pidx <- inla.stack.index(stGIA, tag = "pred")
 n.data <- length(ydata)
-n.GIA <- GIA_spde$n.spde
-n.errs <- nrow(sll_loc)
-GIA_mpost <- res_inla$summary.linear.predictor$mean[pidx$data[(n.data+1): (n.data+n.GIA)]] + GIA_mu
-GIA_spost <- res_inla$summary.linear.predictor$sd[pidx$data[(n.data+1): (n.data+n.GIA)]]
+n.GIA <- nrow(GIA_loc6)
+
+GIA_mpost <- res_inla$summary.linear.predictor$mean[pidx$data[-c(1:n.data)]] + GIA_ice6g$trend
+GIA_spost <- res_inla$summary.linear.predictor$sd[pidx$data[-c(1:n.data)]]
 
 GPS_mpost <- res_inla$summary.linear.predictor$mean[pidx$data[1:n.data]]
 GPS_spost <- res_inla$summary.linear.predictor$sd[pidx$data[1:n.data]]
 
-err_spost <- res_inla$summary.linear.predictor$sd[pidx$data[-c(1:(n.data+n.GIA))]]
+GIA_ice6g2 <- cbind(GIA_ice6g, GIA_mpost, GIA_spost)
+
+write.table(GIA_ice6g2, file = paste0(wkdir, exname, "GIApred.txt"), row.names = FALSE, eol = "\r\n")
+
+xyord <- order(GIA_ice6g$x_center, GIA_ice6g$y_center, decreasing = c(FALSE, FALSE), method = "radix")
+yy <- unique(GIA_ice6g$y_center[xyord])
+xx <- unique(GIA_ice6g$x_center[xyord])
+
+GIA_mMat <- matrix(GIA_mpost[xyord], nrow = 360, ncol = 180, byrow = TRUE)
+GIA_sMat <- matrix(GIA_spost[xyord], nrow = 360, ncol = 180, byrow = TRUE)
+
 
 GPScol <- ifelse(ydata > 0, 2, 1)
 
 ## plot the posterior error only
 pdf(file = paste0(wkdir, exname, "GIA_error_field.pdf"), width = 8, height = 10)
 par(mfrow = c(2,1))
+
 Q2 <- inla.spde2.precision(GIA_spde, theta = theta_mean)
 image.plot(proj$x, proj$y, inla.mesh.project(proj, as.vector(sqrt(1/diag(Q2)))), col = topo.colors(40),
            xlab = "Longitude", ylab = "Latitude", main = "Matern posterior Error field")
