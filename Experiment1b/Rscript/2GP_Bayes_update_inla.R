@@ -166,7 +166,11 @@ yy <- unique(GIA_ice6g$y_center[xyord])
 xx <- unique(GIA_ice6g$x_center[xyord])
 
 GIA_mMat <- matrix(GIA_mpost[xyord], nrow = 360, ncol = 180, byrow = TRUE)
-GIA_sMat <- matrix(GIA_spost[xyord], nrow = 360, ncol = 180, byrow = TRUE)
+GIA_sMat <- matrix(sqrt(GIA_spost[xyord]), nrow = 360, ncol = 180, byrow = TRUE)
+
+image.plot(xx, yy, GIA_sMat, col = topo.colors(40),
+           xlab = "Longitude", ylab = "Latitude", main = "Matern posterior Error field")
+points(GPSX, GPSY,  pch = 1)
 
 
 GPScol <- ifelse(ydata > 0, 2, 1)

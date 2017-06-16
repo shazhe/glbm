@@ -83,12 +83,12 @@ GIA_samps <- do.call(rbind, lapply(res, function(x) x$samples$xGIA))
 GIA_mean <- colMeans(GIA_samps)
 GIApost_cov <- cov(GIA_samps)
 
-GIA_mpred <- CMat2 %*% GIA_mean
+GIA_mpred <- as.numeric(CMat2 %*% GIA_mean)
 CMat2C <- CMat2 %*% GIApost_cov
 GIA_spred <- rep(0, nrow(CMat2))
 
 ids <- c(seq(1, 64800, 6480), 64800)
 GIA_spred <- mclapply.hack(1:10, function(i) sapply(ids[i]:ids[i+1], function(x) CMat2[x,] %*% CMat2C[x,]))
-
-GIA_ice6g2 <- cbind(GIA_ice6g, GIA_mpred, GIA_spred)
-write.table(GIA_ice6g2, file = paste0(wkdir, exname, "GIApred.txt"), row.names = FALSE, eol = "\r\n")
+GIA_spreds <- c(sapply(1:10, function(x) GIA_spred[[x]][1:6480]))
+GIA_ice6g2 <- cbind(GIA_ice6g, GIA_mpost = GIA_mpred, GIA_spost = GIA_spreds)
+write.table(GIA_ice6g2, file = paste0(wkdir, exname, "_GIApred.txt"), row.names = FALSE, eol = "\r\n")
