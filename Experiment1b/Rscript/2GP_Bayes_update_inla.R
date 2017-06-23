@@ -173,6 +173,13 @@ GIA_mMat2 <- matrix(GIA_mpost2[xyord], nrow = 360, ncol = 180, byrow = TRUE)
 image.plot(xx, yy, GIA_mMat2)
 points(GPSX, GPSY, cex = GPS_spost*2, pch = 1)
 
+GIA_sMat <- matrix(sqrt(GIA_spost[xyord]), nrow = 360, ncol = 180, byrow = TRUE)
+
+image.plot(xx, yy, GIA_sMat, col = topo.colors(40),
+           xlab = "Longitude", ylab = "Latitude", main = "Matern posterior Error field")
+points(GPSX, GPSY,  pch = 1)
+
+
 GPScol <- ifelse(ydata > 0, 2, 1)
 
 ## plot the posterior error only
