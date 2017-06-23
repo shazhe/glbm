@@ -152,10 +152,12 @@ n.data <- length(ydata)
 n.GIA <- nrow(GIA_loc6)
 
 GIA_mpost <- res_inla$summary.linear.predictor$mean[pidx$data[-c(1:n.data)]] + GIA_ice6g$trend
+GIA_mpost2 <- res_inla$summary.linear.predictor$mean[pidx$data[-c(1:n.data)]]
 GIA_spost <- res_inla$summary.linear.predictor$sd[pidx$data[-c(1:n.data)]]
 
 GPS_mpost <- res_inla$summary.linear.predictor$mean[pidx$data[1:n.data]]
 GPS_spost <- res_inla$summary.linear.predictor$sd[pidx$data[1:n.data]]
+GPS_obs <- cbind(GPS_obs, GPS_mpost, GPS_spost)
 
 GIA_ice6g2 <- cbind(GIA_ice6g, GIA_mpost, GIA_spost)
 
@@ -167,7 +169,9 @@ xx <- unique(GIA_ice6g$x_center[xyord])
 
 GIA_mMat <- matrix(GIA_mpost[xyord], nrow = 360, ncol = 180, byrow = TRUE)
 GIA_sMat <- matrix(GIA_spost[xyord], nrow = 360, ncol = 180, byrow = TRUE)
-
+GIA_mMat2 <- matrix(GIA_mpost2[xyord], nrow = 360, ncol = 180, byrow = TRUE)
+image.plot(xx, yy, GIA_mMat2)
+points(GPSX, GPSY, cex = GPS_spost*2, pch = 1)
 
 GPScol <- ifelse(ydata > 0, 2, 1)
 
