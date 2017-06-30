@@ -45,6 +45,7 @@ dev.off()
 ## Posterior mean
 GIApost_mean <- lapply(res, function(x) colMeans(x$samples$xGIA))
 GIApost_sd <- lapply(res, function(x) apply( x$samples$xGIA, 2, sd))
+GIA_ice6g2 <- cbind(GIA_ice6g, GIApost_mean, GIApost_sd)
 
 proj <- inla.mesh.projector(Mesh_GIA, projection = "longlat", dims = c(361,181))
 

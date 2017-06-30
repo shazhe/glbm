@@ -42,7 +42,7 @@ GPS_loc <- do.call(cbind, Lll2xyz(lat = GPS_obs$lat, lon = GPS_obs$lon))
 GPSX <- ifelse(GPS_obs$lon > 180, GPS_obs$lon-360, GPS_obs$lon)
 GPSY <- GPS_obs$lat
 
-Mesh_GIA <- inla.mesh.2d(loc = GPS_loc, cutoff = 0.001,  max.edge = max_edge)
+Mesh_GIA <- inla.mesh.create(globe = 10)
 MlocLL <- Lxyz2ll(list(x=Mesh_GIA$loc[,1], y = Mesh_GIA$loc[,2], z = Mesh_GIA$loc[,3]))
 MlocLL$lon <- ifelse(MlocLL$lon < 0, MlocLL$lon + 360, MlocLL$lon)
 MlocLL$lon <- ifelse(MlocLL$lon > 359.5, MlocLL$lon - 360, MlocLL$lon)
