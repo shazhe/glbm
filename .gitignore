@@ -1,12 +1,12 @@
 # Add any directories, files, or patterns you don't want to be tracked by version control
-.dat
-.RData
-.shp
-.csv
-.Rhistory
-.html
-.png
-.nc
-.docx
-.doc
+*.dat
+*.RData
+*.shp
+*.csv
+*.Rhistory
+*.html
+*.png
+*.nc
+*.docx
+*.doc
 wiki/
