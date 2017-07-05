@@ -71,17 +71,17 @@ st.est <- inla.stack(data = list(y=ydata), A = list(Ay),
 Ip <- Matrix(0, GIA_spde$n.spde, GIA_spde$n.spde)
 diag(Ip) <- 1
 st.pred <- inla.stack(data = list(y=NA), A = list(A_all),
-                      effects = list(GIA=1:GIA_spde$n.spde), tag = "pred")
+                      effects = list(GIA=1:spde$n.spde), tag = "pred")
 stGIA <- inla.stack(st.est, st.pred)
 
 ## Fix the sigma_e^2 to be 1 and scale them according to the data in inla(...,scale = scale)
 ## Default uses log(1/sigma_e^2) to be loggamma distribution with intial value = 0.
 hyper <- list(prec = list(fixed = TRUE, initial = log(1/1.5)))
-formula = y ~ -1 + f(GIA, model = GIA_spde)
-prec_scale <- c(1/GPS_obs$std, rep(1, length(ydata)), rep(1, GIA_spde$n.spde), rep(1, nrow(sll_loc)))
-res_inla <- inla(formula, data = inla.stack.data(stGIA, spde = GIA_spde), family = "gaussian",
+formula = y ~ -1 + f(GIA, model = spde)
+prec_scale <- 1/err
+res_inla <- inla(formula, data = inla.stack.data(st.est, spde = spde), family = "gaussian",
                   control.family = list(hyper = hyper),
-                   control.predictor=list(A=inla.stack.A(stGIA), compute =TRUE))
+                   control.predictor=list(A=inla.stack.A(st.est), compute =TRUE))
 summary(res_inla)
 
 ## Plot hyperparameters
