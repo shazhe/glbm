@@ -80,7 +80,7 @@ stGIA <- inla.stack(st.est, st.pred)
 
 hyper <- list(prec = list(fixed = TRUE, initial = 0))
 formula = y ~ -1 +  f(GIA, model = GIA_spde)
-prec_scale <- c(1/GPS_obs$std, rep(1, nrow(A_all)))
+prec_scale <- c(1/GPS_obs$std^2, rep(1, nrow(A_all)))
 res_inla <- inla(formula, data = inla.stack.data(stGIA, spde = GIA_spde), family = "gaussian",
                  scale =prec_scale, control.family = list(hyper = hyper),
                    control.predictor=list(A=inla.stack.A(stGIA), compute =TRUE))

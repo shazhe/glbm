@@ -76,9 +76,9 @@ stGIA <- inla.stack(st.est, st.pred)
 
 ## Fix the sigma_e^2 to be 1 and scale them according to the data in inla(...,scale = scale)
 ## Default uses log(1/sigma_e^2) to be loggamma distribution with intial value = 0.
-hyper <- list(prec = list(fixed = TRUE, initial = log(1/1.5)))
+hyper <- list(prec = list(fixed = TRUE, initial = log(1/mean(err^2))))
 formula = y ~ -1 + f(GIA, model = spde)
-prec_scale <- 1/err
+prec_scale <- 1/err^2
 res_inla <- inla(formula, data = inla.stack.data(st.est, spde = spde), family = "gaussian",
                   control.family = list(hyper = hyper),
                    control.predictor=list(A=inla.stack.A(st.est), compute =TRUE))
