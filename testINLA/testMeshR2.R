@@ -7,11 +7,11 @@ library(fields)
 #### 0 Test the mesh effect on variances
 #### Statement: the mesh effect on the variances is casued by shape change and range vs max.edge
 
-#### on a sparse regular grid
+#### 0.1 on a regular grids
 plot.mvar <- function(range0, locres, max.edge, plot.mesh = TRUE, xylim = TRUE){
   sigma0 <- 1
   loc <- as.matrix(expand.grid(seq(0, 1, locres), seq(0, 1, locres)))
-  mesh <- inla.mesh.2d(loc = loc, offset = c(0.1, 0.4), max.edge = max.edge )
+  mesh <- inla.mesh.2d(loc = loc, offset = c(0.2, 0.5), max.edge = max.edge )
   kappa0 <- sqrt(8)/range0
   tau0 <- 1/(sqrt(4*pi)*kappa0*sigma0)
   
@@ -44,10 +44,10 @@ plot.mvar(range0=0.5, locres = 0.025, max.edge = c(0.04, 0.04), plot.mesh = FALS
 
 ### fix grid size and change range
 par(mfrow = c(2,2))
-plot.mvar(range0=20, locres = 0.1, max.edge = c(0.15, 0.15), plot.mesh = FALSE, xylim = FALSE)
-plot.mvar(range0=0.5, locres = 0.1, max.edge = c(0.15, 0.15), plot.mesh = FALSE, xylim = FALSE)
-plot.mvar(range0=1e-2, locres = 0.1, max.edge = c(0.15, 0.15), plot.mesh = FALSE, xylim = FALSE)
-plot.mvar(range0=1e-7, locres = 0.1, max.edge = c(0.15, 0.15), plot.mesh = FALSE, xylim = FALSE)
+plot.mvar(range0=20, locres = 0.2, max.edge = c(0.3, 0.3), plot.mesh = FALSE, xylim = FALSE)
+plot.mvar(range0=0.5, locres = 0.2, max.edge = c(0.3, 0.3), plot.mesh = FALSE, xylim = FALSE)
+plot.mvar(range0=1e-2, locres = 0.2, max.edge = c(0.3, 0.3), plot.mesh = FALSE, xylim = FALSE)
+plot.mvar(range0=1e-7, locres = 0.2, max.edge = c(0.3, 0.3), plot.mesh = FALSE, xylim = FALSE)
 
 par(mfrow = c(2,2))
 plot.mvar(range0=20, locres = 0.05, max.edge = c(0.1, 0.1), plot.mesh = FALSE, xylim = FALSE)
@@ -55,6 +55,54 @@ plot.mvar(range0=0.5, locres = 0.05, max.edge = c(0.1, 0.1), plot.mesh = FALSE, 
 plot.mvar(range0=1e-2, locres = 0.05, max.edge = c(0.1, 0.1), plot.mesh = FALSE, xylim = FALSE)
 plot.mvar(range0=1e-5, locres = 0.05, max.edge = c(0.1, 0.1), plot.mesh = FALSE, xylim = FALSE)
 
+#### 0.2 on irregular grids
+plot.mvar2 <- function(range0, locnum, max.edge, plot.mesh = TRUE, xylim = TRUE){
+  loc <- matrix(runif(locnum*2), locnum, 2)
+  bnd <- inla.nonconvex.hull(loc, convex = 0.12)
+  sigma0 <- 1
+  mesh <- inla.mesh.2d(boundary = bnd, cutoff = max.edge[1],  max.edge = max.edge )
+  kappa0 <- sqrt(8)/range0
+  tau0 <- 1/(sqrt(4*pi)*kappa0*sigma0)
+  
+  spde <- inla.spde2.matern(mesh, B.tau = cbind(log(tau0), -1, 1),
+                            B.kappa = cbind(log(kappa0), 0, -1), 
+                            theta.prior.mean = c(0,0), theta.prior.prec = c(0.1, 1))
+  Q <- inla.spde.precision(spde, theta = c(0,0))
+  mvars <- diag(Q)
+  proj <- inla.mesh.projector(mesh, dims = c(100,100))
+  
+  if(xylim){
+    image.plot(proj$x, proj$y, inla.mesh.project(proj, as.vector(mvars)), 
+               col = topo.colors(7), xlim = c(0,1), ylim = c(0,1))
+  }else{
+    image.plot(proj$x, proj$y, inla.mesh.project(proj, as.vector(mvars)), 
+               col = topo.colors(7))
+  }
+  
+  if(plot.mesh){
+    plot(mesh, add = TRUE)}
+}
+
+### fix range and vary grid size
+par(mfrow = c(2,2))
+plot.mvar2(range0=0.5, locnum = 1e2, max.edge = c(0.1, 0.1))
+plot.mvar2(range0=0.5, locnum = 1e3, max.edge = c(0.1, 0.1))
+plot.mvar2(range0=0.5, locnum = 1e4, max.edge = c(0.05, 0.05))
+plot.mvar2(range0=0.5, locnum = 1e3, max.edge = c(0.01, 0.01), plot.mesh = FALSE)
+
+
+### fix grid size and change range
+par(mfrow = c(2,2))
+plot.mvar(range0=20, locres = 0.2, max.edge = c(0.3, 0.3), plot.mesh = FALSE, xylim = FALSE)
+plot.mvar(range0=0.5, locres = 0.2, max.edge = c(0.3, 0.3), plot.mesh = FALSE, xylim = FALSE)
+plot.mvar(range0=1e-2, locres = 0.2, max.edge = c(0.3, 0.3), plot.mesh = FALSE, xylim = FALSE)
+plot.mvar(range0=1e-7, locres = 0.2, max.edge = c(0.3, 0.3), plot.mesh = FALSE, xylim = FALSE)
+
+par(mfrow = c(2,2))
+plot.mvar(range0=20, locres = 0.05, max.edge = c(0.1, 0.1), plot.mesh = FALSE, xylim = FALSE)
+plot.mvar(range0=0.5, locres = 0.05, max.edge = c(0.1, 0.1), plot.mesh = FALSE, xylim = FALSE)
+plot.mvar(range0=1e-2, locres = 0.05, max.edge = c(0.1, 0.1), plot.mesh = FALSE, xylim = FALSE)
+plot.mvar(range0=1e-5, locres = 0.05, max.edge = c(0.1, 0.1), plot.mesh = FALSE, xylim = FALSE)
 
 
 #### 1 Test on the plane (example from JSS paper)
