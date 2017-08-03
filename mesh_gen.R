@@ -35,6 +35,7 @@ aa <- fiboSphere2(1000)
 bb <- do.call(cbind, Lll2xyz(lat = aa[,2], lon = aa[,1]))
 
 library(INLA)
-Mesh_b <- inla.mesh.2d(loc = aa, cutoff = 0.001, max.edge = 5) ## small
-plot(Mes_b, rgl = T)
+Mesh_b <- inla.mesh.2d(loc = bb, cutoff = 0.001, max.edge = 5) ## small
 
+plot(Mesh_b, rgl = T)
+points3d(bb, add = T, col = "green", size = 8, pch = 20)
