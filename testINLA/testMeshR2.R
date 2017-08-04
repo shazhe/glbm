@@ -1,3 +1,6 @@
+
+
+
 #### Test INLA mesh on R2 using different types of meshes
 library(INLA)
 library(lattice)
