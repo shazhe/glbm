@@ -137,14 +137,15 @@ In the following experiment, we assume the true process has $\rho = 0.1, \sigma^
 First we simulate data from the true process on a fine grid.
 ```{r warning=FALSE, message=FALSE, cache=TRUE}
 ## Simulate the true process on a fine grid
-set.seed(12)
+set.seed(10)
 data_grid <- as.matrix(expand.grid(seq(0, 1, 0.01), seq(0, 1, 0.01)))
 locdist <- as.matrix(dist(data_grid))
 data_cov <- Matern(d =locdist, range = 0.1, smoothness = 1, phi = 1) # to be compared with inla: smoothness(nu) = alpha - d/2
 data_vec <- chol(data_cov) %*% rnorm(nrow(data_grid))
 simdata <- data.frame(x = data_grid[,1], y = data_grid[,2], z = data_vec)
 library(ggplot2)
-true_process <- ggplot(simdata) + geom_raster(aes(x = x, y = y, fill = z)) + scale_fill_gradientn(colours = terrain.colors(12))
+true_process <- ggplot(simdata) + geom_raster(aes(x = x, y = y, fill = z)) + scale_fill_gradientn(colours = terrain.colors(12)) +
+  ggtitle("Simulated data from the true process") 
 print(true_process)
 ```
 
@@ -152,8 +153,8 @@ print(true_process)
 From this grid we sample 500 data points as our observations.
 ```{r warning=FALSE, message=FALSE, cache=TRUE}
 obs_ind <- sample(1:length(data_vec), 500)
-obs_data <- data.frame(x = data_grid[obs_ind, 1], y = data_grid[obs_ind, 2], z = data_vec[obs_ind] + rnorm(500)*0.5)
-sample_data <- true_process + geom_point(data=obs_data, aes(x, y))
+obs_data <- data.frame(x = data_grid[obs_ind, 1], y = data_grid[obs_ind, 2], z = data_vec[obs_ind] + rnorm(500)*1)
+sample_data <- true_process + geom_point(data=obs_data, aes(x, y)) + ggtitle("Sampled observations") 
 print(sample_data)
 ```
 
@@ -194,7 +195,7 @@ INLA_infer <- function(mesh, data){
   
   hyper <- list(prec = list(fixed = TRUE, initial = log(1)))
   formula = y ~ -1 + f(process, model = spde)
-  prec_scale <- 1/(0.5^2)
+  prec_scale <- 1/(1^2)
   
   res_inla <- inla(formula, data = inla.stack.data(st.est, spde = spde), family = "gaussian",
                   scale = prec_scale, control.family = list(hyper = hyper),
@@ -204,8 +205,8 @@ INLA_infer <- function(mesh, data){
   
   ## the predictions
   proj <- inla.mesh.projector(mesh,dims = c(500,500))
-  mean_post <- res_inla$summary.random$GIA$mean
-  sd_post <- res_inla$summary.random$GIA$sd
+  mean_post <- res_inla$summary.random$process$mean
+  sd_post <- res_inla$summary.random$process$sd
   
   return(list(pars = res_pars, proj = proj, mean = mean_post, sd = sd_post))
 }
@@ -241,7 +242,54 @@ legend("topright", legend = c("reg_s", "reg_m", "reg_l", "irreg_m"), lwd = rep(1
 
 ```
 
-Finally we compare the predicted mean field and uncertainties.
+Finally we compare the predicted mean field.
 ```{r warning=FALSE, message=FALSE}
+library(INLA)
+preddata1 <- data.frame(x=res1$proj$x, y = res1$proj$y, z = inla.mesh.project(res1$proj, as.vector(res1$mean)), 
+                        sd = inla.mesh.project(res1$proj, as.vector(res1$sd)))
+preddata2 <- data.frame(x=res2$proj$x, y = res2$proj$y, z = inla.mesh.project(res2$proj, as.vector(res2$mean)),
+                       sd = inla.mesh.project(res2$proj, as.vector(res2$sd)))
+preddata3 <- data.frame(x=res3$proj$x, y = res3$proj$y, z = inla.mesh.project(res3$proj, as.vector(res3$mean)),
+                        sd = inla.mesh.project(res3$proj, as.vector(res3$sd)))
+preddata4 <- data.frame(x=res4$proj$x, y = res4$proj$y, z = inla.mesh.project(res4$proj, as.vector(res4$mean)),
+                        sd = inla.mesh.project(res4$proj, as.vector(res4$sd)))
 
+
+m1 <- ggplot(preddata1) + geom_raster(aes(x = x, y = y, fill = z)) + scale_fill_gradientn(colours = terrain.colors(12)) +
+  ggtitle("Predicted mean using regular mesh 1")
+
+m2 <- ggplot(preddata2) + geom_raster(aes(x = x, y = y, fill = z)) + scale_fill_gradientn(colours = terrain.colors(12)) +
+  ggtitle("Predicted mean using regular mesh 2")
+
+m3 <- ggplot(preddata3) + geom_raster(aes(x = x, y = y, fill = z)) + scale_fill_gradientn(colours = terrain.colors(12)) +
+  ggtitle("Predicted mean using regular mesh 3")
+
+m4 <- ggplot(preddata4) + geom_raster(aes(x = x, y = y, fill = z)) + scale_fill_gradientn(colours = terrain.colors(12)) +
+  ggtitle("Predicted mean using irregular mesh")
+
+print(true_process)
+print(m1)
+print(m2)
+print(m3)
+print(m4)
+```
+
+And also compare the predicted uncertainties.
+```{r warning=FALSE, message=FALSE}
+sd1 <- ggplot(predata1) + geom_raster(aes(x = x, y = y, fill = sd)) + scale_fill_gradientn(colours = terrain.colors(12)) +
+  ggtitle("Predicted uncertainties using regular mesh 1")
+
+sd2 <- ggplot(predata2) + geom_raster(aes(x = x, y = y, fill = sd)) + scale_fill_gradientn(colours = terrain.colors(12)) +
+  ggtitle("Predicted uncertainties using regular mesh 2")
+
+sd3 <- ggplot(predata3) + geom_raster(aes(x = x, y = y, fill = sd)) + scale_fill_gradientn(colours = terrain.colors(12)) +
+  ggtitle("Predicted uncertainties using regular mesh 3")
+
+sd4 <- ggplot(predata4) + geom_raster(aes(x = x, y = y, fill = sd)) + scale_fill_gradientn(colours = terrain.colors(12)) +
+  ggtitle("Predicted uncertainties using irregular mesh")
+
+print(sd1)
+print(sd2)
+print(sd3)
+print(sd4)
 ```
