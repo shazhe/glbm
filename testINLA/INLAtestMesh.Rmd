@@ -29,6 +29,7 @@ We first test on $R^2$. The correlation length is fixed to be $\rho = 0.1$ and v
 
 ```{r warning=FALSE, message=FALSE, cache=TRUE}
 library(INLA)
+INLA:::inla.dynload.workaround()
 library(lattice)
 library(fields)
 
@@ -314,15 +315,33 @@ The best mesh for parameter estimation is the regular mesh with the resolution s
 ### 2.2 Test stabilities 
 The Same experiment is replicated 100 times for each mesh with different simulated data.
 ```{r warning=FALSE, message=FALSE, cache=TRUE}
-
-repFun <- function(){
+library(parallel)
+repFun <- function(mesh){
 data_vec <- data_chol %*% rnorm(nrow(data_grid))
 obs_ind <- sample(1:length(data_vec), 1000)
 obs_data <- data.frame(x = data_grid[obs_ind, 1], y = data_grid[obs_ind, 2], z = data_vec[obs_ind] + rnorm(1000)*0.1)
-INLA_infer(mesh2, obs_data)
+res <- INLA_infer(mesh, obs_data)
+pars <- res$pars
+return(pars)
 }
 
-replicate(2, repFun())
+reg2_pars <- mclapply(1:100, function(x) return(repFun(mesh=mesh2)), mc.cores = 20)
+reg3_pars <- mclapply(1:100, function(x) return(repFun(mesh=mesh3)), mc.cores = 5)
+reg4_pars <- mclapply(1:100, function(x) return(repFun(mesh=mesh4)), mc.cores = 20)
+reg4_pars <- mclapply(1:100, function(x) return(repFun(mesh=mesh5)), mc.cores = 5)
+
+plot(reg2_pars[[1]]$marginals.range.nominal[[1]], type = "l", col = "grey",
+      main = "range", xlim = c(0,0.3), ylim = c(0, 50))
+for(i in 2:100){
+ lines(reg2_pars[[i]]$marginals.range.nominal[[1]], col = "grey")
+}
+
+plot(reg2_pars[[1]]$marginals.variance.nominal[[1]], type = "l", col = "grey", 
+      main = "variance", xlim = c(0,3), ylim = c(0, 5))
+for(i in 2:100){
+ lines(reg2_pars[[i]]$marginals.variance.nominal[[1]], col = "grey")
+}
+
 ```
 
 
