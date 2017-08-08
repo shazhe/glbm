@@ -132,46 +132,55 @@ Now we test the mesh effect on parameter inference.
 
 Here we compare posterior marginal distributions of the hyper parameters, $\rho$ and $\sigma^2$ from four different meshes using simulated data. The four meshes include three regular meshes with maximum edge length larger, approximately equal and smaller than the correlation length and an irregular mesh with maximum edge length approximately equal to the correlation length.
 
-In the following experiment, we assume the true process has $\rho = 0.1, \sigma^2 = 1$ and we again study the region $[0,1] \times [0,1] \subset R^2$.
+In the following experiment, we assume the true process has $\rho = 0.05, \sigma^2 = 1$ and we again study the region $[0,1] \times [0,1] \subset R^2$.
 
 First we simulate data from the true process on a fine grid.
 ```{r warning=FALSE, message=FALSE, cache=TRUE}
 ## Simulate the true process on a fine grid
-set.seed(10)
+set.seed(12)
 data_grid <- as.matrix(expand.grid(seq(0, 1, 0.01), seq(0, 1, 0.01)))
 locdist <- as.matrix(dist(data_grid))
-data_cov <- Matern(d =locdist, range = 0.1, smoothness = 1, phi = 1) # to be compared with inla: smoothness(nu) = alpha - d/2
-data_vec <- chol(data_cov) %*% rnorm(nrow(data_grid))
+data_cov <- Matern(d =locdist, range = 0.05, smoothness = 1, phi = 1) # to be compared with inla: smoothness(nu) = alpha - d/2
+data_chol <- chol(data_cov) 
+data_vec <- data_chol %*% rnorm(nrow(data_grid))
 simdata <- data.frame(x = data_grid[,1], y = data_grid[,2], z = data_vec)
+```
+
+```{r warning=FALSE, message=FALSE}
 library(ggplot2)
-true_process <- ggplot(simdata) + geom_raster(aes(x = x, y = y, fill = z)) + scale_fill_gradientn(colours = terrain.colors(12)) +
+true_process <- ggplot(simdata) + coord_fixed() + scale_x_continuous(limits=c(0,1),  expand = c(0.02, 0.02)) + 
+    scale_y_continuous(limits=c(0,1),  expand = c(0.02, 0.02)) + 
+  geom_raster(aes(x = x, y = y, fill = z)) + 
+  scale_fill_gradientn(colours = terrain.colors(12), limit = c(-4,4)) +
   ggtitle("Simulated data from the true process") 
 print(true_process)
 ```
 
 
 From this grid we sample 500 data points as our observations.
-```{r warning=FALSE, message=FALSE, cache=TRUE}
-obs_ind <- sample(1:length(data_vec), 500)
-obs_data <- data.frame(x = data_grid[obs_ind, 1], y = data_grid[obs_ind, 2], z = data_vec[obs_ind] + rnorm(500)*1)
-sample_data <- true_process + geom_point(data=obs_data, aes(x, y)) + ggtitle("Sampled observations") 
+```{r warning=FALSE, message=FALSE}
+obs_ind <- sample(1:length(data_vec), 1000)
+obs_data <- data.frame(x = data_grid[obs_ind, 1], y = data_grid[obs_ind, 2], z = data_vec[obs_ind] + rnorm(1000)*0.1)
+sample_data <- true_process + geom_point(data=obs_data, aes(x, y), pch = 20, size = 0.5) + ggtitle("Sampled observations") 
 print(sample_data)
 ```
 
 
 Then we generate four different meshes: 3 regular meshes with increasing resolution and 1 irregular grid with resolution similar to the range.
-```{r warning=FALSE, message=FALSE, cache=TRUE}
+```{r warning=FALSE, message=FALSE}
 ## generate 4 different meshes
 ## Regular
-mesh1 <- inla.mesh.2d(loc = as.matrix(expand.grid(seq(0, 1, 0.2), seq(0, 1, 0.2))), 
-                      offset = c(0.1, 0.4), max.edge = c(0.3, 0.3))
-mesh2 <- inla.mesh.2d(loc = as.matrix(expand.grid(seq(0, 1, 0.08), seq(0, 1, 0.08))), 
-                      offset = c(0.1, 0.4), max.edge = c(0.12, 0.12))
-mesh3 <- inla.mesh.2d(loc = as.matrix(expand.grid(seq(0, 1, 0.04), seq(0, 1, 0.04))), 
-                      offset = c(0.1, 0.4), max.edge = c(0.06, 0.06))
+mesh1 <- inla.mesh.2d(loc = as.matrix(expand.grid(seq(0, 1, 0.1), seq(0, 1, 0.1))), 
+                      offset = c(0.1, 0.4), max.edge = c(0.15, 0.15))
+mesh2 <- inla.mesh.2d(loc = as.matrix(expand.grid(seq(0, 1, 0.05), seq(0, 1, 0.05))), 
+                      offset = c(0.1, 0.4), max.edge = c(0.08, 0.08))
+mesh3 <- inla.mesh.2d(loc = as.matrix(expand.grid(seq(0, 1, 0.01), seq(0, 1, 0.01))), 
+                      offset = c(0.1, 0.4), max.edge = c(0.015, 0.015))
 ## Irregular
 data_loc <- cbind(x = obs_data[,1], y = obs_data[,2])
-mesh4 <- inla.mesh.2d(loc = data_loc, cutoff = 0.07, offset = c(0.1, 0.4), max.edge = c(0.1, 0.12))
+mesh4 <- inla.mesh.2d(loc = data_loc, cutoff = 0.05, offset = c(0.1, 0.4), max.edge = c(0.08, 0.08))
+mesh5 <- inla.mesh.2d(loc = data_loc, cutoff = 0.01, offset = c(0.1, 0.4), max.edge = c(0.015, 0.015))
+mesh_names <- c("r - 0.15", "r - 0.08", "r - 0.015", "ir - 0.08", "ir - 0.015")
 ```
 
 Now with the data and four meshes, we use INLA to do the parameter inference and prediction.
@@ -195,7 +204,7 @@ INLA_infer <- function(mesh, data){
   
   hyper <- list(prec = list(fixed = TRUE, initial = log(1)))
   formula = y ~ -1 + f(process, model = spde)
-  prec_scale <- 1/(1^2)
+  prec_scale <- 1/(0.1^2)
   
   res_inla <- inla(formula, data = inla.stack.data(st.est, spde = spde), family = "gaussian",
                   scale = prec_scale, control.family = list(hyper = hyper),
@@ -215,6 +224,7 @@ res1 <- INLA_infer(mesh1, obs_data)
 res2 <- INLA_infer(mesh2, obs_data)
 res3 <- INLA_infer(mesh3, obs_data)
 res4 <- INLA_infer(mesh4, obs_data)
+res5 <- INLA_infer(mesh5, obs_data)
 ```
 
 Compare the posteriors of the parameters from the four meshes.
@@ -223,73 +233,96 @@ pars1 <- res1$pars
 pars2 <- res2$pars
 pars3 <- res3$pars
 pars4 <- res4$pars
-
+pars5 <- res5$pars
 ## Plot the range 
  plot(pars1$marginals.range.nominal[[1]], type = "l",
-      main = "range", xlim = c(0,1))
+      main = "range", xlim = c(0,0.35), ylim = c(0, 50))
  lines(pars2$marginals.range.nominal[[1]], col = 2)
  lines(pars3$marginals.range.nominal[[1]], col = 4)
- lines(pars4$marginals.range.nominal[[1]], col = 5)
- legend("topright", legend = c("reg_s", "reg_m", "reg_l", "irreg_m"), lwd = rep(1,4), lty = rep(1,4), col = c(1, 2, 4, 5))
+ lines(pars4$marginals.range.nominal[[1]], col = 2, lty = 2)
+ lines(pars5$marginals.range.nominal[[1]], col = 4, lty = 2)
+ legend("topright", legend = mesh_names, lwd = rep(1,5), 
+        lty = c(1,1,1,2,2), col = c(1, 2, 4, 2, 4))
 
 ## Plot the marginal variance
 plot(pars1$marginals.variance.nominal[[1]], type = "l",
-     main = "marginal variance", xlim = c(0, 6), ylim = c(0,1.6))
+     main = "marginal variance", xlim = c(0, 4), ylim = c(0,4.5))
 lines(pars2$marginals.variance.nominal[[1]], col = 2)
 lines(pars3$marginals.variance.nominal[[1]], col = 4)
-lines(pars4$marginals.variance.nominal[[1]], col = 5)
-legend("topright", legend = c("reg_s", "reg_m", "reg_l", "irreg_m"), lwd = rep(1,4), lty = rep(1,4), col = c(1, 2, 4, 5))
+lines(pars4$marginals.variance.nominal[[1]], col = 2, lty = 2)
+lines(pars5$marginals.variance.nominal[[1]], col = 4, lty = 2)
+legend("topright", legend = mesh_names, lwd = rep(1,5), 
+       lty = c(1,1,1,2,2), col = c(1, 2, 4, 2, 4))
 
 ```
 
 Finally we compare the predicted mean field.
 ```{r warning=FALSE, message=FALSE}
-library(INLA)
-preddata1 <- data.frame(x=res1$proj$x, y = res1$proj$y, z = inla.mesh.project(res1$proj, as.vector(res1$mean)), 
-                        sd = inla.mesh.project(res1$proj, as.vector(res1$sd)))
-preddata2 <- data.frame(x=res2$proj$x, y = res2$proj$y, z = inla.mesh.project(res2$proj, as.vector(res2$mean)),
-                       sd = inla.mesh.project(res2$proj, as.vector(res2$sd)))
-preddata3 <- data.frame(x=res3$proj$x, y = res3$proj$y, z = inla.mesh.project(res3$proj, as.vector(res3$mean)),
-                        sd = inla.mesh.project(res3$proj, as.vector(res3$sd)))
-preddata4 <- data.frame(x=res4$proj$x, y = res4$proj$y, z = inla.mesh.project(res4$proj, as.vector(res4$mean)),
-                        sd = inla.mesh.project(res4$proj, as.vector(res4$sd)))
+plot_mean <- function(res, title){
+  xygrid <- expand.grid(res$proj$x, res$proj$y)
+  z <- as.vector(inla.mesh.project(res$proj, as.vector(res$mean)))
+  preddata <- data.frame(x=xygrid[,1], y = xygrid[,2], z = z)
+  ggplot(preddata) + coord_fixed() + scale_x_continuous(limits=c(0,1),  expand = c(0.02, 0.02)) + 
+    scale_y_continuous(limits=c(0,1),  expand = c(0.02, 0.02)) +
+    geom_raster(aes(x = x, y = y, fill = z)) + 
+    scale_fill_gradientn(colours = terrain.colors(12), limit = c(-4,4)) +
+    ggtitle(title)
+}
 
 
-m1 <- ggplot(preddata1) + geom_raster(aes(x = x, y = y, fill = z)) + scale_fill_gradientn(colours = terrain.colors(12)) +
-  ggtitle("Predicted mean using regular mesh 1")
+m1 <- plot_mean(res1, title = mesh_names[1])
 
-m2 <- ggplot(preddata2) + geom_raster(aes(x = x, y = y, fill = z)) + scale_fill_gradientn(colours = terrain.colors(12)) +
-  ggtitle("Predicted mean using regular mesh 2")
+m2 <- plot_mean(res2, title = mesh_names[2])
 
-m3 <- ggplot(preddata3) + geom_raster(aes(x = x, y = y, fill = z)) + scale_fill_gradientn(colours = terrain.colors(12)) +
-  ggtitle("Predicted mean using regular mesh 3")
+m3 <- plot_mean(res3, title = mesh_names[3])
 
-m4 <- ggplot(preddata4) + geom_raster(aes(x = x, y = y, fill = z)) + scale_fill_gradientn(colours = terrain.colors(12)) +
-  ggtitle("Predicted mean using irregular mesh")
+m4 <- plot_mean(res4, title = mesh_names[4])
 
-print(true_process)
-print(m1)
-print(m2)
-print(m3)
-print(m4)
+m5 <- plot_mean(res5, title = mesh_names[5])
+
+library(grid)
+library(gridExtra)
+grid.arrange(true_process, m1, m2, m3, m4, m5, ncol = 2)
 ```
 
 And also compare the predicted uncertainties.
 ```{r warning=FALSE, message=FALSE}
-sd1 <- ggplot(predata1) + geom_raster(aes(x = x, y = y, fill = sd)) + scale_fill_gradientn(colours = terrain.colors(12)) +
-  ggtitle("Predicted uncertainties using regular mesh 1")
+plot_sd <- function(res, title){
+  xygrid <- expand.grid(res$proj$x, res$proj$y)
+  sd <- as.vector(inla.mesh.project(res$proj, as.vector(res$sd)))
+  preddata <- data.frame(x=xygrid[,1], y = xygrid[,2], sd = sd)
+  ggplot(preddata) + coord_fixed() + scale_x_continuous(limits=c(0,1),  expand = c(0.02, 0.02)) + 
+    scale_y_continuous(limits=c(0,1),  expand = c(0.02, 0.02)) +
+    geom_raster(aes(x = x, y = y, fill = sd)) + geom_point(data=obs_data, aes(x, y), size = 0.3, pch = 20)+
+    scale_fill_gradientn(colours = terrain.colors(12), limit = c(0.05,2)) +
+    ggtitle(title)
+}
 
-sd2 <- ggplot(predata2) + geom_raster(aes(x = x, y = y, fill = sd)) + scale_fill_gradientn(colours = terrain.colors(12)) +
-  ggtitle("Predicted uncertainties using regular mesh 2")
-
-sd3 <- ggplot(predata3) + geom_raster(aes(x = x, y = y, fill = sd)) + scale_fill_gradientn(colours = terrain.colors(12)) +
-  ggtitle("Predicted uncertainties using regular mesh 3")
-
-sd4 <- ggplot(predata4) + geom_raster(aes(x = x, y = y, fill = sd)) + scale_fill_gradientn(colours = terrain.colors(12)) +
-  ggtitle("Predicted uncertainties using irregular mesh")
-
+sd1 <- plot_sd(res1, title = mesh_names[1])
+sd2 <- plot_sd(res2, title = mesh_names[2])
+sd3 <- plot_sd(res3, title = mesh_names[3])
+sd4 <- plot_sd(res4, title = mesh_names[4])
+sd5 <- plot_sd(res5, title = mesh_names[5])
 print(sd1)
-print(sd2)
-print(sd3)
-print(sd4)
+grid.arrange(sd2, sd4, ncol = 2)
+grid.arrange(sd3, sd5, ncol = 2)
 ```
+
+The best mesh for parameter estimation is the regular mesh with the resolution similar to the correlation length but it is not good for prediction as details get blurred due to the its sparseness.
+
+
+### 2.2 Test stabilities 
+The Same experiment is replicated 100 times for each mesh with different simulated data.
+```{r warning=FALSE, message=FALSE, cache=TRUE}
+
+repFun <- function(){
+data_vec <- data_chol %*% rnorm(nrow(data_grid))
+obs_ind <- sample(1:length(data_vec), 1000)
+obs_data <- data.frame(x = data_grid[obs_ind, 1], y = data_grid[obs_ind, 2], z = data_vec[obs_ind] + rnorm(1000)*0.1)
+INLA_infer(mesh2, obs_data)
+}
+
+replicate(2, repFun())
+```
+
+
