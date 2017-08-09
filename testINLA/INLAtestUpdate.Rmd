@@ -1,0 +1,11 @@
+---
+output:
+  pdf_document: default
+  html_document:
+  fig_height: 6
+  fig_width: 8
+---
+  # Test the "update theorem" using INLA
+  
+  ***
+  

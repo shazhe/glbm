@@ -1,0 +1,9 @@
+---
+title: "INLA test GPS error"
+author: "Z Sha"
+date: "9 August 2017"
+output: html_document
+---
+# Test the effect of measurement error using INLA
+  
+  ***
