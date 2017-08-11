@@ -3,14 +3,9 @@
 ## This script read in and process the data and produce the mesh ##
 ###################################################################
 #### 0 load libraries
-library(rgl)
 library(GEOmap)
 library(INLA)
 if(Sys.info()['sysname'] == "Linux"){INLA:::inla.dynload.workaround()}
-library(fields)
-library(gstat)
-library(geoR)
-
 
 #### 1 Read in GIA data
 ###################################################################
@@ -43,7 +38,7 @@ GPS_loc <- do.call(cbind, Lll2xyz(lat = GPS_obs$lat, lon = GPS_obs$lon))
 
 ## Find the prior mean at the GPS locations
 GPSY <- GPS_obs$lat
-GPSx <- ifelse(GPS_obs$lon < 0, GPSx + 360, GPS_obs$lon)
+GPSx <- ifelse(GPS_obs$lon < 0, GPS_obs$lon + 360, GPS_obs$lon)
 GPSxx <- ifelse(GPSxx > 359.5, GPSxx - 360, GPSxx)
 GPS_sp <- SpatialPoints(data.frame(lon = GPSxx, lat = GPSY), proj4string = CRS("+proj=longlat"))
 Midx2 <- over(GPS_sp, Plist)
