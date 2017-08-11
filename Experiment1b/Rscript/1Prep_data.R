@@ -5,6 +5,7 @@
 #### 0 load libraries
 library(rgl)
 library(GEOmap)
+library(INLA)
 if(Sys.info()['sysname'] == "Linux"){INLA:::inla.dynload.workaround()}
 library(fields)
 library(gstat)
