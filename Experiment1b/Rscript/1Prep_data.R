@@ -39,7 +39,7 @@ GPS_loc <- do.call(cbind, Lll2xyz(lat = GPS_obs$lat, lon = GPS_obs$lon))
 ## Find the prior mean at the GPS locations
 GPSY <- GPS_obs$lat
 GPSx <- ifelse(GPS_obs$lon < 0, GPS_obs$lon + 360, GPS_obs$lon)
-GPSxx <- ifelse(GPSxx > 359.5, GPSxx - 360, GPSxx)
+GPSxx <- ifelse(GPSx > 359.5, GPSx - 360, GPSx)
 GPS_sp <- SpatialPoints(data.frame(lon = GPSxx, lat = GPSY), proj4string = CRS("+proj=longlat"))
 Midx2 <- over(GPS_sp, Plist)
 GPS_mu <- GIA_prior$trend[Midx2]
