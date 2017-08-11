@@ -24,12 +24,8 @@ GIA_spde <- inla.spde2.matern(Mesh_GIA, B.tau = matrix(c(ltau0, -1, 1),1,3), B.k
 ## Find the mapping between observations and processes basis
 A_data <- inla.spde.make.A(mesh = Mesh_GIA, loc = GPS_loc)
 
-## Create a stack of locations to plot the posterior (resolution = 5 degree apart)
-s_lat <- seq(-89.5, 89.5, 10)
-s_lon <- seq(-179.5, 179.5, 10)
-sll <- expand.grid(x = s_lon, y = s_lat)
-sll_loc <- do.call(cbind, Lll2xyz(lat = sll$y, lon = sll$x))
-A_pred <- inla.spde.make.A(mesh = Mesh_GIA, loc = rbind(Mesh_GIA$loc, sll_loc))
+## Map predictions
+A_pred <- inla.spde.make.A(mesh = Mesh_GIA, loc = rbind(GPS_loc, Mesh_GIA$loc))
 
 ## Create the estimation and stack
 st.est <- inla.stack(data = list(y=GPS_data), A = list(A_data),
