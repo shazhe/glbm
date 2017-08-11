@@ -6,6 +6,7 @@
 ###################################################################
 
 library(ggplot2)
+library(gridExtra)
 
 #### 1 Plot hyperparameters
 pars_GIA <- inla.spde2.result(res_inla, "GIA", GIA_spde, do.transf=TRUE)
@@ -23,7 +24,7 @@ lsigma_mean <- pars_GIA$summary.log.variance.nominal$mean
 lsigma_sd <- pars_GIA$summary.log.variance.nominal$sd
 sigma_mode <- exp(lsigma_mean - lsigma_sd^2)
 
-pdf(file = paste0(outdir, outname, "_hyperpar.pdf"), width = 6, height = 8)
+png(paste0(outdir, outname, "_hyperpar.png"), width = 960, height = 480, pointsize = 20)
 par(mfrow = c(1,2))
 plot(pars_GIA$marginals.range.nominal[[1]], type = "l",
      main = bquote(bold(rho("mode") == .(round(rho_mode, 4))))) # The posterior from inla output

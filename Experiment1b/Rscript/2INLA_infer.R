@@ -46,4 +46,4 @@ res_inla <- inla(formula, data = inla.stack.data(stGIA, spde = GIA_spde), family
 
 summary(res_inla)
 
-save(res_inla, GIA_spde, stGIA, file = paste0(outdir, exname, "inla.RData"))
+save(res_inla, GIA_spde, stGIA, file = paste0(outdir, outname, "inla.RData"))
