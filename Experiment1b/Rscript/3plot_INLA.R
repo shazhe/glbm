@@ -41,8 +41,8 @@ INLA_pred <- res_inla$summary.linear.predictor
 
 ### Get the predicted mean and uncertainties
 pred_idx <- inla.stack.index(stGIA, tag = "pred")$data
-GPS_idx <- pred_idx[1:length(GPS_data)]
-GIA_idx <- pred_idx[-c(1:length(GPS_data))]
+GPS_idx <- pred_idx[1:nrow(GPS_obs)]
+GIA_idx <- pred_idx[-c(1:nrow(GPS_obs))]
 
 ## GPS 
 GPS_u <- INLA_pred$sd[GPS_idx]
@@ -51,20 +51,20 @@ GPS_pred <- data.frame(lon = GPS_obs$lon, lat = GPS_obs$lat, u = GPS_u)
 ## GIA
 GIA_m <- INLA_pred$mean[GIA_idx] + GIA_mu
 GIA_u <- INLA_pred$sd[GIA_idx]
-proj <- inla.mesh.projector(Mesh_GIA, projection = "longlat", dims = c(361,181))
+proj <- inla.mesh.projector(Mesh_GIA, projection = "longlat", dims = c(360,180), xlim = c(0, 359), ylim = c(-89.5, 89.5))
 GIA_grid <- expand.grid(proj$x, proj$y)
 GIA_pred <- data.frame(lon = GIA_grid[,1], lat = GIA_grid[,2],
                        mean = as.vector(inla.mesh.project(proj, as.vector(GIA_m))),
                        u = as.vector(inla.mesh.project(proj, as.vector(GIA_u))))
-
+write.table(GIA_pred, file = paste0(outdir, outname, "_predict.txt"), row.names = FALSE)
 ## Now plot
 map_GIA <- ggplot(data=GIA_pred) + geom_raster(aes(x = lon, y = lat, fill = mean)) + 
   coord_fixed() + xlab("Longitude") + ylab("Latitude") + 
-  scale_x_continuous(limits=c(-180,180),  expand = c(0, 0)) + scale_y_continuous(limits=c(-90,90),  expand = c(0, 0)) + 
+  scale_x_continuous(limits=c(0,359),  expand = c(0, 0)) + scale_y_continuous(limits=c(-89.5,89.5),  expand = c(0, 0)) + 
   scale_fill_gradientn(colors = terrain.colors(12), name = "mm/yr", limit = c(-15, 15),
                        guide = guide_colorbar(barwidth = 2, barheight = 10, label.position = "right", title.position = "bottom")) 
 
-world_map <- map_data("world")
+world_map <- map_data("world2")
 map_GIA2 <- map_GIA + geom_polygon(data=world_map, aes(x=long, y=lat, group=group), 
                                    colour="grey", fill = NA, alpha = 0.5)
 
@@ -72,8 +72,8 @@ map_GIA2 <- map_GIA + geom_polygon(data=world_map, aes(x=long, y=lat, group=grou
 map_GIA3 <- map_GIA2 + geom_point(data=GPS_pred, aes(x=lon, y=lat), pch=19, size = GPS_pred$u*3,
                                     col = "black", fill = "black", alpha=0.3) 
 
-GIA_std <- subset(GIA_pred, lon %in% seq(-175, 175, 15))
-GIA_std <- subset(GIA_std, lat %in% seq(-82, 82, 12))
+GIA_std <- subset(GIA_pred, lon %in% seq(0, 359, 15))
+GIA_std <- subset(GIA_std, lat %in% seq(-82.5, 82.5, 12))
 
 map_GIA4 <- map_GIA3 + geom_point(data=GIA_std, aes(x=lon, y=lat), pch=19, size = GIA_std$u*3,
                                   col = "grey", fill = "grey", alpha=0.5)
