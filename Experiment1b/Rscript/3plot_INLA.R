@@ -56,7 +56,8 @@ GIA_grid <- expand.grid(proj$x, proj$y)
 GIA_pred <- data.frame(lon = GIA_grid[,1], lat = GIA_grid[,2],
                        mean = as.vector(inla.mesh.project(proj, as.vector(GIA_m))),
                        u = as.vector(inla.mesh.project(proj, as.vector(GIA_u))))
-write.table(GIA_pred, file = paste0(outdir, outname, "_predict.txt"), row.names = FALSE)
+write.table(GIA_pred, file = paste0(outdir, outname, "_predict.txt"), row.names = FALSE, eol = "\r\n")
+
 ## Now plot
 map_GIA <- ggplot(data=GIA_pred) + geom_raster(aes(x = lon, y = lat, fill = mean)) + 
   coord_fixed() + xlab("Longitude") + ylab("Latitude") + 
