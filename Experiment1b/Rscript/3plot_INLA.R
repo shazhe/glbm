@@ -46,12 +46,12 @@ GIA_idx <- pred_idx[-c(1:nrow(GPS_obs))]
 
 ## GPS 
 GPS_u <- INLA_pred$sd[GPS_idx]
-GPS_pred <- data.frame(lon = GPS_obs$lon, lat = GPS_obs$lat, u = GPS_u)
+GPS_pred <- data.frame(lon = GPSx, lat = GPS_obs$lat, u = GPS_u)
 
 ## GIA
 GIA_m <- INLA_pred$mean[GIA_idx] + GIA_mu
 GIA_u <- INLA_pred$sd[GIA_idx]
-proj <- inla.mesh.projector(Mesh_GIA, projection = "longlat", dims = c(360,180), xlim = c(0, 359), ylim = c(-89.5, 89.5))
+proj <- inla.mesh.projector(Mesh_GIA, projection = "longlat", dims = c(360,180), xlim = c(0, 360), ylim = c(-90, 90))
 GIA_grid <- expand.grid(proj$x, proj$y)
 GIA_pred <- data.frame(lon = GIA_grid[,1], lat = GIA_grid[,2],
                        mean = as.vector(inla.mesh.project(proj, as.vector(GIA_m))),
@@ -60,7 +60,7 @@ write.table(GIA_pred, file = paste0(outdir, outname, "_predict.txt"), row.names 
 ## Now plot
 map_GIA <- ggplot(data=GIA_pred) + geom_raster(aes(x = lon, y = lat, fill = mean)) + 
   coord_fixed() + xlab("Longitude") + ylab("Latitude") + 
-  scale_x_continuous(limits=c(0,359),  expand = c(0, 0)) + scale_y_continuous(limits=c(-89.5,89.5),  expand = c(0, 0)) + 
+  scale_x_continuous(limits=c(0,360),  expand = c(0, 0)) + scale_y_continuous(limits=c(-90,90),  expand = c(0, 0)) + 
   scale_fill_gradientn(colors = terrain.colors(12), name = "mm/yr", limit = c(-15, 15),
                        guide = guide_colorbar(barwidth = 2, barheight = 10, label.position = "right", title.position = "bottom")) 
 
@@ -93,11 +93,10 @@ map_GIAf <- map_GIA4 + beauty + ggtitle("predicted GIA mean field (vertical bedr
 
 ## The Prior
 GIA_prior2 <- GIA_prior
-GIA_prior2$x_center <- ifelse(GIA_prior2$x_center > 180, GIA_prior2$x_center - 360, GIA_prior2$x_center)
 
 map_prior <- ggplot(data=GIA_prior2) + geom_raster(aes(x = x_center, y = y_center, fill = trend)) + 
   coord_fixed() + xlab("Longitude") + ylab("Latitude") + 
-  scale_x_continuous(limits=c(-180,180),  expand = c(0, 0)) + scale_y_continuous(limits=c(-90,90),  expand = c(0, 0)) + 
+  scale_x_continuous(limits=c(0,359),  expand = c(0, 0)) + scale_y_continuous(limits=c(-89.5,89.5),  expand = c(0, 0)) + 
   scale_fill_gradientn(colors = terrain.colors(12), name = "mm/yr", limit = c(-15, 15),
                        guide = guide_colorbar(barwidth = 2, barheight = 10, label.position = "right", title.position = "bottom")) 
 map_prior2 <- map_prior + geom_polygon(data=world_map, aes(x=long, y=lat, group=group), 
