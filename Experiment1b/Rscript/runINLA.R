@@ -13,7 +13,7 @@ outdir <- "/./projects/GlobalMass/WP1-BHM/Experiment1b/output/"
 data_path <- "/./projects/GlobalMass/WP1-BHM/Experiment1b/Data_inputs/"
 
 GIA_name <- strsplit(strsplit(GIA_input, split = ".txt")[[1]], split="_")[[1]][2]
-GPS_name <- strsplit(strsplit("GPSdataset_v03c_QC_20170809_comb", split = ".txt")[[1]], split="_")[[1]][2]
+GPS_name <- strsplit(strsplit(GPS_input, split = ".txt")[[1]], split="_")[[1]][2]
 
 GIA_file <- paste0(data_path, "GIA/", GIA_input)
 GPS_file <- paste0(data_path, "GPS/", GPS_input)

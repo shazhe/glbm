@@ -51,7 +51,7 @@ GPS_pred <- data.frame(lon = GPSx, lat = GPS_obs$lat, u = GPS_u)
 ## GIA
 GIA_m <- INLA_pred$mean[GIA_idx] + GIA_mu
 GIA_u <- INLA_pred$sd[GIA_idx]
-proj <- inla.mesh.projector(Mesh_GIA, projection = "longlat", dims = c(360,180), xlim = c(0, 360), ylim = c(-90, 90))
+proj <- inla.mesh.projector(Mesh_GIA, projection = "longlat", dims = c(360,180), xlim = c(0, 359), ylim = c(-89.5, 89.5))
 GIA_grid <- expand.grid(proj$x, proj$y)
 GIA_pred <- data.frame(lon = GIA_grid[,1], lat = GIA_grid[,2],
                        mean = as.vector(inla.mesh.project(proj, as.vector(GIA_m))),
@@ -74,7 +74,7 @@ map_GIA3 <- map_GIA2 + geom_point(data=GPS_pred, aes(x=lon, y=lat), pch=19, size
                                     col = "black", fill = "black", alpha=0.3) 
 
 GIA_std <- subset(GIA_pred, lon %in% seq(0, 359, 15))
-GIA_std <- subset(GIA_std, lat %in% seq(-82.5, 82.5, 12))
+GIA_std <- subset(GIA_std, lat %in% seq(-82.5, 82.5, 10))
 
 map_GIA4 <- map_GIA3 + geom_point(data=GIA_std, aes(x=lon, y=lat), pch=19, size = GIA_std$u*3,
                                   col = "grey", fill = "grey", alpha=0.5)
