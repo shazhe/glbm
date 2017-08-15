@@ -4,7 +4,7 @@
 ## of the GIA processes                                          ##
 ###################################################################
 #### 0 setup codes
-source("glbm/Experiment1a/Rscript/MVSTplus.R")
+source("~/glbm/Experiment1a/Rscript/MVSTplus.R")
 
 #### 1 Setup for spde parameters
 trho <- Tlognorm(mu_r, v_r)
