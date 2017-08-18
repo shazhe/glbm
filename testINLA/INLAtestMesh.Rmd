@@ -140,7 +140,7 @@ Now we test the mesh effect on parameter inference.
 
 Here we compare posterior marginal distributions of the hyper parameters, $\rho$ and $\sigma^2$ from four different meshes using simulated data. The four meshes include three regular meshes with maximum edge length larger, approximately equal and smaller than the correlation length and an irregular mesh with maximum edge length approximately equal to the correlation length.
 
-In the following experiment, we assume the true process has $\rho = 0.05, \sigma^2 = 1$ and we again study the region $[0,1] \times [0,1] \subset R^2$.
+In the following experiment, we assume the true process has $\rho = 0.05, \sigma^2 = 1$ and we again study the region $[0,1] \times [0,1] \subset R^2$.a
 
 First we simulate data from the true process on a fine grid.
 ```{r warning=FALSE, message=FALSE, cache=TRUE}
