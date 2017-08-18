@@ -1,6 +1,5 @@
 ---
 output:
-  pdf_document: default
   html_document:
     fig_height: 6
     fig_width: 8
@@ -39,6 +38,10 @@ library(INLA)
 if(Sys.info()['sysname'] == "Linux"){INLA:::inla.dynload.workaround()}
 library(lattice)
 library(fields)
+library(GEOmap)
+library(ggplot2)
+library(gridExtra)
+library(geoR)
 
 ## a wrapper for generating mesh, evaluating the variance and plot the result
 plot.mvar <- function(range0, locres, max.edge, plot.mesh = TRUE, xylim = FALSE){
@@ -140,37 +143,107 @@ Now we test the mesh effect on parameter inference.
 
 Here we compare posterior marginal distributions of the hyper parameters, $\rho$ and $\sigma^2$ from four different meshes using simulated data. The four meshes include three regular meshes with maximum edge length larger, approximately equal and smaller than the correlation length and an irregular mesh with maximum edge length approximately equal to the correlation length.
 
-In the following experiment, we assume the true process has $\rho = 0.05, \sigma^2 = 1$ and we again study the region $[0,1] \times [0,1] \subset R^2$.a
-
-First we simulate data from the true process on a fine grid.
+#### 2.1.1 Compare the GMRF approximation and the Matern samples. 
+First we compare the simulated data from a Matern covarance matrix and a GMRF approximation. The Matern covariance is computed by using functions from two different R packages, `fields::Matern` and `geoR::matern`.
 ```{r warning=FALSE, message=FALSE, cache=TRUE}
 ## Simulate the true process on a fine grid
 set.seed(12)
-data_grid <- as.matrix(expand.grid(seq(0, 1, 0.01), seq(0, 1, 0.01)))
-locdist <- as.matrix(dist(data_grid))
-data_cov <- Matern(d =locdist, range = 0.05, smoothness = 1, phi = 1) # to be compared with inla: smoothness(nu) = alpha - d/2
-data_chol <- chol(data_cov) 
-data_vec <- data_chol %*% rnorm(nrow(data_grid))
-simdata <- data.frame(x = data_grid[,1], y = data_grid[,2], z = data_vec)
+loc_grid <- as.matrix(expand.grid(seq(0, 1, 0.05), seq(0, 1, 0.05)))
+mesh <- inla.mesh.2d(loc = loc_grid, offset = c(0.1, 0.4), max.edge = c(0.072, 0.072) )
+locdist <- as.matrix(dist(mesh$loc))
+data0 <- rnorm(nrow(locdist))
+
+## Matern covariance # to be compared with inla: smoothness(nu) = alpha - d/2, d = 2 here and default in inla alpha = 2.
+Matern_cov1 <- Matern(d =locdist, range = 0.05, smoothness = 1, phi = 1) 
+Matern_cov2 <- matern(u =locdist, phi = 0.05, kappa = 1) 
+## GMRF precision Matrix
+lkappa0 <- log(8)/2 - log(0.05)
+ltau0 <- 0.5*log(1/(4*pi)) - log(1) - lkappa0
+spde <- inla.spde2.matern(mesh, B.tau = matrix(c(ltau0, -1, 1),1,3),
+                            B.kappa = matrix(c(lkappa0, 0, -1), 1,3), 
+                            theta.prior.mean = c(0,0), theta.prior.prec = c(0.1, 0.1))
+Q <- inla.spde.precision(spde, theta = c(0,0))
+## Matern and GMRF samples
+Matern_chol1<- chol(Matern_cov1) 
+Matern_chol2<- chol(Matern_cov2)
+Matern_data1 <- Matern_chol1 %*% data0
+Matern_data2 <- Matern_chol2 %*% data0
+Q_chol <- chol(Q)
+GMRF_data <- as.vector(solve(t(Q_chol), data0))
+## assemble for plotting
+proj <- inla.mesh.projector(mesh, dims = c(100,100))
+xy <- expand.grid(proj$x, proj$y)
+Mdata1 <- as.vector(inla.mesh.project(proj, Matern_data1))
+Mdata2 <- as.vector(inla.mesh.project(proj, Matern_data2))
+Gdata <-  as.vector(inla.mesh.project(proj, GMRF_data))
+rndata <-  as.vector(inla.mesh.project(proj, data0))
+simdata <- data.frame(x =xy[,1] , y = xy[,2], rndaa = rndata, Mdata1 = Mdata1, Mdata2 = Mdata2, Gdata = Gdata)
 ```
 
+Plot the simulated data. The GMRF approximation is close to the Matern but the not as smooth. The quality of approximation also ***depend on the range parameter***! 
+There range parameter in GMRF is defined to be the distance for which the correlation falls to to about 0.13 instead of 0 as in the Matern covariance function. So When using the GMRF approximation in INLA one should bear in mind that the estimated range parameter is longer than the range defined in Matern. (This explains why the estimated range in the following experiment tends to be always larger than the truth.)
+
 ```{r warning=FALSE, message=FALSE, cache=TRUE}
-library(ggplot2)
-true_process <- ggplot(simdata) + coord_fixed() + scale_x_continuous(limits=c(0,1),  expand = c(0.02, 0.02)) + 
+randnorm_p <- ggplot(simdata) + coord_fixed() + scale_x_continuous(limits=c(0,1),  expand = c(0.02, 0.02)) + 
     scale_y_continuous(limits=c(0,1),  expand = c(0.02, 0.02)) + 
-  geom_raster(aes(x = x, y = y, fill = z)) + 
+  geom_raster(aes(x = x, y = y, fill = rndata)) + 
   scale_fill_gradientn(colours = terrain.colors(12), limit = c(-4,4)) +
-  ggtitle("Simulated data from the true process") 
-print(true_process)
+  ggtitle("normal random") 
+Matern_p1 <- ggplot(simdata) + coord_fixed() + scale_x_continuous(limits=c(0,1),  expand = c(0.02, 0.02)) + 
+    scale_y_continuous(limits=c(0,1),  expand = c(0.02, 0.02)) + 
+  geom_raster(aes(x = x, y = y, fill = Mdata1)) + 
+  scale_fill_gradientn(colours = terrain.colors(12), limit = c(-4,4)) +
+  ggtitle("fields:Matern") 
+Matern_p2 <- ggplot(simdata) + coord_fixed() + scale_x_continuous(limits=c(0,1),  expand = c(0.02, 0.02)) + 
+    scale_y_continuous(limits=c(0,1),  expand = c(0.02, 0.02)) + 
+  geom_raster(aes(x = x, y = y, fill = Mdata2)) + 
+  scale_fill_gradientn(colours = terrain.colors(12), limit = c(-4,4)) +
+  ggtitle("geoR::matern") 
+GMRF_p <- ggplot(simdata) + coord_fixed() + scale_x_continuous(limits=c(0,1),  expand = c(0.02, 0.02)) + 
+    scale_y_continuous(limits=c(0,1),  expand = c(0.02, 0.02)) + 
+  geom_raster(aes(x = x, y = y, fill = Gdata)) + 
+  scale_fill_gradientn(colours = terrain.colors(12), limit = c(-4,4)) +
+  ggtitle("GMRF") 
+
+grid.arrange(randnorm_p, GMRF_p, Matern_p1, Matern_p2, ncol = 2 )
+```
+
+#### 2.1.2 Inference test
+Since there is slight difference between the parameter definiation of the GMRF representation and the Matern covarance. We simulate data directly usingthe GMRF representation on a fine grid.
+In the following experiment, we assume the true process has GMRF parameters $\rho = 0.05, \sigma^2 = 1$ and we again study the region $[0,1] \times [0,1] \subset R^2$.
+
+```{r warning=FALSE, message=FALSE, cache=TRUE}
+set.seed(21)
+loc_grid <- as.matrix(expand.grid(seq(0, 1, 0.02), seq(0, 1, 0.02)))
+mesh <- inla.mesh.2d(loc = loc_grid, offset = c(0.1, 0.4), max.edge = c(0.03, 0.03) )
+lkappa0 <- log(8)/2 - log(0.05)
+ltau0 <- 0.5*log(1/(4*pi)) - log(1) - lkappa0
+spde <- inla.spde2.matern(mesh, B.tau = matrix(c(ltau0, -1, 1),1,3),
+                            B.kappa = matrix(c(lkappa0, 0, -1), 1,3), 
+                            theta.prior.mean = c(0,0), theta.prior.prec = c(0.1, 0.1))
+Q <- inla.spde.precision(spde, theta = c(0,0))
+Qsamp <- inla.qsample(n=1, Q)
+proj <- inla.mesh.projector(mesh, dims = c(200,200))
+xy <- expand.grid(proj$x, proj$y)
+Gdata <-  as.vector(inla.mesh.project(proj, Qsamp))
+simdata <- data.frame(x =xy[,1] , y = xy[,2], Gdata = Gdata)
 ```
 
 
-From this grid we sample 500 data points as our observations.
+From this grid we sample 1000 data points as our observations.
 ```{r warning=FALSE, message=FALSE, cache=TRUE}
-obs_ind <- sample(1:length(data_vec), 1000)
-obs_data <- data.frame(x=data_grid[obs_ind, 1], y=data_grid[obs_ind, 2], z=rep(0, 1000), 
-                       obs = data_vec[obs_ind] + rnorm(1000)*0.1)
-sample_data <- true_process + geom_point(data=obs_data, aes(x, y), pch = 20, size = 0.5) + ggtitle("Sampled observations") 
+keep <- which(xy[,1] >=0.25 & xy[,1] <=0.75 & xy[,2] >=0.25 & xy[,2] <=0.75)
+obs_ind <- sample(keep, 1000)
+errs <- rnorm(1000)*0.1
+obs_data <- simdata[obs_ind,]
+obs_data$obs <- obs_data$Gdata + errs
+
+GMRF_p <- ggplot(simdata) + coord_fixed() + scale_x_continuous(limits=c(0,1),  expand = c(0.02, 0.02)) + 
+    scale_y_continuous(limits=c(0,1),  expand = c(0.02, 0.02)) + 
+  geom_raster(aes(x = x, y = y, fill = Gdata)) + 
+  scale_fill_gradientn(colours = terrain.colors(12), limit = c(-4,4)) +
+  ggtitle("GMRF") 
+sample_data <- GMRF_p + geom_point(data=obs_data, aes(x, y), pch = 20, size = abs(errs) *10) + ggtitle("Sampled observations") 
 print(sample_data)
 ```
 
@@ -179,34 +252,37 @@ Then we generate four different meshes: 3 regular meshes with increasing resolut
 ```{r warning=FALSE, message=FALSE, cache=TRUE}
 ## generate 4 different meshes
 ## Regular
-mesh1 <- inla.mesh.2d(loc = as.matrix(expand.grid(seq(0, 1, 0.1), seq(0, 1, 0.1))), 
-                      offset = c(0.1, 0.4), max.edge = c(0.15, 0.15))
-mesh2 <- inla.mesh.2d(loc = as.matrix(expand.grid(seq(0, 1, 0.05), seq(0, 1, 0.05))), 
-                      offset = c(0.1, 0.4), max.edge = c(0.08, 0.08))
+mesh1 <- inla.mesh.2d(loc = as.matrix(expand.grid(seq(0, 1, 0.15), seq(0, 1, 0.15))), 
+                      offset = c(0.1, 0.4), max.edge = c(0.2, 0.2))
+mesh2 <- inla.mesh.2d(loc = as.matrix(expand.grid(seq(0, 1, 0.035), seq(0, 1, 0.035))), 
+                      offset = c(0.1, 0.4), max.edge = c(0.05, 0.05))
 mesh3 <- inla.mesh.2d(loc = as.matrix(expand.grid(seq(0, 1, 0.01), seq(0, 1, 0.01))), 
                       offset = c(0.1, 0.4), max.edge = c(0.015, 0.015))
 ## Irregular
-data_loc <- obs_data[,1:3]
-mesh4 <- inla.mesh.2d(loc = data_loc, cutoff = 0.05, offset = c(0.1, 0.4), max.edge = c(0.08, 0.08))
+data_loc <- matrix(runif(2000), ncol = 2)
+mesh4 <- inla.mesh.2d(loc = data_loc, cutoff = 0.03, offset = c(0.1, 0.4), max.edge = c(0.05, 0.05))
 mesh5 <- inla.mesh.2d(loc = data_loc, cutoff = 0.01, offset = c(0.1, 0.4), max.edge = c(0.015, 0.015))
-mesh_names <- c("r - 0.15", "r - 0.08", "r - 0.015", "ir - 0.08", "ir - 0.015")
+mesh_names <- c("r - 0.2", "r - 0.05", "r - 0.015", "ir - 0.05", "ir - 0.015")
 ```
 
 Now with the data and four meshes, we use INLA to do the parameter inference and prediction.
 ```{r warning=FALSE, message=FALSE, cache=TRUE}
-## set prior values for the hyper parameters, delibrately set to be different from the truth.
-sigma0 <- 0.5
-range0 <- 0.5
-lkappa0 <- log(8)/2 - log(range0)
-ltau0 <- 0.5*log(1/(4*pi)) - log(sigma0) - lkappa0
 
 ## A wrapper to do the INLA inference and prediction
 INLA_infer <- function(mesh, data, S2 = FALSE){
+  ## set prior values for the hyper parameters, delibrately set to be different from the truth.
+  sigma0 <- 0.5
+  range0 <- 0.5
+  lkappa0 <- log(8)/2 - log(range0)
+  ltau0 <- 0.5*log(1/(4*pi)) - log(sigma0) - lkappa0
+
   spde <- inla.spde2.matern(mesh, B.tau = matrix(c(ltau0, -1, 1),1,3), B.kappa = matrix(c(lkappa0, 0, -1), 1,3), 
                           theta.prior.mean = c(0,0), theta.prior.prec = c(0.01, 0.01))
   
   data_loc <- as.matrix(data[,1:3])
-  obs <- data[,4]
+  obs <- data$obs
+  
+  
   Ay <- inla.spde.make.A(mesh = mesh, loc = data_loc)
   st.est <- inla.stack(data = list(y=obs), A = list(Ay),
                      effects = list(process = 1:spde$n.spde), tag = "est")
@@ -223,7 +299,7 @@ INLA_infer <- function(mesh, data, S2 = FALSE){
   
   ## the predictions
   if(S2){
-    proj <- inla.mesh.projector(mesh, projection = "longlat", dims = c(360,180))
+    proj <- inla.mesh.projector(mesh, projection = "longlat", dims = c(360,180), xlim = c(0,360))
   }else{
     proj <- inla.mesh.projector(mesh,dims = c(500,500))
   }
@@ -276,7 +352,7 @@ plot_mean <- function(res, title, S2 = FALSE){
   z <- as.vector(inla.mesh.project(res$proj, as.vector(res$mean)))
   preddata <- data.frame(x=xygrid[,1], y = xygrid[,2], z = z)
   if(S2){
-    ggplot(preddata) + coord_fixed() + scale_x_continuous(limits=c(-180,180),  expand = c(0.02, 0.02)) + 
+    ggplot(preddata) + coord_fixed() + scale_x_continuous(limits=c(0,360),  expand = c(0.02, 0.02)) + 
     scale_y_continuous(limits=c(-90,90),  expand = c(0.02, 0.02)) +
     geom_raster(aes(x = x, y = y, fill = z)) + 
     scale_fill_gradientn(colours = terrain.colors(12)) +
@@ -285,7 +361,7 @@ plot_mean <- function(res, title, S2 = FALSE){
   ggplot(preddata) + coord_fixed() + scale_x_continuous(limits=c(0,1),  expand = c(0.02, 0.02)) + 
     scale_y_continuous(limits=c(0,1),  expand = c(0.02, 0.02)) +
     geom_raster(aes(x = x, y = y, fill = z)) + 
-    scale_fill_gradientn(colours = terrain.colors(12), limit = c(-4,4)) +
+    scale_fill_gradientn(colours = terrain.colors(12), limit = c(-5,5)) +
     ggtitle(title)
   }
 }
@@ -299,7 +375,7 @@ m5 <- plot_mean(res5, title = mesh_names[5])
 
 library(grid)
 library(gridExtra)
-grid.arrange(true_process, m1, m2, m3, m4, m5, ncol = 2)
+grid.arrange(GMRF_p, m1, m2, m3, m4, m5, ncol = 2)
 ```
 
 And also compare the predicted uncertainties.
@@ -309,7 +385,7 @@ plot_sd <- function(res, title, S2=FALSE){
   sd <- as.vector(inla.mesh.project(res$proj, as.vector(res$sd)))
   preddata <- data.frame(x=xygrid[,1], y = xygrid[,2], sd = sd)
   if(S2){
-    ggplot(preddata) + coord_fixed() + scale_x_continuous(limits=c(-180,180),  expand = c(0.02, 0.02)) + 
+    ggplot(preddata) + coord_fixed() + scale_x_continuous(limits=c(0,360),  expand = c(0.02, 0.02)) + 
     scale_y_continuous(limits=c(-90, 90),  expand = c(0.02, 0.02)) +
     geom_raster(aes(x = x, y = y, fill = sd)) + 
     scale_fill_gradientn(colours = terrain.colors(12)) +
@@ -318,7 +394,7 @@ plot_sd <- function(res, title, S2=FALSE){
     ggplot(preddata) + coord_fixed() + scale_x_continuous(limits=c(0,1),  expand = c(0.02, 0.02)) + 
     scale_y_continuous(limits=c(0,1),  expand = c(0.02, 0.02)) +
     geom_raster(aes(x = x, y = y, fill = sd)) + 
-    scale_fill_gradientn(colours = terrain.colors(12), limit = c(0.05,2)) +
+    scale_fill_gradientn(colours = terrain.colors(12), limits = c(0.001,2)) +
     ggtitle(title)
   }
 }
@@ -348,23 +424,41 @@ spde_s <- inla.spde2.matern(mesh_s, B.tau = matrix(c(ltau_t, -1, 1),1,3),
                           B.kappa = matrix(c(lkappa_t, 0, -1), 1,3), 
                           theta.prior.mean = c(0,0), theta.prior.prec = c(0.1, 0.1))
 Q_s <- inla.spde.precision(spde_s, theta = c(0,0))
-data_s2 <- inla.qsample(n=1,Q_s)
-data_s2obs <- data_s2 + rnorm(length(data_s2))*0.1
-obs_dataS2 <- data.frame(x=mesh_s$loc[,1], y = mesh_s$loc[,2], z = mesh_s$loc[,3], obs = as.vector(data_s2obs))
+data_s <- inla.qsample(n=1,Q_s)
+proj_s <- inla.mesh.projector(mesh_s, dims = c(360,181), xlim = c(0, 360))
+xy_s <- expand.grid(proj_s$x, proj_s$y)
+data_sproj <- as.vector(inla.mesh.project(proj_s, as.vector(data_s)))
+simdataS2 <- data.frame(lon = xy_s[,1], lat = xy_s[,2], samp = data_sproj)
 
-proj_s <- inla.mesh.projector(mesh_s, dims = c(360,181))
+## 1000 uniform sample all over the vertices 
+data_ind1 <- sample(1: nrow(Q_s), 1000)
+samp1 <- data_s[data_ind1]
+samp1_loc <- mesh_s$loc[data_ind1,]
+samp1_coords <- Lxyz2ll(list(x=samp1_loc[,1], y = samp1_loc[,2], z = samp1_loc[,3]))
+samp1_coords$lon <- ifelse(samp1_coords$lon < 0, samp1_coords$lon + 360, samp1_coords$lon)
+data_samp1 <- data.frame(x = samp1_loc[,1], y = samp1_loc[, 2], z = samp1_loc[,3],
+                         lon=samp1_coords$lon, lat = samp1_coords$lat, samp=samp1)
+## 200 samples from a region
+keep_s <- which(xy_s[,1] > 20 & xy_s[,1] < 60 & xy_s[,2] > 40 & xy_s[,2] < 60)
+data_ind2 <- sample(keep_s, 200)
+samp2 <- data_sproj[data_ind2]
+samp2_coords <- xy_s[data_ind2,]
+loc2 <- do.call(cbind, Lll2xyz(lat = samp2_coords[,2], lon = samp2_coords[,1]))
+data_samp2 <- data.frame(x = loc2[, 1], y = loc2[, 2], z = loc2[,3], 
+                         lon = samp2_coords[,1], lat = samp2_coords[,2], samp=samp2)
 
-par(mfrow = c(1,2))
-image.plot(proj_s$x, proj_s$y, inla.mesh.project(proj_s, as.vector(data_s2)), 
-           col = topo.colors(40),
-           xlab = "", ylab="",
-           main = paste("edge length = ", 0.06))
+## Assemble the observations
+errs_s <- rnorm(1200)*0.1
+obs_dataS2 <- rbind(data_samp1, data_samp2)
+obs_dataS2$obs <- obs_dataS2$samp + errs_s
 
-image.plot(proj_s$x, proj_s$y, inla.mesh.project(proj_s, as.vector(data_s2obs)), 
-           col = topo.colors(40),
-           xlab = "", ylab="",
-           main = paste("edge length = ", 0.06))
+sampS2_p <- ggplot(data=simdataS2) + geom_raster(aes(x = lon, y = lat, fill = samp)) + 
+  coord_fixed() + xlab("Longitude") + ylab("Latitude") + 
+  scale_x_continuous(limits=c(0,360),  expand = c(0, 0)) + scale_y_continuous(limits=c(-90,90),  expand = c(0, 0)) + 
+  scale_fill_gradientn(colors = terrain.colors(12), guide = guide_colorbar(barwidth = 2, barheight = 10, label.position = "right", title.position = "bottom")) 
 
+sampS2obs_p <- sampS2_p + geom_point(data=obs_dataS2, aes(lon, lat), pch = 20, size = abs(errs_s) *10) + ggtitle("Sampled observations")
+print(sampS2obs_p)
 
 ```
 
@@ -375,11 +469,11 @@ mesh1_s <- mesh_s
 mesh2_s <- inla.mesh.create(globe = 33)
 
 ## irregular mesh
-coords <- as.matrix(expand.grid(seq(-86, 86, 1),seq(-176, 176, 1)))
+coords <- as.matrix(expand.grid(seq(-86, 86, 2),seq(-176, 176, 2)))
 coords <- coords + matrix(rnorm(nrow(coords)*2)*0.3, ncol =2)
 s2_loc <- inla.mesh.map(loc = coords, projection=("longlat"))
 mesh3_s <- inla.mesh.2d(loc = s2_loc, cutoff = 0.06, max.edge = 0.1)
-mesh4_s <- inla.mesh.2d(loc = s2_loc, cutoff = 0.05, max.edge = 0.05)
+mesh4_s <- inla.mesh.2d(loc = s2_loc, cutoff = 0.03, max.edge = 0.05)
 
 mesh_names2 <- c("r - 0.06 - S2", "r - 0.03 - S2", "ir - 0.06 - S2", "ir - 0.03 - S2")
 res1s <- INLA_infer(mesh1_s, obs_dataS2, S2 = TRUE)
@@ -398,7 +492,7 @@ pars4s <- res4s$pars
 ## Plot the range 
 par(mfrow = c(1,2))
  plot(pars1s$marginals.range.nominal[[1]], type = "l",
-      main = "range", xlim = c(0, 0.1), ylim = c(0, 300))
+      main = "range", xlim= c(0,0.2), ylim = c(0,100))
  lines(pars2s$marginals.range.nominal[[1]], col = 2)
  lines(pars3s$marginals.range.nominal[[1]], col = 1, lty = 2, lwd = 3)
  lines(pars4s$marginals.range.nominal[[1]], col = 2, lty = 2)
@@ -407,9 +501,9 @@ par(mfrow = c(1,2))
 
 ## Plot the marginal variance
 plot(pars1s$marginals.variance.nominal[[1]], type = "l",
-     main = "marginal variance", xlim = c(0, 2), ylim = c(0,25))
+     main = "marginal variance", xlim = c(0,4), ylim = c(0,3))
 lines(pars2s$marginals.variance.nominal[[1]], col = 2)
-lines(pars3s$marginals.variance.nominal[[1]], col = 1)
+lines(pars3s$marginals.variance.nominal[[1]], col = 1, lty = 2)
 lines(pars4s$marginals.variance.nominal[[1]], col = 2, lty = 2)
 legend("topright", legend = mesh_names2, 
        lty = c(1,1,2,2), col = c(1, 2, 1, 2))
@@ -436,16 +530,91 @@ grid.arrange(sd1, sd2, sd3, sd4, ncol = 2)
 As an illustration, we use 10 replications of the above experiment to show the stabilities of estimation results from different meshes. The code chunk below uses parallel computing for the replications and would be better to run on a cluster with more than 24 cores since the INLA precedure is also parallelled. The number of CPUs used by a single INLA procedure is not fixed and the dense mesh takes longer time and more cores. 
 
 ```{r warning=FALSE, message=FALSE, eval = FALSE}
+library(INLA)
+if(Sys.info()['sysname'] == "Linux"){INLA:::inla.dynload.workaround()}
 library(parallel)
+
+loc_grid <- as.matrix(expand.grid(seq(0, 1, 0.02), seq(0, 1, 0.02)))
+mesh <- inla.mesh.2d(loc = loc_grid, offset = c(0.1, 0.4), max.edge = c(0.03, 0.03) )
+lkappa0 <- log(8)/2 - log(0.05)
+ltau0 <- 0.5*log(1/(4*pi)) - log(1) - lkappa0
+spde <- inla.spde2.matern(mesh, B.tau = matrix(c(ltau0, -1, 1),1,3),
+                            B.kappa = matrix(c(lkappa0, 0, -1), 1,3), 
+                            theta.prior.mean = c(0,0), theta.prior.prec = c(0.1, 0.1))
+Q <- inla.spde.precision(spde, theta = c(0,0))
+proj <- inla.mesh.projector(mesh, dims = c(200,200))
+xy <- expand.grid(proj$x, proj$y)
+keep <- which(xy[,1] >=0.25 & xy[,1] <=0.75 & xy[,2] >=0.25 & xy[,2] <=0.75)
+
+INLA_infer <- function(mesh, data, S2 = FALSE){
+  ## set prior values for the hyper parameters, delibrately set to be different from the truth.
+  sigma0 <- 0.5
+  range0 <- 0.5
+  lkappa0 <- log(8)/2 - log(range0)
+  ltau0 <- 0.5*log(1/(4*pi)) - log(sigma0) - lkappa0
+
+  spde <- inla.spde2.matern(mesh, B.tau = matrix(c(ltau0, -1, 1),1,3), B.kappa = matrix(c(lkappa0, 0, -1), 1,3), 
+                          theta.prior.mean = c(0,0), theta.prior.prec = c(0.01, 0.01))
+  
+  data_loc <- as.matrix(data[,1:3])
+  obs <- data$obs
+  
+  
+  Ay <- inla.spde.make.A(mesh = mesh, loc = data_loc)
+  st.est <- inla.stack(data = list(y=obs), A = list(Ay),
+                     effects = list(process = 1:spde$n.spde), tag = "est")
+  
+  hyper <- list(prec = list(fixed = TRUE, initial = log(1)))
+  formula = y ~ -1 + f(process, model = spde)
+  prec_scale <- 1/(0.1^2)
+  
+  res_inla <- inla(formula, data = inla.stack.data(st.est, spde = spde), family = "gaussian",
+                  scale = prec_scale, control.family = list(hyper = hyper),
+                   control.predictor=list(A=inla.stack.A(st.est), compute =TRUE))
+  ## the parameters
+  res_pars <- inla.spde2.result(res_inla, "process", spde, do.transf=TRUE)
+  
+  ## the predictions
+  if(S2){
+    proj <- inla.mesh.projector(mesh, projection = "longlat", dims = c(360,180), xlim = c(0,360))
+  }else{
+    proj <- inla.mesh.projector(mesh,dims = c(500,500))
+  }
+  mean_post <- res_inla$summary.random$process$mean
+  sd_post <- res_inla$summary.random$process$sd
+  
+  return(list(pars = res_pars, proj = proj, mean = mean_post, sd = sd_post))
+}
+
+
 repFun <- function(mesh){
-data_vec <- data_chol %*% rnorm(nrow(data_grid))
-obs_ind <- sample(1:length(data_vec), 1000)
-obs_data <- data.frame(x = data_grid[obs_ind, 1], y = data_grid[obs_ind, 2], z = data_vec[obs_ind] + rnorm(1000)*0.1)
+Qsamp <- inla.qsample(n=1, Q)
+Gdata <-  as.vector(inla.mesh.project(proj, Qsamp))
+simdata <- data.frame(x =xy[,1] , y = xy[,2], Gdata = Gdata)
+obs_ind <- sample(keep, 1000)
+errs <- rnorm(1000)*0.1
+obs_data <- simdata[obs_ind],]
+obs_data$obs <- obs_data$Gdata + errs
 res <- INLA_infer(mesh, obs_data)
 pars <- res$pars
 return(pars)
 }
 
+## generate 4 different meshes
+## Regular
+mesh1 <- inla.mesh.2d(loc = as.matrix(expand.grid(seq(0, 1, 0.15), seq(0, 1, 0.15))), 
+                      offset = c(0.1, 0.4), max.edge = c(0.2, 0.2))
+mesh2 <- inla.mesh.2d(loc = as.matrix(expand.grid(seq(0, 1, 0.035), seq(0, 1, 0.035))), 
+                      offset = c(0.1, 0.4), max.edge = c(0.05, 0.05))
+mesh3 <- inla.mesh.2d(loc = as.matrix(expand.grid(seq(0, 1, 0.01), seq(0, 1, 0.01))), 
+                      offset = c(0.1, 0.4), max.edge = c(0.015, 0.015))
+## Irregular
+data_loc <- matrix(runif(2000), ncol =2)
+mesh4 <- inla.mesh.2d(loc = data_loc, cutoff = 0.03, offset = c(0.1, 0.4), max.edge = c(0.05, 0.05))
+mesh5 <- inla.mesh.2d(loc = data_loc, cutoff = 0.01, offset = c(0.1, 0.4), max.edge = c(0.015, 0.015))
+mesh_names <- c("r - 0.15", "r - 0.05", "r - 0.015", "ir - 0.05", "ir - 0.015")
+
+set.seed(51)
 reg2_pars <- mclapply(1:10, function(x) return(repFun(mesh=mesh2)), mc.cores = 10)
 reg3_pars <- mclapply(1:10, function(x) return(repFun(mesh=mesh3)), mc.cores = 5)
 reg4_pars <- mclapply(1:10, function(x) return(repFun(mesh=mesh4)), mc.cores = 10)
