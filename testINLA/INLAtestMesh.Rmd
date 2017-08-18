@@ -593,7 +593,7 @@ Gdata <-  as.vector(inla.mesh.project(proj, Qsamp))
 simdata <- data.frame(x =xy[,1] , y = xy[,2], Gdata = Gdata)
 obs_ind <- sample(keep, 1000)
 errs <- rnorm(1000)*0.1
-obs_data <- simdata[obs_ind],]
+obs_data <- simdata[obs_ind,]
 obs_data$obs <- obs_data$Gdata + errs
 res <- INLA_infer(mesh, obs_data)
 pars <- res$pars
@@ -619,6 +619,8 @@ reg2_pars <- mclapply(1:10, function(x) return(repFun(mesh=mesh2)), mc.cores = 1
 reg3_pars <- mclapply(1:10, function(x) return(repFun(mesh=mesh3)), mc.cores = 5)
 reg4_pars <- mclapply(1:10, function(x) return(repFun(mesh=mesh4)), mc.cores = 10)
 reg5_pars <- mclapply(1:10, function(x) return(repFun(mesh=mesh5)), mc.cores = 5)
+
+
 ```
 
 Now we plot the results for the two hyper-parameters.
