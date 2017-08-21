@@ -6,6 +6,7 @@
 ###################################################################
 
 library(ggplot2)
+library(grid)
 library(gridExtra)
 
 #### 1 Plot hyperparameters
@@ -59,9 +60,30 @@ GIA_pred <- data.frame(lon = GIA_grid[,1], lat = GIA_grid[,2],
 write.table(GIA_pred, file = paste0(outdir, outname, "_predict.txt"), row.names = FALSE, eol = "\r\n")
 
 ## Now plot
+## 1 The Prior
+map_prior <- ggplot(data=GIA_prior) + geom_raster(aes(x = x_center, y = y_center, fill = trend)) + 
+  coord_fixed() + xlab("Longitude") + ylab("Latitude") + 
+  scale_x_continuous(limits=c(0,359),  expand = c(0, 0)) + scale_y_continuous(limits=c(-89.5,89.5),  expand = c(0, 0)) + 
+  scale_fill_gradientn(colors = terrain.colors(12), name = "mm/yr", limit = c(-15, 15),
+                       guide = guide_colorbar(barwidth = 2, barheight = 10, label.position = "right", title.position = "bottom")) 
+beauty <- 
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), 
+        panel.background = element_rect(fill = "white", colour = 'white'), 
+        legend.text = element_text(size = 15),
+        legend.title = element_text(size = 15), 
+        axis.text = element_text(size = 12),
+        axis.title = element_text(size = 12),
+        axis.line = element_line(size = 1),
+        plot.title = element_text(hjust = 0.5, size = 20),
+        plot.subtitle = element_text(hjust = 0.5, size = 15),
+        panel.border = element_blank())
+
+map_prior <- map_prior + geom_polygon(data=world_map, aes(x=long, y=lat, group=group), 
+                                       colour="grey", fill = NA, alpha = 0.5) + beauty + ggtitle("Prior GIA mean field")
+
+## 2 The prediction map
 map_GIA <- ggplot(data=GIA_pred) + geom_raster(aes(x = lon, y = lat, fill = mean)) + 
   coord_fixed() + xlab("Longitude") + ylab("Latitude") + 
-  scale_x_continuous(limits=c(0,360),  expand = c(0, 0)) + scale_y_continuous(limits=c(-90,90),  expand = c(0, 0)) + 
   scale_fill_gradientn(colors = terrain.colors(12), name = "mm/yr", limit = c(-15, 15),
                        guide = guide_colorbar(barwidth = 2, barheight = 10, label.position = "right", title.position = "bottom")) 
 
@@ -69,42 +91,61 @@ world_map <- map_data("world2")
 map_GIA2 <- map_GIA + geom_polygon(data=world_map, aes(x=long, y=lat, group=group), 
                                    colour="grey", fill = NA, alpha = 0.5)
 
-
 map_GIA3 <- map_GIA2 + geom_point(data=GPS_pred, aes(x=lon, y=lat), pch=19, size = GPS_pred$u*3,
-                                    col = "black", fill = "black", alpha=0.3) 
+                                    col = "red", fill = "red", alpha=0.7) 
 
 GIA_std <- subset(GIA_pred, lon %in% seq(0, 359, 15))
 GIA_std <- subset(GIA_std, lat %in% seq(-82.5, 82.5, 10))
 
 map_GIA4 <- map_GIA3 + geom_point(data=GIA_std, aes(x=lon, y=lat), pch=19, size = GIA_std$u*3,
                                   col = "grey", fill = "grey", alpha=0.5)
-beauty <- 
-  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), 
-        panel.background = element_rect(fill = "white", colour = 'white'), 
-        legend.text = element_text(size = 20),
-        legend.title = element_text(size = 20), 
-        axis.text = element_text(size = 25),
-        axis.title = element_text(size = 25),
-        axis.line = element_line(size = 1),
-        plot.title = element_text(hjust = 0.5, size = 30),
-        panel.border = element_blank())
-       
 
-map_GIAf <- map_GIA4 + beauty + ggtitle("predicted GIA mean field (vertical bedrock movement)") 
+map_GIAf1 <- map_GIA2 + beauty + ggtitle("Predicted GIA") +
+  scale_x_continuous(limits=c(0,360),  expand = c(0, 0)) + 
+  scale_y_continuous(limits=c(-90,90),  expand = c(0, 0)) 
 
-## The Prior
-GIA_prior2 <- GIA_prior
+map_GIAf2 <- map_GIA4 + beauty + ggtitle("Predicted GIA and uncertaities") +
+  scale_x_continuous(limits=c(0,360),  expand = c(0, 0)) + 
+  scale_y_continuous(limits=c(-90,90),  expand = c(0, 0)) 
 
-map_prior <- ggplot(data=GIA_prior2) + geom_raster(aes(x = x_center, y = y_center, fill = trend)) + 
+## 3 The uncertainty map 
+map_unc <- ggplot(data=GIA_pred) + geom_raster(aes(x = lon, y = lat, fill = u)) + 
   coord_fixed() + xlab("Longitude") + ylab("Latitude") + 
-  scale_x_continuous(limits=c(0,359),  expand = c(0, 0)) + scale_y_continuous(limits=c(-89.5,89.5),  expand = c(0, 0)) + 
-  scale_fill_gradientn(colors = terrain.colors(12), name = "mm/yr", limit = c(-15, 15),
+  scale_fill_gradientn(colors = terrain.colors(12), name = "mm/yr",
                        guide = guide_colorbar(barwidth = 2, barheight = 10, label.position = "right", title.position = "bottom")) 
-map_prior2 <- map_prior + geom_polygon(data=world_map, aes(x=long, y=lat, group=group), 
-                                      colour="grey", fill = NA, alpha = 0.5) + beauty +
-  ggtitle("Prior GIA mean field (vertical bedrock movement)")
 
-png(paste0(outdir, outname, "_GIAmap.png"), width = 1200, height = 1200, pointsize = 20)
-grid.arrange(map_prior2, map_GIAf)
+map_unc2 <- map_unc + geom_polygon(data=world_map, aes(x=long, y=lat, group=group), 
+                                   colour="grey", fill = NA, alpha = 0.5)
+
+map_unc3 <- map_unc2 + geom_point(data=GPS_pred, aes(x=lon, y=lat), pch=19, size = 0.5,
+                                  col = "black", fill = "grey", alpha=0.3) 
+
+map_uncf <- map_unc3 + beauty + ggtitle("Predicted uncertainties") +
+  scale_x_continuous(limits=c(0,360),  expand = c(0, 0)) + 
+  scale_y_continuous(limits=c(-90,90),  expand = c(0, 0)) 
+
+
+## Zoom in for inspecting the uncertainties and correlation length.
+## Choose the area near Alaska.
+zoom_data <- subset(GIA_pred, lon > 180 & lon < 230 & lat > 50 & lat < 75)
+map_zoom <- map_GIA3 +
+  scale_x_continuous(limits=c(180,230),  expand = c(0.03, 0.03)) + scale_y_continuous(limits=c(50,75),  expand = c(0, 0)) 
+## Calculate the approximate correlation length
+cor_deg <- round(rho_mode /(2*pi) * 360)
+cor_dist <- round(rho_mode * 6371)
+map_zoom <- map_zoom +ggtitle("Zoom-in near Alaska", 
+                              subtitle = paste("The estimated correlation length is about", eval(cor_dist), "km", "(", eval(cor_deg),"degree)"))
+
+zoom_std <- subset(zoom_data, lon %in% seq(182,228, 2))
+zoom_std <- subset(zoom_std, lat %in% seq(52.5, 72.5, 2))
+map_zoom <- map_zoom + geom_point(data=zoom_std, aes(x=lon, y=lat), pch=19, size = zoom_std$u*3,
+                                  col = "black", fill = "black", alpha=0.3) + beauty
+
+## Plot on the grid  
+png(paste0(outdir, outname, "_GIAmap1.png"), width = 900, height = 1200, pointsize = 20)
+grid.arrange(map_prior, map_GIAf1, map_uncf)
 dev.off()
 
+png(paste0(outdir, outname, "_GIAmap2.png"), width = 900, height = 800, pointsize = 25)
+grid.arrange(map_GIAf2, map_zoom)
+dev.off()
