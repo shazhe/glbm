@@ -60,6 +60,7 @@ GIA_pred <- data.frame(lon = GIA_grid[,1], lat = GIA_grid[,2],
 write.table(GIA_pred, file = paste0(outdir, outname, "_predict.txt"), row.names = FALSE, eol = "\r\n")
 
 ## Now plot
+world_map <- map_data("world2")
 ## 1 The Prior
 map_prior <- ggplot(data=GIA_prior) + geom_raster(aes(x = x_center, y = y_center, fill = trend)) + 
   coord_fixed() + xlab("Longitude") + ylab("Latitude") + 
@@ -87,7 +88,7 @@ map_GIA <- ggplot(data=GIA_pred) + geom_raster(aes(x = lon, y = lat, fill = mean
   scale_fill_gradientn(colors = terrain.colors(12), name = "mm/yr", limit = c(-15, 15),
                        guide = guide_colorbar(barwidth = 2, barheight = 10, label.position = "right", title.position = "bottom")) 
 
-world_map <- map_data("world2")
+
 map_GIA2 <- map_GIA + geom_polygon(data=world_map, aes(x=long, y=lat, group=group), 
                                    colour="grey", fill = NA, alpha = 0.5)
 
