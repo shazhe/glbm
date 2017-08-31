@@ -1,10 +1,11 @@
 ---
-output:
-  html_document:
-    fig_height: 6
-    fig_width: 8
+title: "INLA Mesh test"
+author: "Zhe Sha (zhe.sha@bristol.ac.uk)"
+date: "21 August 2017"
+output: html_document
+fig_height: 6
+fig_width: 9
 ---
-# Test INLA Mesh effects
 
 ***
 
@@ -55,17 +56,17 @@ plot.mvar <- function(range0, locres, max.edge, plot.mesh = TRUE, xylim = FALSE)
                             B.kappa = matrix(c(lkappa0, 0, -1), 1,3), 
                             theta.prior.mean = c(0,0), theta.prior.prec = c(0.1, 1))
   Q <- inla.spde.precision(spde, theta = c(0,0))
-  msd <- sqrt(1/diag(Q))
+  mvar <- sqrt(diag(inla.qinv(Q)))
   proj <- inla.mesh.projector(mesh, dims = c(100,100))
   
   if(xylim){
-    image.plot(proj$x, proj$y, inla.mesh.project(proj, as.vector(msd)), 
-             col = topo.colors(24), breaks = seq(0, 1.2, 0.05),
+    image.plot(proj$x, proj$y, inla.mesh.project(proj, as.vector(mvar)), 
+             col = topo.colors(24),
              xlim = c(0,1), ylim = c(0,1), xlab = "", ylab="",
              main = paste("edge length = ", locres))
   }else{
-      image.plot(proj$x, proj$y, inla.mesh.project(proj, as.vector(msd)), 
-                 col = topo.colors(24), breaks = seq(0, 1.2, 0.05),
+      image.plot(proj$x, proj$y, inla.mesh.project(proj, as.vector(mvar)), 
+                 col = topo.colors(24),
                  xlab = "", ylab="",
                  main = paste("edge length = ", locres))
     }
@@ -87,9 +88,9 @@ plot.mvar(range0=0.1, locres = 0.02, max.edge = c(0.03, 0.03), plot.mesh = FALSE
 
 #### Remarks
 
-The true standard error should be equal to 1 and the closest in the above plots is the those with edge length around 0.1 which is also the correlation length of the process. The standard error is under approximated using either a low or high resolution grid. 
+The true marginal variance should be equal to 1 and the SPDE approximation gets more accurate when the maximum edge lenghth is close to and smaller than the correlation length of the process.
 
-**_We may conclude that the best resolution of the mesh would be the one with triangle length approximately equal to the process correlation length._**
+**_We may conclude that the best resolution of the mesh would be the one with triangle length approximately equal to or no larger than the process correlation length._**
 
 
 ### 1.2 Semi-regular grid on $S^2$
@@ -110,11 +111,11 @@ plot.mvarS2 <- function(range0, nseg){
                             B.kappa = matrix(c(lkappa0, 0, -1), 1,3), 
                             theta.prior.mean = c(0,0), theta.prior.prec = c(0.1, 0.1))
   Q <- inla.spde.precision(spde, theta = c(0,0))
-  msd <- sqrt(1/diag(Q))
+  mvar <- diag(inla.qinv(Q))
   proj <- inla.mesh.projector(mesh, dims = c(360,181))
 
-  image.plot(proj$x, proj$y, inla.mesh.project(proj, as.vector(msd)), 
-             col = topo.colors(40), breaks = seq(0,1,0.025),
+  image.plot(proj$x, proj$y, inla.mesh.project(proj, as.vector(mvar)), 
+             col = topo.colors(20),
              xlab = "", ylab="",
              main = paste("edge length = ", 1/nseg))
 }
@@ -131,7 +132,7 @@ plot.mvarS2(range0=0.1, nseg = 100)
 
 #### Remarks
 
-The mesh effect due to the shape change of triangles can not be eliminated but the variation becomes negligible when the edge length of the triangles are similar to the correlation length and the variance approximation is also more accurate.
+Same as the previous test. The mesh effect due to the shape change of triangles can not be eliminated but the variation becomes negligible when the edge length of the triangles gets smaller.
 
 ***
 
@@ -146,7 +147,7 @@ Here we compare posterior marginal distributions of the hyper parameters, $\rho$
 #### 2.1.1 Compare the GMRF approximation and the Matern samples. 
 First we compare the simulated data from a Matern covarance matrix and a GMRF approximation. The Matern covariance is computed by using functions from two different R packages, `fields::Matern` and `geoR::matern`. Not that the parameterization in the matern function is different from the that in INLA!!
 
-With the same parameter values, the GMRF approximation is much rougher than the one given by Matern covariance. 
+With the same parameter values, the GMRF approximation is slightly different from the one given by Matern covariance. 
 
  
 
@@ -187,13 +188,13 @@ simdata <- data.frame(x =xy[,1] , y = xy[,2], rndaa = rndata, Mdata1 = Mdata1, M
 
 This is because:
 
-   1. ***In the Matern functions, $\rho$ is the length scale parameter and it need to be adjusted so that the practical range is the distance at which the correlation drops to about 0.05. For $\nu = 1$, $\mbox{practical range} = 0.1$, we use $\rho = 0.025$.*** 
+   1. ***In the Matern functions, $\rho$ is the length scale parameter and it need to be adjusted so that the practical range is the distance at which the correlation drops to about 0.05; that is for $\nu = 1$, $\mbox{practical range} = 0.1$, $\rho$ should be adjusted to 0.025.*** 
    
    2. The range parameter in INLA GMRF is the distance at which the correlation drops to about 0.13 (**NOT 0.05 as usually defined in the Matern!**)
    
    3. The GMRF approximation cuts all long-range correlations. 
    
-   4. We adjust rho in Matern so that correlation also drops to about 0.1 at the practical range. For $\nu = 1$, $\mbox{practical range} = 0.1$, we use $\rho = 0.033$.
+   4. We adjust $rho$ in Matern so that correlation also drops to about 0.1 at the practical range; that is for $\nu = 1$, $\mbox{practical range} = 0.1$, we use $\rho = 0.033$.
    
    5. Using setting in 4, the GMRF approximation and Matern are almost the same.
 
