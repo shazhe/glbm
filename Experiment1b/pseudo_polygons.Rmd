@@ -1,0 +1,176 @@
+---
+title: "Define Pseudo Observation Polygons"
+author: "Z Sha"
+date: "12 September 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(out.width="1200px", dpi=400)
+```
+
+## Find suitable area fro defining pseudo observation polygons
+
+In this document, we use the 14 GIA forward model solutions to find regions where the observations are certain and close to zero. The 14 GIA forward model solutions are given at 1 degree resolution with the mean trend and estimated errors over the period 2005-1015.
+
+In the following we explore the data sets individually as well as in an ensemble approach.
+
+### 0 Load useful packages and the data
+
+```{r load}
+library(ggplot2)
+library(gridExtra)
+
+
+### Load the 14 GIA data 
+data_path <- "Z:/WP2-SolidEarth/GIAforwardModels/textfiles/"
+file_names <- system(paste("ls", data_path), intern = TRUE)[1:14]
+GIA_name <- unlist(strsplit(file_names, split = ".txt"))
+GIA_priors <- list()
+for (i in 1:14){
+GIA_priors[[i]] <- GIA_temp <- read.table(paste0(data_path, file_names[i]), header = T)
+}
+
+```
+
+### 1 Criteria based on statistical tests
+Assume the GIA solutions are GIA plus Gaussian noise and the standard errors reflect the magnitude of the Gaussian noise. We deifne a point GIA value to be significantly deveiated from zero if it is larger than 2 times the corresponding standard errors.
+Hence the "zero region" will be those with GIA values smaller than 2 times the standard errors. 
+We plot such "zero region" for the 14 GIA solutions and their ensemble means and standard errors.
+
+```{r statszero, cache = TRUE}
+## setup base
+world_map <- map_data("world2")
+map_zero1 <- list()
+
+
+## Individual data sets
+for (i in 1:14){
+  GIA_temp <- GIA_priors[[i]]
+GIA_temp$zero <- abs(GIA_temp$trend) < GIA_temp$std * 2
+
+map_temp1 <- ggplot(data=GIA_temp) + geom_raster(aes(x = x_center, y = y_center, fill = trend)) + 
+  coord_fixed() + xlab("Longitude") + ylab("Latitude") + 
+  scale_x_continuous(limits=c(0,359),  expand = c(0, 0)) + scale_y_continuous(limits=c(-89.5,89.5),  expand = c(0, 0)) 
+
+map_temp1 <- map_temp1 + geom_polygon(data=world_map, aes(x=long, y=lat, group=group), 
+                                      colour="grey", fill = NA, alpha = 0.5) + ggtitle(paste(i, GIA_name[i], "-- trend"))
+
+
+map_temp2 <- ggplot(data=GIA_temp) + geom_raster(aes(x = x_center, y = y_center, fill = std)) + 
+  coord_fixed() + xlab("Longitude") + ylab("Latitude") + 
+  scale_x_continuous(limits=c(0,359),  expand = c(0, 0)) + scale_y_continuous(limits=c(-89.5,89.5),  expand = c(0, 0)) 
+
+map_temp2 <- map_temp2 + geom_polygon(data=world_map, aes(x=long, y=lat, group=group), 
+                                      colour="grey", fill = NA, alpha = 0.5) + ggtitle("standard error")
+
+map_temp3 <- ggplot(data=GIA_temp) + geom_raster(aes(x = x_center, y = y_center, fill = zero)) + 
+  coord_fixed() + xlab("Longitude") + ylab("Latitude") + 
+  scale_x_continuous(limits=c(0,359),  expand = c(0, 0)) + scale_y_continuous(limits=c(-89.5,89.5),  expand = c(0, 0)) 
+
+map_temp3 <- map_temp3 + geom_polygon(data=world_map, aes(x=long, y=lat, group=group), 
+                                      colour="grey", fill = NA, alpha = 0.5) + ggtitle(paste(i, GIA_name[i], "-- zero region"))
+map_zero1[[i]] <- map_temp3
+
+## Plot the result
+print(map_temp3)
+
+}
+
+```
+
+Then do the same for the ensemble mean of the 14 data sets.
+```{r ensemble}
+## create the ensemble data sets
+GIA_ensemble <- GIA_priors[[1]]
+GIA_ensemble$trend <- rowMeans(sapply(GIA_priors, "[[", "trend"))
+GIA_ensemble$sd <- sqrt((rowSums(sapply(GIA_priors, function(x) (x$std)^2)))/14)
+GIA_ensemble$zero <- abs(GIA_ensemble$trend) < GIA_ensemble$std*2
+
+## Plot the result
+map_ens1 <- ggplot(data=GIA_ensemble) + geom_raster(aes(x = x_center, y = y_center, fill = trend)) + 
+  coord_fixed() + xlab("Longitude") + ylab("Latitude") + 
+  scale_x_continuous(limits=c(0,359),  expand = c(0, 0)) + scale_y_continuous(limits=c(-89.5,89.5),  expand = c(0, 0)) 
+
+map_ens1 <- map_ens1 + geom_polygon(data=world_map, aes(x=long, y=lat, group=group), 
+                                      colour="grey", fill = NA, alpha = 0.5) + ggtitle("ensemble -- trend")
+
+map_ens2 <- ggplot(data=GIA_ensemble) + geom_raster(aes(x = x_center, y = y_center, fill = std)) + 
+  coord_fixed() + xlab("Longitude") + ylab("Latitude") + 
+  scale_x_continuous(limits=c(0,359),  expand = c(0, 0)) + scale_y_continuous(limits=c(-89.5,89.5),  expand = c(0, 0)) 
+
+map_ens2 <- map_ens2 + geom_polygon(data=world_map, aes(x=long, y=lat, group=group), 
+                                      colour="grey", fill = NA, alpha = 0.5) + ggtitle("standard error")
+
+map_ens3 <- ggplot(data=GIA_ensemble) + geom_raster(aes(x = x_center, y = y_center, fill = zero)) + 
+  coord_fixed() + xlab("Longitude") + ylab("Latitude") + 
+  scale_x_continuous(limits=c(0,359),  expand = c(0, 0)) + scale_y_continuous(limits=c(-89.5,89.5),  expand = c(0, 0)) 
+
+map_ens3 <- map_ens3 + geom_polygon(data=world_map, aes(x=long, y=lat, group=group), 
+                                      colour="grey", fill = NA, alpha = 0.5) + ggtitle("zero region")
+
+## Plot the result
+map_ens1
+map_ens2
+map_ens3
+
+```
+
+
+### 2 Criteria based on absolute values
+The plots based on the statistical criterion is not satisfactory, so we change to use a simple rule based on absolute value smaller than a given threshold, say 0.5mm/year.
+```{r abszero, cache = TRUE}
+## Individual data sets
+for (i in 1:14){
+GIA_temp <- GIA_priors[[i]]
+GIA_temp$zero <- abs(GIA_temp$trend) < 0.5
+
+map_temp3 <- ggplot(data=GIA_temp) + geom_raster(aes(x = x_center, y = y_center, fill = zero)) + 
+  coord_fixed() + xlab("Longitude") + ylab("Latitude") + 
+  scale_x_continuous(limits=c(0,359),  expand = c(0, 0)) + scale_y_continuous(limits=c(-89.5,89.5),  expand = c(0, 0)) 
+
+map_temp3 <- map_temp3 + geom_polygon(data=world_map, aes(x=long, y=lat, group=group), 
+                                      colour="grey", fill = NA, alpha = 0.5) + ggtitle(paste(i, GIA_name[i], "-- zero region"))
+map_zero1[[i+14]] <- map_temp3
+
+## Plot the result
+print(map_temp3)
+
+}
+
+```
+
+Then the same for the ensemble mean.
+```{r ensemble2}
+GIA_ensemble$zero2 <- abs(GIA_ensemble$trend) < 0.5
+
+## Plot the result
+map_ens3.2 <- ggplot(data=GIA_ensemble) + geom_raster(aes(x = x_center, y = y_center, fill = zero2)) + 
+  coord_fixed() + xlab("Longitude") + ylab("Latitude") + 
+  scale_x_continuous(limits=c(0,359),  expand = c(0, 0)) + scale_y_continuous(limits=c(-89.5,89.5),  expand = c(0, 0)) 
+
+map_ens3.2 <- map_ens3.2 + geom_polygon(data=world_map, aes(x=long, y=lat, group=group), 
+                                      colour="grey", fill = NA, alpha = 0.5) + ggtitle("ensemble zero region 2")
+
+## Plot the result
+map_ens3.2
+
+```
+
+The ensemble mean using the absolute value criteria looks reasonable for defining the zero value polygons.
+
+### Exclude the GPS area
+Given the zero value region, we also want to exclude the region that include real GPS readings. Now we plot the latest GPS data for inspection.
+```{r GPSdata}
+GPS_data <- read.table("Z:/WP2-SolidEarth/GPS/NGL/GPS_version03/GPSdataset_v03c_QC_20170809_comb.txt",  header = T)
+GPS_data$lon <- ifelse(GPS_data$lon < 0, GPS_data$lon + 359, GPS_data$lon)
+map_ensGPS <- map_ens3.2 + geom_point(data=GPS_data, aes(x=lon, y=lat), pch=19, 
+                                    col = "red", fill = "red", alpha=0.7) 
+map_ensGPS
+
+```
+
+
+### Define the locations of the pseudo observations
+With the GPS added in the plots, it is messy to define polygons for the pseudo observations. One simple way to create the locations is to generate a regular mesh over the entire sphere, then remove vertices outside the zero value region and points that has GPS reading or too close to a GPS reading.

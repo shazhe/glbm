@@ -30,10 +30,10 @@ B.bdry$loc <- B.xyz
 plot3d(B.xyz) # visualise these points in 3d
 
 #### 4. Generate the mesh on the globe by using the sampling points
-meshR <- inla.mesh.create(globe = 40)
-MeshB <- inla.mesh.2d(loc = meshR$loc, interior = B.bdry, cutoff = 0.05, max.edge = 0.05)
+meshR <- inla.mesh.create(globe = 60)
+MeshB <- inla.mesh.2d(loc = meshR$loc, interior = B.bdry, cutoff = 0.02, max.edge = 0.02)
 MeshB2 <- inla.mesh.2d(loc = rbind(meshR$loc, B.xyz), cutoff = 0.05, max.edge = 0.05)
-plot(MeshB2, rgl = T)
+plot(MeshB, rgl = T)
 summary(MeshB)
 
 
