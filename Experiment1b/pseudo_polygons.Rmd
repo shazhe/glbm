@@ -7,7 +7,6 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-knitr::opts_chunk$set(out.width="1200px", dpi=400)
 ```
 
 ## Find suitable area fro defining pseudo observation polygons
@@ -148,7 +147,7 @@ GIA_ensemble$zero2 <- abs(GIA_ensemble$trend) < 0.5
 ## Plot the result
 map_ens3.2 <- ggplot(data=GIA_ensemble) + geom_raster(aes(x = x_center, y = y_center, fill = zero2)) + 
   coord_fixed() + xlab("Longitude") + ylab("Latitude") + 
-  scale_x_continuous(limits=c(0,359),  expand = c(0, 0)) + scale_y_continuous(limits=c(-89.5,89.5),  expand = c(0, 0)) 
+  scale_x_continuous(limits=c(0,359),  expand = c(0, 0)) + scale_y_continuous(limits=c(-90,90),  expand = c(0, 0)) 
 
 map_ens3.2 <- map_ens3.2 + geom_polygon(data=world_map, aes(x=long, y=lat, group=group), 
                                       colour="grey", fill = NA, alpha = 0.5) + ggtitle("ensemble zero region 2")
@@ -158,7 +157,16 @@ map_ens3.2
 
 ```
 
-The ensemble mean using the absolute value criteria looks reasonable for defining the zero value polygons.
+The ensemble mean using the absolute value criteria looks reasonable for defining the zero value polygons. Now we convert the pixels in the zero stable area into polygons.
+```{r polygons}
+## create a Spatialpixels object
+GIA_ens <- GIA_ensemble[,c(1:3,16)]
+coordinates(GIA_ens) = c("x_center", "y_center")
+gridded(GIA_ens) <- TRUE
+GIA_ensR <- raster(GIA_ens, layer = 2)
+GIA_zeroPoly <- rasterToPolygons(GIA_ensR, fun=function(zero2) {zero2 == TRUE}, dissolve=TRUE ) 
+plot(GIA_zeroPoly, col = "red", main = "zero certain regions")
+```
 
 ### Exclude the GPS area
 Given the zero value region, we also want to exclude the region that include real GPS readings. Now we plot the latest GPS data for inspection.
@@ -166,7 +174,7 @@ Given the zero value region, we also want to exclude the region that include rea
 GPS_data <- read.table("Z:/WP2-SolidEarth/GPS/NGL/GPS_version03/GPSdataset_v03c_QC_20170809_comb.txt",  header = T)
 GPS_data$lon <- ifelse(GPS_data$lon < 0, GPS_data$lon + 359, GPS_data$lon)
 map_ensGPS <- map_ens3.2 + geom_point(data=GPS_data, aes(x=lon, y=lat), pch=19, 
-                                    col = "red", fill = "red", alpha=0.7) 
+                                    col = "red", fill = "red", alpha=0.7) + ggtitle("ensemble zero region 2 with GPS")
 map_ensGPS
 
 ```
@@ -174,3 +182,46 @@ map_ensGPS
 
 ### Define the locations of the pseudo observations
 With the GPS added in the plots, it is messy to define polygons for the pseudo observations. One simple way to create the locations is to generate a regular mesh over the entire sphere, then remove vertices outside the zero value region and points that has GPS reading or too close to a GPS reading.
+
+First, generate vertices that evenly distributed over the entire globe. The distance between the vertices is about the same as the correlation length of the of the residual process, which is about 400-500km apart. This is about spreading 1000 points using the Fibnacci spiral on a sphere.
+```{r pseudobs}
+## xyz -- Generate equally distributed points around a sphere -- Fibonacci spiral
+fiboSphere1 <- function(n = 1000L) {
+  
+  phi <- (sqrt(5) + 1) / 2  # golden ratio
+  i <- seq(-(n-1), (n-1),2)
+  theta <- 2 * pi * i / phi
+  sphi <- i/n
+  cphi <- sqrt((n+i) * (n-i))/n
+  
+  x <- cphi * sin(theta)
+  y <- cphi * cos(theta)
+  z <- sphi
+  return(cbind(x,y,z))
+}
+
+##lonlat -- Generate equally distributed points around a sphere -- Fibonacci spiral
+fiboSphere2 <- function(n = 1000L) {
+  phi <- (sqrt(5) + 1) / 2 - 1 # golden ratio
+  ga <- phi * 2 * pi           # golden angle
+  
+  i <- 1L:n
+  lon <- ga * i / (2 * pi)
+  lon <- 2 * pi * (lon - floor(lon))
+  lon <- ifelse(lon <= pi, lon, lon - 2 * pi)/pi*180
+  lat <- asin(-1 + 2 * i / n)/pi*180
+  
+  cbind(lon = lon, lat = lat)
+}
+
+fibopoints <- fiboSphere2(n = 1000) 
+fibopoints <- data.frame(fibopoints)
+fibopoints$lon <- ifelse(fibopoints$lon < 0, fibopoints$lon+359, fibopoints$lon)
+## Plot these points 
+map_fibo <- map_ensGPS + geom_point(data=data.frame(fibopoints), aes(x=lon, y=lat), pch=19, 
+                                    col = "blue", alpha=0.5)  + ggtitle("ensemble zero region 2 with GPS and fibo points")
+map_fibo
+
+
+```
+Then remove points that are not in the zero 
