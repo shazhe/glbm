@@ -9,7 +9,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## Find suitable area fro defining pseudo observation polygons
+## Find suitable area for defining pseudo observation polygons
 
 In this document, we use the 14 GIA forward model solutions to find regions where the observations are certain and close to zero. The 14 GIA forward model solutions are given at 1 degree resolution with the mean trend and estimated errors over the period 2005-1015.
 
@@ -34,7 +34,7 @@ GIA_priors[[i]] <- GIA_temp <- read.table(paste0(data_path, file_names[i]), head
 ```
 
 ### 1 Criteria based on statistical tests
-Assume the GIA solutions are GIA plus Gaussian noise and the standard errors reflect the magnitude of the Gaussian noise. We deifne a point GIA value to be significantly deveiated from zero if it is larger than 2 times the corresponding standard errors.
+Assume the GIA solutions are GIA plus Gaussian noise and the standard errors reflect the magnitude of the Gaussian noise. We define a point GIA value to be significantly deviated from zero if it is larger than 2 times the corresponding standard errors.
 Hence the "zero region" will be those with GIA values smaller than 2 times the standard errors. 
 We plot such "zero region" for the 14 GIA solutions and their ensemble means and standard errors.
 
@@ -161,12 +161,31 @@ The ensemble mean using the absolute value criteria looks reasonable for definin
 ```{r polygons}
 ## create a Spatialpixels object
 GIA_ens <- GIA_ensemble[,c(1:3,16)]
-coordinates(GIA_ens) = c("x_center", "y_center")
+library(sp)
+library(raster)
+coordinates(GIA_ens) <- c("x_center", "y_center")
 gridded(GIA_ens) <- TRUE
-GIA_ensR <- raster(GIA_ens, layer = 2)
+GIA_ensR <- raster(GIA_ens, layer = 2) # 2 is the column no of zero2
 GIA_zeroPoly <- rasterToPolygons(GIA_ensR, fun=function(zero2) {zero2 == TRUE}, dissolve=TRUE ) 
-plot(GIA_zeroPoly, col = "red", main = "zero certain regions")
+plot(GIA_zeroPoly, col = "blue", main = "zero certain regions")
 ```
+
+Note that there are holes in the large polygons and check if they are correctly labeled.
+
+```{r holes}
+sapply(GIA_zeroPoly@polygons[[1]]@Polygons, function(x) slot(x, "hole"))
+```
+
+
+We can convert the spatialPolygonDataFrame object to a data frame that can be plotted by ggplot2.
+
+```{r ggpolygons}
+library(broom)
+GIA_zeroDF <- tidy(GIA_zeroPoly)
+zeropoly_map <- ggplot()+ coord_fixed()+ geom_polygon(data = GIA_zeroDF, aes(x=long, y=lat, group = group, fill = !hole),colour="black") 
+print(zeropoly_map)
+```
+
 
 ### Exclude the GPS area
 Given the zero value region, we also want to exclude the region that include real GPS readings. Now we plot the latest GPS data for inspection.
@@ -175,15 +194,15 @@ GPS_data <- read.table("Z:/WP2-SolidEarth/GPS/NGL/GPS_version03/GPSdataset_v03c_
 GPS_data$lon <- ifelse(GPS_data$lon < 0, GPS_data$lon + 359, GPS_data$lon)
 map_ensGPS <- map_ens3.2 + geom_point(data=GPS_data, aes(x=lon, y=lat), pch=19, 
                                     col = "red", fill = "red", alpha=0.7) + ggtitle("ensemble zero region 2 with GPS")
-map_ensGPS
-
+map_ensGPS 
 ```
 
 
 ### Define the locations of the pseudo observations
 With the GPS added in the plots, it is messy to define polygons for the pseudo observations. One simple way to create the locations is to generate a regular mesh over the entire sphere, then remove vertices outside the zero value region and points that has GPS reading or too close to a GPS reading.
 
-First, generate vertices that evenly distributed over the entire globe. The distance between the vertices is about the same as the correlation length of the of the residual process, which is about 400-500km apart. This is about spreading 1000 points using the Fibnacci spiral on a sphere.
+First, generate vertices that evenly distributed over the entire globe. The distance between the vertices is about the same as the correlation length of the of the residual process, which is about 400-500km apart. This is about spreading 1000 points using the Fibonacci spiral on a sphere.
+
 ```{r pseudobs}
 ## xyz -- Generate equally distributed points around a sphere -- Fibonacci spiral
 fiboSphere1 <- function(n = 1000L) {
@@ -221,7 +240,62 @@ fibopoints$lon <- ifelse(fibopoints$lon < 0, fibopoints$lon+359, fibopoints$lon)
 map_fibo <- map_ensGPS + geom_point(data=data.frame(fibopoints), aes(x=lon, y=lat), pch=19, 
                                     col = "blue", alpha=0.5)  + ggtitle("ensemble zero region 2 with GPS and fibo points")
 map_fibo
+```
 
+
+Then remove points that are not in the zero region polygons.
+
+```{r rePoly}
+fibsp <- SpatialPoints(fibopoints, proj4string = CRS("+proj=longlat"))
+zeroPolys <- SpatialPolygons(GIA_zeroPoly@polygons, proj4string = CRS("+proj=longlat"))
+fibin <- over(fibsp, zeroPolys)
+fibin <- ifelse(is.na(fibin), FALSE, TRUE)
+## plot these points
+fibpoint_in <- data.frame(fibopoints[fibin, ])
+map_fibo2 <- zeropoly_map + geom_point(data=fibpoint_in, aes(x=lon, y=lat), pch=19, 
+                                    col = "blue", alpha=0.5)  + ggtitle("fibpoints in the zero value regions")
+map_fibo2
+```
+
+Then remove points that are too close to the GPS observations (say within the correlation length 400-500km , that is about 5 degree in longlat).
+
+```{r reGPS, cache=TRUE}
+fibin2 <- apply(fibpoint_in, 1, function(x) all(apply(GPS_data[,2:3], 1, function(y) dist(rbind(y, x)) > 5)))
+fibpoint_in2 <- fibpoint_in[fibin2,]
+```
+
+```{r reGPS2}
+map_fibo3 <- zeropoly_map + geom_point(data=fibpoint_in2, aes(x=lon, y=lat), pch=19, 
+                                    col = "blue", alpha=0.5)  +
+  geom_point(data=GPS_data, aes(x=lon, y=lat), pch=19, 
+                                    col = "red", fill = "red", alpha=0.7) +
+  ggtitle("fibpoints in the zero value regions away from GPS")
+map_fibo3
+```
+
+Finally, assemble the pseudo observation and real observation into the same data set. The pseudo observations are simulated from a zero mean Gaussian distribution with sd error half of the smallest real GPS error.
+```{r assemble}
+pseudo_error <- min(GPS_data$std)/2
+nps <- nrow(fibpoint_in2)
+pseudo_obs <- rnorm(nps, sd = pseudo_error)
+pseudo_data <- data.frame(ID = rep("pseudo", nps), lon = fibpoint_in2$lon, lat = fibpoint_in2$lat, 
+                          trend = pseudo_obs, std = rep(pseudo_error, nps))
+obs_all <- rbind(GPS_data, pseudo_data)
+obs_all$source <- ifelse(obs_all$ID == "pseudo", "pseudo", "real")
+
+map_final <- ggplot() + coord_fixed() + geom_polygon(data=world_map, aes(x=long, y=lat, group=group), colour="black", fill = NA) + 
+  geom_polygon(data = GIA_zeroDF, aes(x=long, y=lat, group = group), colour="red", fill = NA) +
+  geom_point(data=obs_all, aes(x=lon, y=lat, colour = source), pch=19) + 
+  ggtitle("Final map of real and pseudo observations.")
+
+map_final
+```
+
+
+Plot with another projection.
+
+```{r projection}
+library(mapproj)
+map_final + coord_map(projection = "orthographic")
 
 ```
-Then remove points that are not in the zero 
