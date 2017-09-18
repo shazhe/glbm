@@ -11,7 +11,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Find suitable area for defining pseudo observation polygons
 
-In this document, we use the 14 GIA forward model solutions to find regions where the observations are certain and close to zero. The 14 GIA forward model solutions are given at 1 degree resolution with the mean trend and estimated errors over the period 2005-1015.
+In this document, we use the 14 GIA forward model solutions to find regions where the observations are certain and close to zero. The 13 GIA forward model solutions are given at 1 degree resolution with the mean trend and estimated errors.
 
 In the following we explore the data sets individually as well as in an ensemble approach.
 
@@ -25,67 +25,85 @@ library(gridExtra)
 ### Load the 14 GIA data 
 data_path <- "Z:/WP2-SolidEarth/GIAforwardModels/textfiles/"
 file_names <- system(paste("ls", data_path), intern = TRUE)[1:14]
+## Remove the no.11 W&O-EGOD
+file_names <- file_names[-11]
 GIA_name <- unlist(strsplit(file_names, split = ".txt"))
 GIA_priors <- list()
-for (i in 1:14){
-GIA_priors[[i]] <- GIA_temp <- read.table(paste0(data_path, file_names[i]), header = T)
+for (i in 1:13){
+GIA_priors[[i]] <- read.table(paste0(data_path, file_names[i]), header = T)
+}
+
+## create the ensemble data sets
+GIA_ensemble <- GIA_priors[[1]]
+GIA_ensemble$trend <- rowMeans(sapply(GIA_priors, "[[", "trend"))
+GIA_ensemble$sd <- sqrt((rowSums(sapply(GIA_priors, function(x) (x$std)^2)))/13)
+```
+
+### 1 Criteria for selecting zero-value regions
+To select the reasonable regions where the GIA are zero with high certainty, we first examine the distributions of the GIA values from the 13 forward models and their ensemble mean.
+```{r eda}
+## All 13 datasets together
+alltrend <- sapply(GIA_priors, "[[", "trend")
+range(alltrend)
+boxplot.stats(alltrend)$conf
+
+## the esemble mean
+range(GIA_ensemble$trend)
+boxplot.stats(GIA_ensemble$trend)$conf
+
+## combine the 13 lists to one dataframe
+alltrend <- data.frame(alltrend)
+names(alltrend) <- paste0("trend", 1:13)
+alltrend$x_center <- GIA_priors[[1]]$x_center
+alltrend$y_center <- GIA_priors[[1]]$y_center
+
+## create a raster object 
+library(sp)
+library(raster)
+coordinates(alltrend) <- c("x_center", "y_center")
+gridded(alltrend) <- TRUE
+all_layers <- lapply(1:13, function(x) raster(alltrend, layer = x)) # 2 is the column no of zero2
+brks <- seq(-8.5, 25.5, 2)
+ticks <- c(-5, 0, 5, 10, 15)
+colpal <- colorRamps::matlab.like(length(brks) - 1)
+plot(all_layers[[1]], breaks = brks, col = colpal, alpha = 0.2, 
+     axis.args=list( at=ticks, labels=ticks))
+for(i in 2:13){
+plot(all_layers[[i]], breaks = brks, col = colpal, alpha = 0.2, axis.args=list( at=ticks, labels=ticks), add = TRUE)
+}
+
+## Plot the 13 datasets
+world_map <- map_data("world2") 
+
+GIA13map <- ggplot() + geom_polygon(data=world_map, aes(x=long, y=lat, group=group), colour="grey", fill = NA, alpha = 0.5) +
+  coord_fixed() + xlab("Longitude") + ylab("Latitude") +  scale_x_continuous(limits=c(0,359),  expand = c(0, 0)) + 
+  scale_y_continuous(limits=c(-89.5,89.5),  expand = c(0, 0)) + ggtitle("13 GIA model trends") # The base
+
+## overlaying the trends
+for (i in 1:13){
+GIA_temp <- GIA_priors[[i]]
+
+GIA13map <- GIA13map + geom_raster(data = GIA_temp, aes(x = x_center, y = y_center, fill = trend)) + 
+  scale_fill_gradientn(colours =  colorRamps::matlab.like(10), limits = c(-8.5,25.5))
+
 }
 
 ```
 
-### 1 Criteria based on statistical tests
+All distributions have mass concentrated around negative values near zero. The notches of the boxplot provide guidelines for choosing threshold for the zero-value regions: most values are around -0.2. Hence, in the following we use four different values for the threshold: 0.05, 0.1, 0.2, 0.3; and plot the zero-value regions.
+
+
 Assume the GIA solutions are GIA plus Gaussian noise and the standard errors reflect the magnitude of the Gaussian noise. We define a point GIA value to be significantly deviated from zero if it is larger than 2 times the corresponding standard errors.
 Hence the "zero region" will be those with GIA values smaller than 2 times the standard errors. 
 We plot such "zero region" for the 14 GIA solutions and their ensemble means and standard errors.
 
 ```{r statszero, cache = TRUE}
-## setup base
-world_map <- map_data("world2")
-map_zero1 <- list()
 
-
-## Individual data sets
-for (i in 1:14){
-  GIA_temp <- GIA_priors[[i]]
-GIA_temp$zero <- abs(GIA_temp$trend) < GIA_temp$std * 2
-
-map_temp1 <- ggplot(data=GIA_temp) + geom_raster(aes(x = x_center, y = y_center, fill = trend)) + 
-  coord_fixed() + xlab("Longitude") + ylab("Latitude") + 
-  scale_x_continuous(limits=c(0,359),  expand = c(0, 0)) + scale_y_continuous(limits=c(-89.5,89.5),  expand = c(0, 0)) 
-
-map_temp1 <- map_temp1 + geom_polygon(data=world_map, aes(x=long, y=lat, group=group), 
-                                      colour="grey", fill = NA, alpha = 0.5) + ggtitle(paste(i, GIA_name[i], "-- trend"))
-
-
-map_temp2 <- ggplot(data=GIA_temp) + geom_raster(aes(x = x_center, y = y_center, fill = std)) + 
-  coord_fixed() + xlab("Longitude") + ylab("Latitude") + 
-  scale_x_continuous(limits=c(0,359),  expand = c(0, 0)) + scale_y_continuous(limits=c(-89.5,89.5),  expand = c(0, 0)) 
-
-map_temp2 <- map_temp2 + geom_polygon(data=world_map, aes(x=long, y=lat, group=group), 
-                                      colour="grey", fill = NA, alpha = 0.5) + ggtitle("standard error")
-
-map_temp3 <- ggplot(data=GIA_temp) + geom_raster(aes(x = x_center, y = y_center, fill = zero)) + 
-  coord_fixed() + xlab("Longitude") + ylab("Latitude") + 
-  scale_x_continuous(limits=c(0,359),  expand = c(0, 0)) + scale_y_continuous(limits=c(-89.5,89.5),  expand = c(0, 0)) 
-
-map_temp3 <- map_temp3 + geom_polygon(data=world_map, aes(x=long, y=lat, group=group), 
-                                      colour="grey", fill = NA, alpha = 0.5) + ggtitle(paste(i, GIA_name[i], "-- zero region"))
-map_zero1[[i]] <- map_temp3
-
-## Plot the result
-print(map_temp3)
-
-}
 
 ```
 
 Then do the same for the ensemble mean of the 14 data sets.
 ```{r ensemble}
-## create the ensemble data sets
-GIA_ensemble <- GIA_priors[[1]]
-GIA_ensemble$trend <- rowMeans(sapply(GIA_priors, "[[", "trend"))
-GIA_ensemble$sd <- sqrt((rowSums(sapply(GIA_priors, function(x) (x$std)^2)))/14)
-GIA_ensemble$zero <- abs(GIA_ensemble$trend) < GIA_ensemble$std*2
 
 ## Plot the result
 map_ens1 <- ggplot(data=GIA_ensemble) + geom_raster(aes(x = x_center, y = y_center, fill = trend)) + 
@@ -120,23 +138,7 @@ map_ens3
 ### 2 Criteria based on absolute values
 The plots based on the statistical criterion is not satisfactory, so we change to use a simple rule based on absolute value smaller than a given threshold, say 0.5mm/year.
 ```{r abszero, cache = TRUE}
-## Individual data sets
-for (i in 1:14){
-GIA_temp <- GIA_priors[[i]]
-GIA_temp$zero <- abs(GIA_temp$trend) < 0.5
 
-map_temp3 <- ggplot(data=GIA_temp) + geom_raster(aes(x = x_center, y = y_center, fill = zero)) + 
-  coord_fixed() + xlab("Longitude") + ylab("Latitude") + 
-  scale_x_continuous(limits=c(0,359),  expand = c(0, 0)) + scale_y_continuous(limits=c(-89.5,89.5),  expand = c(0, 0)) 
-
-map_temp3 <- map_temp3 + geom_polygon(data=world_map, aes(x=long, y=lat, group=group), 
-                                      colour="grey", fill = NA, alpha = 0.5) + ggtitle(paste(i, GIA_name[i], "-- zero region"))
-map_zero1[[i+14]] <- map_temp3
-
-## Plot the result
-print(map_temp3)
-
-}
 
 ```
 
