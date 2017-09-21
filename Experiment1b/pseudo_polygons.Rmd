@@ -1,7 +1,7 @@
 ---
-title: "Define Pseudo Observation Polygons"
+title: "Define Pseudo Observation Polygons -- Version 02"
 author: "Z Sha"
-date: "12 September 2017"
+date: "21 September 2017"
 output: html_document
 ---
 
@@ -93,12 +93,14 @@ breaks <- c(-8.5, -2, -1, -0.5, -0.1, 0, 0.1, 0.5, 1, 2, 25.5)
 plot_rescale(breaks)
 
 ```
-Remove signsand rescale the colorbar down to details within 0.5 in absolute value.
+
+Remove signs and rescale the colorbar down to details within 0.5 in absolute value.
 ```{r eda_plot3}
 breaks <- c( 0, 0.1, 0.2, 0.5, 1, 25.5)
 plot_rescale(breaks, abs = TRUE)
 ```
-Down to the value of 0.5, most of the plots are very similar to each other except for trend3. They include most of the zero value regions. For a final comparison, we plot the zero value regions with threshold 0.1, 0.15, 0.2 and 0.5.
+
+Down to the value of 0.5, most of the plots are very similar to each other except for trend3. They include most of the zero value regions. For a final comparison, we plot the zero value regions with threshold 0.1, 0.2, 0.3 and 0.5.
 ```{r eda_plot4}
 
 ## 0.1
@@ -122,53 +124,44 @@ The map using ensemble mean and thresholds at 0.2 and 0.3 looks reasonable and w
 
 
 ### 2 Create the zero value polygons.
-Now we convert the region defined by the above criteria from pixels to polygons.
+Now we convert the region defined by the above criteria from pixels to polygons. We will try three threshold values: 0.1, 0.2, 0.3. ***I would recommend to use 0.2 and 0.3*** since they cover more regions and unwanted points can always be removed later.
+
+In the following, we fisrt do the porcessing for threshold value 0.1 and later we do the same for 0.2 and 0.3.
 ```{r polygons}
 ## from Spatialpixels to raster to polygons
 library(raster)
 GIA_sp <- GIA_ensemble[, c(2,3,4,5)]
-GIA_sp$trend02 <- GIA_sp$trend <=0.2
-GIA_sp$trend03 <- GIA_sp$trend <=0.3
+GIA_sp$trend01 <- abs(GIA_sp$trend) <0.1
+GIA_sp$trend02 <- abs(GIA_sp$trend) <0.2
+GIA_sp$trend03 <- abs(GIA_sp$trend) <0.3
 coordinates(GIA_sp) <- c("x_center", "y_center")
 gridded(GIA_sp) <- TRUE
 
-GIA_ras02 <- raster(GIA_sp, layer = 3) # 3 is the column no of trend02
-GIA_ras03 <- raster(GIA_sp, layer = 4) # 4 is the column no of trend03
-zeroPoly02 <- rasterToPolygons(GIA_ras02, fun=function(trend02) {trend02 == TRUE}, dissolve=TRUE ) 
-zeroPoly03 <- rasterToPolygons(GIA_ras03, fun=function(trend03) {trend03 == TRUE}, dissolve=TRUE ) 
-plot(zeroPoly02, col = "blue", main = "zero regions -- threshold = 0.2")
-plot(zeroPoly03, col = "blue", main = "zero regions -- threshold = 0.3")
+
+GIA_ras01 <- raster(GIA_sp, layer = 3) # 3 is the column no of trend01
+zeroPoly01 <- rasterToPolygons(GIA_ras01, fun=function(trend01) {trend01 == TRUE}, dissolve=TRUE ) 
+plot(zeroPoly01, col = "blue", main = "zero regions -- threshold = 0.1")
 ```
 
 Note that there are holes in the large polygons and check if they are correctly labeled.
-
 ```{r holes}
-sapply(zeroPoly02@polygons[[1]]@Polygons, function(x) slot(x, "hole"))
-
-
-sapply(zeroPoly03@polygons[[1]]@Polygons, function(x) slot(x, "hole"))
+sapply(zeroPoly01@polygons[[1]]@Polygons, function(x) slot(x, "hole"))
 ```
 
-
 We can convert the spatialPolygonDataFrame object to a data frame that can be plotted by ggplot2.
-
 ```{r ggpolygons}
 library(broom)
 library(ggplot2)
-GIA_zeroDF02 <- tidy(zeroPoly02)
-zeropoly_map02 <- ggplot()+ coord_fixed()+ geom_polygon(data = GIA_zeroDF02, aes(x=long, y=lat, group = group, fill = !hole),colour="black") + ggtitle("Threshold = 0.2")
 
-GIA_zeroDF03 <- tidy(zeroPoly03)
-zeropoly_map03 <- ggplot()+ coord_fixed()+ geom_polygon(data = GIA_zeroDF03, aes(x=long, y=lat, group = group, fill = !hole),colour="black") + ggtitle("Threshold = 0.3")
+GIA_zeroDF01 <- tidy(zeroPoly01)
+zeropoly_map01 <- ggplot()+ coord_fixed()+ geom_polygon(data = GIA_zeroDF01, aes(x=long, y=lat, group = group, fill = !hole),colour="black") + ggtitle("Threshold = 0.1")
 
-print(zeropoly_map02)
-print(zeropoly_map03)
+print(zeropoly_map01)
 ```
 
 
 ### 3 Generate Pseudo observations within the zero polygons
 First, generate vertices that evenly distributed over the entire globe. The distance between the vertices is about the same as the correlation length of the of the residual process, which is about 400-500km apart. This is about spreading 1000 points using the Fibonacci spiral on a sphere.
-
 ```{r pseudobs}
 ## xyz -- Generate equally distributed points around a sphere -- Fibonacci spiral
 fiboSphere1 <- function(n = 1000L) {
@@ -214,32 +207,20 @@ map_fibo <- ggplot() + coord_fixed() +
 map_fibo
 ```
 
-
 Then remove points that are not in the zero region polygons.
-```{r rePoly02}
+```{r rePoly01}
 fibsp <- SpatialPoints(fibopoints, proj4string = CRS("+proj=longlat"))
-zeroPolys02 <- SpatialPolygons(zeroPoly02@polygons, proj4string = CRS("+proj=longlat"))
-fibin02 <- over(fibsp, zeroPolys02)
-fibin02 <- ifelse(is.na(fibin02), FALSE, TRUE)
+zeroPolys01 <- SpatialPolygons(zeroPoly01@polygons, proj4string = CRS("+proj=longlat"))
+fibin01 <- over(fibsp, zeroPolys01)
+fibin01 <- ifelse(is.na(fibin01), FALSE, TRUE)
 ## plot these points
-fibpoint_in02 <- data.frame(fibopoints[fibin02, ])
+fibpoint_in01 <- data.frame(fibopoints[fibin01, ])
 
-map_fiboZero02 <- zeropoly_map02 + geom_point(data=fibpoint_in02, aes(x=lon, y=lat), pch=19, 
-                                    col = "blue", alpha=0.5)  + ggtitle("fibpoints in the zero polygons -- threshold = 0.2")
-map_fiboZero02
+map_fiboZero01 <- zeropoly_map01 + geom_point(data=fibpoint_in01, aes(x=lon, y=lat), pch=19, 
+                                    col = "blue", alpha=0.5)  + ggtitle("fibpoints in the zero polygons -- threshold = 0.1")
+map_fiboZero01
 ```
-Same for the other threshold.
-```{r rePoly03}
-zeroPolys03 <- SpatialPolygons(zeroPoly03@polygons, proj4string = CRS("+proj=longlat"))
-fibin03 <- over(fibsp, zeroPolys03)
-fibin03 <- ifelse(is.na(fibin03), FALSE, TRUE)
-## plot these points
-fibpoint_in03 <- data.frame(fibopoints[fibin03, ])
 
-map_fiboZero03 <- zeropoly_map03 + geom_point(data=fibpoint_in03, aes(x=lon, y=lat), pch=19, 
-                                    col = "blue", alpha=0.5)  + ggtitle("fibpoints in the zero polygons -- threshold = 0.3")
-map_fiboZero03
-```
 
 ### 4 Exclude the GPS area
 Given the zero value region, we also want to exclude the region that include real GPS readings. Now we plot the latest GPS data for inspection.
@@ -252,8 +233,78 @@ map_GPS <-  ggplot() + coord_fixed() + geom_polygon(data=world_map, aes(x=long, 
                                     col = "red", fill = "red", alpha=0.7) + ggtitle("Real GPS observations")
 map_GPS 
 ```
-We remove points that are too close to the GPS observations (say within the correlation length 400-500km , that is about 5 degree in longlat).
 
+We remove points that are too close to the GPS observations (say within the correlation length 400-500km , that is about 5 degree in longlat).
+```{r reGPS01a, cache=TRUE}
+fibin01gps <- apply(fibpoint_in01, 1, function(x) all(apply(GPS_data[,2:3], 1, function(y) dist(rbind(y, x)) > 5)))
+fibpoint_in01gps <- fibpoint_in01[fibin01gps,]
+```
+
+```{r reGPS01b}
+map_fibo01 <- zeropoly_map01 + geom_point(data=fibpoint_in01gps, aes(x=lon, y=lat), pch=19, 
+                                    col = "blue", alpha=0.5)  +
+  geom_point(data=GPS_data, aes(x=lon, y=lat), pch=19, 
+                                    col = "red", fill = "red", alpha=0.7) +
+  ggtitle("fibpoints in the zero polygons and away from GPS -- threshold = 0.1")
+map_fibo01
+```
+
+Finally, assemble the pseudo observation and real observation into the same data set. The pseudo observations are all zero and ***the related uncertainty is set to be tenth of the threshold values.***
+```{r assemble01}
+nps01 <- nrow(fibpoint_in01gps)
+pseudo_data01 <- data.frame(ID = rep("pseudo", nps01), lon = fibpoint_in01gps$lon, lat = fibpoint_in01gps$lat, 
+                          trend = 0, std = 0.01)
+obs_all01 <- rbind(GPS_data, pseudo_data01)
+obs_all01$source <- ifelse(obs_all01$ID == "pseudo", "pseudo", "real")
+
+map_final01 <- ggplot() + coord_fixed() + geom_polygon(data=world_map, aes(x=long, y=lat, group=group), colour="black", fill = NA) + 
+  geom_polygon(data = GIA_zeroDF01, aes(x=long, y=lat, group = group), colour="red", fill = NA) +
+  geom_point(data=obs_all01, aes(x=lon, y=lat, colour = source), pch=19) + 
+  ggtitle("Final map of real and pseudo observations -- threhold = 0.1")
+
+map_final01
+```
+
+Plot with another projection.
+```{r projection01}
+library(mapproj)
+map_final01 + coord_map(projection = "orthographic")
+```
+
+
+### 5 Threshold = 0.2
+
+Now we do the same using threshold value 0.2. First create the admissible polygons.
+```{r polygons02}
+## Generate the polygons
+GIA_ras02 <- raster(GIA_sp, layer = 4) # 4 is the column no of trend02
+zeroPoly02 <- rasterToPolygons(GIA_ras02, fun=function(trend02) {trend02 == TRUE}, dissolve=TRUE ) 
+plot(zeroPoly02, col = "blue", main = "zero regions -- threshold = 0.2")
+
+## Checking holes
+sapply(zeroPoly02@polygons[[1]]@Polygons, function(x) slot(x, "hole"))
+
+## plot in ggplot2
+GIA_zeroDF02 <- tidy(zeroPoly02)
+zeropoly_map02 <- ggplot()+ coord_fixed()+ geom_polygon(data = GIA_zeroDF02, aes(x=long, y=lat, group = group, fill = !hole),colour="black") + ggtitle("Threshold = 0.2")
+print(zeropoly_map02)
+```
+
+Then remove the points outside theses polygons.
+```{r rePoly02}
+fibsp <- SpatialPoints(fibopoints, proj4string = CRS("+proj=longlat"))
+zeroPolys02 <- SpatialPolygons(zeroPoly02@polygons, proj4string = CRS("+proj=longlat"))
+fibin02 <- over(fibsp, zeroPolys02)
+fibin02 <- ifelse(is.na(fibin02), FALSE, TRUE)
+## plot these points
+fibpoint_in02 <- data.frame(fibopoints[fibin02, ])
+
+map_fiboZero02 <- zeropoly_map02 + geom_point(data=fibpoint_in02, aes(x=lon, y=lat), pch=19, 
+                                    col = "blue", alpha=0.5)  + ggtitle("fibpoints in the zero polygons -- threshold = 0.2")
+map_fiboZero02
+```
+
+Then remove points that are too close the real GPS observations.
 ```{r reGPS02a, cache=TRUE}
 fibin02gps <- apply(fibpoint_in02, 1, function(x) all(apply(GPS_data[,2:3], 1, function(y) dist(rbind(y, x)) > 5)))
 fibpoint_in02gps <- fibpoint_in02[fibin02gps,]
@@ -268,8 +319,57 @@ map_fibo02 <- zeropoly_map02 + geom_point(data=fibpoint_in02gps, aes(x=lon, y=la
 map_fibo02
 ```
 
+Finally, assemble the data and plot.
+```{r assemble02}
+nps02 <- nrow(fibpoint_in02gps)
+pseudo_data02 <- data.frame(ID = rep("pseudo", nps02), lon = fibpoint_in02gps$lon, lat = fibpoint_in02gps$lat, 
+                          trend = 0, std = 0.02)
+obs_all02 <- rbind(GPS_data, pseudo_data02)
+obs_all02$source <- ifelse(obs_all02$ID == "pseudo", "pseudo", "real")
 
-Do the same for the other threshold.
+map_final02 <- ggplot() + coord_fixed() + geom_polygon(data=world_map, aes(x=long, y=lat, group=group), colour="black", fill = NA) + 
+  geom_polygon(data = GIA_zeroDF02, aes(x=long, y=lat, group = group), colour="red", fill = NA) +
+  geom_point(data=obs_all02, aes(x=lon, y=lat, colour = source), pch=19) + 
+  ggtitle("Final map of real and pseudo observations -- threhold = 0.2")
+
+map_final02
+
+map_final02 + coord_map(projection = "orthographic")
+```
+
+
+### 6 Threshold = 0.3
+
+Now we do the same using threshold value 0.3. First create the admissible polygons.
+```{r polygons3}
+## Generate the polygons
+GIA_ras03 <- raster(GIA_sp, layer = 5) # 5 is the column no of trend03
+zeroPoly03 <- rasterToPolygons(GIA_ras03, fun=function(trend03) {trend03 == TRUE}, dissolve=TRUE ) 
+plot(zeroPoly03, col = "blue", main = "zero regions -- threshold = 0.3")
+
+## Checking holes
+sapply(zeroPoly03@polygons[[1]]@Polygons, function(x) slot(x, "hole"))
+
+## plot in ggplot2
+GIA_zeroDF03 <- tidy(zeroPoly03)
+zeropoly_map03 <- ggplot()+ coord_fixed()+ geom_polygon(data = GIA_zeroDF03, aes(x=long, y=lat, group = group, fill = !hole),colour="black") + ggtitle("Threshold = 0.3")
+print(zeropoly_map03)
+```
+
+Then remove the points outside theses polygons.
+```{r rePoly03}
+zeroPolys03 <- SpatialPolygons(zeroPoly03@polygons, proj4string = CRS("+proj=longlat"))
+fibin03 <- over(fibsp, zeroPolys03)
+fibin03 <- ifelse(is.na(fibin03), FALSE, TRUE)
+## plot these points
+fibpoint_in03 <- data.frame(fibopoints[fibin03, ])
+
+map_fiboZero03 <- zeropoly_map03 + geom_point(data=fibpoint_in03, aes(x=lon, y=lat), pch=19, 
+                                    col = "blue", alpha=0.5)  + ggtitle("fibpoints in the zero polygons -- threshold = 0.3")
+map_fiboZero03
+```
+
+Then remove points that are too close the real GPS observations.
 ```{r reGPS03a, cache=TRUE}
 fibin03gps <- apply(fibpoint_in03, 1, function(x) all(apply(GPS_data[,2:3], 1, function(y) dist(rbind(y, x)) > 5)))
 fibpoint_in03gps <- fibpoint_in03[fibin03gps,]
@@ -284,22 +384,7 @@ map_fibo03 <- zeropoly_map03 + geom_point(data=fibpoint_in03gps, aes(x=lon, y=la
 map_fibo03
 ```
 
-Finally, assemble the pseudo observation and real observation into the same data set. The pseudo observations are all zero and the related uncertainty is set to be tenth of the threshold values.
-```{r assemble02}
-nps02 <- nrow(fibpoint_in02gps)
-pseudo_data02 <- data.frame(ID = rep("pseudo", nps02), lon = fibpoint_in02gps$lon, lat = fibpoint_in02gps$lat, 
-                          trend = 0, std = 0.02)
-obs_all02 <- rbind(GPS_data, pseudo_data02)
-obs_all02$source <- ifelse(obs_all02$ID == "pseudo", "pseudo", "real")
-
-map_final02 <- ggplot() + coord_fixed() + geom_polygon(data=world_map, aes(x=long, y=lat, group=group), colour="black", fill = NA) + 
-  geom_polygon(data = GIA_zeroDF02, aes(x=long, y=lat, group = group), colour="red", fill = NA) +
-  geom_point(data=obs_all02, aes(x=lon, y=lat, colour = source), pch=19) + 
-  ggtitle("Final map of real and pseudo observations -- threhold = 0.2")
-
-map_final02
-```
-Same for the other threshold.
+Finally, assemble the data and plot.
 ```{r assemble03}
 nps03 <- nrow(fibpoint_in03gps)
 pseudo_data03 <- data.frame(ID = rep("pseudo", nps03), lon = fibpoint_in03gps$lon, lat = fibpoint_in03gps$lat, 
@@ -313,12 +398,15 @@ map_final03 <- ggplot() + coord_fixed() + geom_polygon(data=world_map, aes(x=lon
   ggtitle("Final map of real and pseudo observations -- threshold = 0.3")
 
 map_final03
-```
-Plot with another projection.
 
-```{r projection}
-library(mapproj)
-map_final02 + coord_map(projection = "orthographic")
 map_final03 + coord_map(projection = "orthographic")
+```
 
+
+### 7 Output the polygons
+```{r writePoly, eval = FALSE}
+outpath <- "Z:/WP1-BHM/Experiment1b/shapefiles"
+writeOGR(zeroPoly01, dsn = outpath, layer = "zero01", driver="ESRI Shapefile")
+writeOGR(zeroPoly02, dsn = outpath, layer = "zero02", driver="ESRI Shapefile")
+writeOGR(zeroPoly03, dsn = outpath, layer = "zero03", driver="ESRI Shapefile")
 ```
