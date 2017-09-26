@@ -323,9 +323,12 @@ Finally, assemble the data and plot.
 ```{r assemble02}
 nps02 <- nrow(fibpoint_in02gps)
 pseudo_data02 <- data.frame(ID = rep("pseudo", nps02), lon = fibpoint_in02gps$lon, lat = fibpoint_in02gps$lat, 
-                          trend = 0, std = 0.02)
+                          trend = 0, std = 0.2)
 obs_all02 <- rbind(GPS_data, pseudo_data02)
 obs_all02$source <- ifelse(obs_all02$ID == "pseudo", "pseudo", "real")
+
+write.table(obs_all02, file = "Z:/WP1-BHM/Experiment1b/GIA_RGL/pseudo02.txt", 
+            row.names = FALSE, eol = "\r\n")
 
 map_final02 <- ggplot() + coord_fixed() + geom_polygon(data=world_map, aes(x=long, y=lat, group=group), colour="black", fill = NA) + 
   geom_polygon(data = GIA_zeroDF02, aes(x=long, y=lat, group = group), colour="red", fill = NA) +
@@ -391,6 +394,9 @@ pseudo_data03 <- data.frame(ID = rep("pseudo", nps03), lon = fibpoint_in03gps$lo
                           trend = 0, std = 0.03)
 obs_all03 <- rbind(GPS_data, pseudo_data03)
 obs_all03$source <- ifelse(obs_all03$ID == "pseudo", "pseudo", "real")
+
+write.table(obs_all03, file = "Z:/WP1-BHM/Experiment1b/GIA_RGL/pseudo03.txt", 
+            row.names = FALSE, eol = "\r\n")
 
 map_final03 <- ggplot() + coord_fixed() + geom_polygon(data=world_map, aes(x=long, y=lat, group=group), colour="black", fill = NA) + 
   geom_polygon(data = GIA_zeroDF03, aes(x=long, y=lat, group = group), colour="red", fill = NA) +
