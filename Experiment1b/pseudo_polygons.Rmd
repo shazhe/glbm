@@ -161,7 +161,7 @@ print(zeropoly_map01)
 
 
 ### 3 Generate Pseudo observations within the zero polygons
-First, generate vertices that evenly distributed over the entire globe. The distance between the vertices is about the same as the correlation length of the of the residual process, which is about 400-500km apart. This is about spreading 1000 points using the Fibonacci spiral on a sphere.
+First, generate vertices that evenly distributed over the entire globe. The distance between the vertices is about the same as the correlation length of the of the residual process, which is about 400-500km apart. This is about spreading 3000 points using the Fibonacci spiral on a sphere.
 ```{r pseudobs}
 ## xyz -- Generate equally distributed points around a sphere -- Fibonacci spiral
 fiboSphere1 <- function(n = 1000L) {
@@ -192,7 +192,7 @@ fiboSphere2 <- function(n = 1000L) {
   cbind(lon = lon, lat = lat)
 }
 
-fibopoints <- fiboSphere2(n = 1000) 
+fibopoints <- fiboSphere2(n = 3000) 
 fibopoints <- data.frame(fibopoints)
 fibopoints$lon <- ifelse(fibopoints$lon < 0, fibopoints$lon+359, fibopoints$lon)
 
@@ -225,7 +225,7 @@ map_fiboZero01
 ### 4 Exclude the GPS area
 Given the zero value region, we also want to exclude the region that include real GPS readings. Now we plot the latest GPS data for inspection.
 ```{r GPSdata}
-GPS_data <- read.table("Z:/WP2-SolidEarth/GPS/NGL/GPS_version03/GPSdataset_v03c_QC_20170809_comb.txt",  header = T)
+GPS_data <- read.table("Z:/WP2-SolidEarth/GPS/NGL/BHMinputFiles/GPS_v03d.txt",  header = T)
 GPS_data$lon <- ifelse(GPS_data$lon < 0, GPS_data$lon + 359, GPS_data$lon)
 
 world_map <- map_data("world2")
@@ -411,6 +411,7 @@ map_final03 + coord_map(projection = "orthographic")
 
 ### 7 Output the polygons
 ```{r writePoly, eval = FALSE}
+library(rgdal)
 outpath <- "Z:/WP1-BHM/Experiment1b/shapefiles"
 writeOGR(zeroPoly01, dsn = outpath, layer = "zero01", driver="ESRI Shapefile")
 writeOGR(zeroPoly02, dsn = outpath, layer = "zero02", driver="ESRI Shapefile")
