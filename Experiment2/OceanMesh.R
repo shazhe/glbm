@@ -19,6 +19,9 @@ landsareas <- sapply(spLand@polygons, function(x) slot(x, "area"))
 Llands <- landsareas > 20
 spLand2 <- spLand[Llands]
 plot(spLand2, col ="grey")
+for(i in 1:19){
+spLand2@polygons[[i]]@ID <- "1"
+}
 
 #### 3. Get the sampling points as starting nodes for inla mesh
 ## use the points defined the coastlines as the sampling points

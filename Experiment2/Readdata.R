@@ -1,20 +1,21 @@
 ## Read in and plot the ssh altimetry data 
 library(ncdf4)
-alt_nc <- nc_open("glbm/Experiment2/trend_SSH_CCI_200501_201512.nc")
+alt_nc <- nc_open("C:/ZSwork/glbm/Experiment2/trend/trend_steric_JAMSTEC_0_2000m_200501_201512.nc")
+alt_nc <- nc_open("Z:/WP3-Ocean/Data/Altimetry/ESA_CCI/trend_SSH_CCI_200501_201512.nc")
 print(alt_nc)
-lon <- ncvar_get(alt_nc, "lon")
-lat <- ncvar_get(alt_nc, "lat")
-trend_ssh <- ncvar_get(alt_nc, "trend_ssh") #note that there re NAs for land datat
+lon <- ncvar_get(alt_nc, "LONGITUDE")
+lat <- ncvar_get(alt_nc, "LATITUDE")
+trend_ssh <- ncvar_get(alt_nc, "trend") #note that there re NAs for land datat
 err_ssh <- ncvar_get(alt_nc, "err")
 
 alt_data <- data.frame(trend_ssh = as.numeric(trend_ssh), err_ssh = as.numeric(err_ssh))
-alt_data$lon <- rep(lon, 180) 
+alt_data$lon <- rep(lon, 132) 
 alt_data$lat <- rep(lat, each = 360)
 
 library(ggplot2)
 
 ## Create the base of word map
-world_map <- map_data("world2")
+world_map <- map_data("world")
 p <- ggplot() + coord_fixed() + xlab("") + ylab("") 
 #Add map to base plot
 base_world <- p + geom_polygon(data=world_map, aes(x=long, y=lat, group=group), 
@@ -24,7 +25,7 @@ base_world <- p + geom_polygon(data=world_map, aes(x=long, y=lat, group=group),
 
 map_alt <- ggplot(data=alt_data) + geom_raster(aes(x = lon, y = lat, fill = trend_ssh)) + 
   coord_fixed() + xlab("Longitude") + ylab("Latitude") + 
-  scale_x_continuous(limits=c(0,360),  expand = c(0, 0)) + scale_y_continuous(limits=c(-90,90),  expand = c(0, 0)) + 
+  scale_x_continuous(limits=c(-180,180),  expand = c(0, 0)) + scale_y_continuous(limits=c(-90,90),  expand = c(0, 0)) + 
   scale_fill_gradient2(low = "blue", mid = "white", high = "orange", midpoint = 0, name = "",
                        limit = c(-20, 20),
                        guide = guide_colorbar(barwidth = 2, barheight = 10, label.position = "right")) 
@@ -50,7 +51,7 @@ dev.off()
 
 map_altE <- ggplot(data=alt_data) + geom_raster(aes(x = lon, y = lat, fill = err_ssh)) + 
   coord_fixed() + xlab("Longitude") + ylab("Latitude") + 
-  scale_x_continuous(limits=c(0,360),  expand = c(0, 0)) + scale_y_continuous(limits=c(-90,90),  expand = c(0, 0)) + 
+  scale_x_continuous(limits=c(-180,180),  expand = c(0, 0)) + scale_y_continuous(limits=c(-90,90),  expand = c(0, 0)) + 
   scale_fill_gradient2(low = "blue", mid = "white", high = "orange", midpoint = 2, name = "",
                        limit = c(0,4),
                        guide = guide_colorbar(barwidth = 2, barheight = 10, label.position = "right")) 
