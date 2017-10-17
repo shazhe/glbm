@@ -31,6 +31,7 @@ grace_trend <- read.table("Z:/WP2-SolidEarth/GRACE/GSFC_global_mascons_v01.1/GRA
 grace_location <- read.table("Z:/WP2-SolidEarth/GRACE/GSFC_global_mascons_v01.1/GRACE_locations_GSFC_global_mascons_v01.1_version01.txt", 
                              fill = TRUE, skip = 1)
 names(grace_location) <- c("id", "area", "lonC", "latC", paste0(c("lon", "lat"), rep(1:19,each=2)))
+library(sp)
 mypoly <- function(x){
   lon <- na.omit(as.numeric(x[seq(5,42,2)]))
   lat <- na.omit(as.numeric(x[seq(6,42,2)]))
@@ -40,7 +41,7 @@ mypoly <- function(x){
 
 aa <- is.na(grace_location)
 bb <- (42-rowSums(aa))/2
-id <- which(bb>5)
+id <- which(bb>3)
 grace_location2 <- grace_location[id,]
 
 
