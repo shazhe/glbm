@@ -1,0 +1,243 @@
+---
+title: "Update Mixture processes -- using Barrier model as prototype"
+author: "Zhe Sha (zhe.sha@bristol.ac.uk)"
+date: "23 Oct 2017"
+output: html_document
+fig_height: 6
+fig_width: 9
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+***
+
+## 0 Introduction
+
+This file demonstrate 3 update method for dealing with mixture processes. We use the prototype model and code from Bakka's Barrier model in INLA. The update methods are
+
+1. Model as a single stationary process and mask the land with desired values
+
+2. Model two stationary processes and seam them together
+
+3. Joint mixture model
+
+
+## 1 Simulate toy data
+
+First we simulate some toy data on a rectangular region with a rectangular hole insde the region as the "barrier".
+
+```{r init, include=TRUE}
+## load libraries and source codes
+library(INLA); library(rgdal); library(maptools); library(GEOmap); library(rgl)
+source("C:/ZSwork/glbm/Experiment1b/mixture_model/BarrierModel/functions-barriers-dt-models-march2017.R")
+```
+
+Create the study regions: a $[0,1] \times [0, 1]$ rectangle and a smaller one inside as the barrier.
+```{r polygons, include=TRUE}
+## boundaries and interiors
+loc.bnd = matrix(c(0,0, 1,0, 1,1, 0,1), 4, 2, byrow=TRUE)
+loc.int = matrix(c(0.3,0.3, 0.8,0.4, 0.7,0.9, 0.2,0.8, 0.3,0.3), 5, 2, byrow=TRUE)
+segm.bnd = inla.mesh.segment(loc.bnd)
+segm.int = inla.mesh.segment(loc.int, is.bnd=FALSE)
+int.Poly <- SpatialPolygons(list(Polygons(list(Polygon(loc.int)), ID = "in")))
+out.Poly <- SpatialPolygons(list(Polygons(list(Polygon(loc.bnd)), ID = "out")))
+```
+NOTES: Why use interior to set up the boundary of the inner rectangle? Because in INLA mesh generator, the interior lines will be inluded as the edges of the triangles.
+
+Now generate points inside these region for creating a desired mesh. We want dense mesh outside and sparse inside and a smooth transition between the two.
+```{r points, include = TRUE}
+# first create uniformaly dense points
+loc0 <- spsample(out.Poly, n = 1000, type = "hexagonal", offset = c(0, 0))
+# remove points inside the polygon
+loc0_id <- unlist(over(int.Poly, loc0, returnList=T))
+loc0a <- loc0[-loc0_id,]
+
+# sparse grid for the inside
+loc1 <- spsample(int.Poly, n = 25, type = "hexagonal", offset = c(0,0))
+
+## add more points along the interior lines
+intLines <- Lines(list(Line(int.Poly@polygons[[1]]@Polygons[[1]]@coords)), ID = 1)
+intLines <- SpatialLines(list(intLines))
+loc2 <- spsample(intLines, n = 12, type = "regular", offset = c(0,0))
+loc2@coords <- jitter(loc2@coords)
+loc <- rbind(loc0a, loc1, loc2)
+plot(loc)
+```
+
+```{r mesh2, include = TRUE}
+mesh = inla.mesh.2d(loc = loc, boundary = segm.bnd, interior = segm.int, max.edge = 0.5)
+# Note that when using interior here offset and max.edge can only be scalars.
+# Bondary defines the boundary of the domain of interest
+# interior defines a set of segments inside the domain of interest that are desired to the triagle edges.
+plot(mesh)
+
+loc_new <- mesh$loc
+mesh = inla.mesh.2d(loc = loc_new, boundary = segm.bnd, cutoff = 0.02, max.edge = 0.5)
+plot(mesh, asp = 1)
+plot(int.Poly, add = TRUE, border = "red", lwd = 2)
+```
+
+Now use this mesh to build the model and simulate data.
+```{r simData, include = TRUE}
+# - The INLA mesh constructor, used for any INLA-SPDE model
+mesh = dt.mesh.addon.posTri(mesh)
+# - Add on mesh$posTri
+# - - contains the positions of the triangles
+
+barrier = over(int.Poly, SpatialPoints(mesh$posTri), returnList=T)
+# - checking which mesh triangles are inside the barrier area
+barrier = unlist(barrier)
+Omega = dt.Omega(list(barrier, 1:mesh$t), mesh)
+Omega.SP = dt.polygon.omega(mesh, Omega)
+
+plot(mesh, main="Mesh and Omega")
+plot(Omega.SP[[1]], add=T, col='grey')
+plot(Omega.SP[[2]], add=T, col='lightblue')
+plot(mesh, add=T)
+
+local.plot.field = function(field, ...){
+  xlim = c(0, 1); ylim = xlim;
+  proj = inla.mesh.projector(mesh, xlim = xlim, 
+                             ylim = ylim, dims=c(300, 300))
+  # - Can project from the mesh onto a 300x300 grid 
+  #   for plots
+  field.proj = inla.mesh.project(proj, field)
+  # - Do the projection
+  image.plot(list(x = proj$x, y=proj$y, z = field.proj), 
+             xlim = xlim, ylim = ylim, ...)  
+  # - Use image.plot to get nice colors and legend
+}
+print(mesh$n)
+
+Q.function = dt.create.Q(mesh, Omega)
+ranges = c(10, 0.17)
+# - the first range is for the barrier area
+# - - it is not sensitive to the exact value here, 
+#     just make it "small"
+# - the second range is for the normal area
+Q = Q.function(theta = c(log(1), log(ranges)))
+# - the precision matrix for fixed ranges
+
+u = inla.qsample(n=1, Q=Q, seed = 2017)
+u = u[ ,1]
+local.plot.field(u, main="The true (simulated) spatial field")
+#plot(Omega.SP[[1]], add=T, col='grey')
+
+```
+
+Now sample observations from this fied. The real observations are usually all over the study region but for our "pseudo-polygons", we normally do not have real observations but we know what values they should be. Hence, we only need a few number of points inside the polygons but more around the boundary. Similar to how we generate the locations for build he mesh.
+```{r observations, include = TRUE}
+obs_loc <- spsample(out.Poly, n = 200, type = "random")
+ids <- unlist(over(int.Poly, obs_loc, returnList=T))
+obs_loc1 <- obs_loc[-ids,]
+
+# sparse grid for the inside
+obs_loc2<- spsample(int.Poly, n = 4, type = "random")
+
+## add more points along the interior lines
+obs_loc3 <- spsample(intLines, n = 40, type = "random")
+obs_loc3@coords <- jitter(obs_loc3@coords)
+obs_loc <- rbind(obs_loc1, obs_loc2, obs_loc3)
+plot(obs_loc)
+
+loc.data <- obs_loc
+A.data = inla.spde.make.A(mesh, loc.data)
+# - the projector matrix required for any spatial model
+# - this matrix can transform the field-defined-on-the-mesh 
+#   to the field-defined-on-the-data-locations
+
+u.data = A.data %*% u
+# - project the field from the finite element  
+#   representation to the data locations
+df = data.frame(loc.data)
+# - df is the dataframe used for modeling
+names(df) = c('locx', 'locy')
+sigma.u = 1
+# - size of the random effect
+sigma.epsilon = 0.2
+# - size of the iid noise in the Gaussian likelihood
+df$y = drop(sigma.u*u.data + sigma.epsilon*rnorm(nrow(df)))
+# - sample observations with gaussian noise
+
+summary(df)
+```
+
+## 2 Inference -- stationary
+
+```{r stationary, include=TRUE}
+stk <- inla.stack(data=list(y=df$y), A=list(A.data, 1),
+                  effects=list(s=1:mesh$n, 
+                               intercept=rep(1, nrow(df))), 
+                  remove.unused = FALSE, tag='est')
+
+model.stat = inla.spde2.matern(mesh)
+# - Set up the model component for the spatial SPDE model: 
+#   Stationary Matern model
+# - I assume you are somewhat familiar with this model
+
+formula <- y ~ 0 + intercept + f(s, model=model.stat)
+# - Remove the default intercept
+# - - Having it in the stack instead improves the numerical 
+#     accuracy of the INLA algorithm
+# - Fixed effects + random effects
+
+res.stationary <- inla(formula, data=inla.stack.data(stk),
+            control.predictor=list(A = inla.stack.A(stk)),
+            family = 'gaussian',
+            control.family = list(hyper = list(prec = list(
+              prior = "pc.prec", fixed = FALSE, 
+              param = c(0.2,0.5)))),
+            control.mode=list(restart=T, theta=c(4,-1.7,0.25)))
+
+summary(res.stationary)
+
+local.plot.field(res.stationary$summary.random$s$sd,
+          main="Spatial estimate with the stationary model -- uncertainty")
+# - plot the posterior spatial marginal means
+# - we call this the spatial estimate, or the smoothed data
+#plot(Omega.SP[[1]], add=T, col='grey')
+
+```
+
+## 2 Inference -- barrier
+```{r barrier, include = TRUE}
+Q.barrier = dt.create.Q(mesh, Omega, fixed.ranges = c(10, NA))
+# - We fix the barrier range to a different value than we 
+#   used for simulations
+# - - Why? It does not matter, as long as it is 'small' 
+#     the models are very
+#     similar
+# - - This shows that you do not need to know the 
+#     true 'barrier range'!
+
+log.prior = dt.create.prior.log.exp(prior.param = c(1,1))
+# - The prior parameters are the lambdas in the exponential 
+#   priors for standard deviation and inverse-range
+
+barrier.model = dt.inla.model(Q = Q.barrier, log.prior=log.prior)
+
+formula2 <- y ~ 0 + intercept + f(s, model=barrier.model)
+# - The spatial model component is different from before
+# - The rest of the model setup is the same! 
+#   (as in the stationary case)
+# - - e.g. the inla(...) call below is the same, 
+#     only this formula is different
+
+res.barrier = inla(formula2, data=inla.stack.data(stk),
+       control.predictor=list(A = inla.stack.A(stk)),
+       family = 'gaussian',
+       control.family = list(hyper = list(prec = list(
+             prior = "pc.prec", fixed = FALSE, 
+             param = c(0.2,0.5)))),
+       control.mode=list(restart=T, theta=c(3.2, 0.4, 1.6)))
+
+summary(res.barrier)
+
+local.plot.field(res.barrier$summary.random$s$sd, 
+                 main="Spatial posterior for Barrier model -- uncertainty")
+# - plot the posterior spatial marginal means
+# - we call this the spatial (smoothing) estimate
+#plot(Omega.SP[[1]], add=T, col='grey')
+```

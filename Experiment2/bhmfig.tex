@@ -78,8 +78,10 @@
     % First line: Data
     &
         \node (u_1) [data]{Altimetry}; &        
-        \node (u_2)  {};     &        
+        & 
+        &       
         \node (u_3) [data]{GRACE}; &
+        &
         \node (u_4) {}; &
         \\
         % Second line: measurement error & A matrix
@@ -95,19 +97,21 @@
         % Third line: the process and constraints
       
         \node (x_1) [process] {$\mathbf{x}_{k-1}$}; &
-       
+        &
         \node (x_2)   [process] {$\mathbf{x}_k$};     &
-      
+        &
         \node (x_3) [process] {$\mathbf{x}_{k+1}$}; &
+        &
          \node (x_4) [process] {$\mathbf{x}_{k+1}$}; &
            \\
         % Fourth line: priors
-        \node (v_k-1) [noise] {$\mathbf{v}_{k-1}$}; &
-        \node (H_k-1) [matrx] {$\mathbf{H}$};       &
-        \node (v_k)   [noise] {$\mathbf{v}_k$};     &
-        \node (H_k)   [matrx] {$\mathbf{H}$};       &
-        \node (v_k+1) [noise] {$\mathbf{v}_{k+1}$}; &
-        \node (H_k+1) [matrx] {$\mathbf{H}$};       &
+        \node (v1) [noise] {$\mathbf{v}_{k-1}$}; &
+        &
+        \node (v2)   [noise] {$\mathbf{v}_k$};     &
+        &
+        \node (v3) [noise] {$\mathbf{v}_{k+1}$}; &
+        &
+        \node (v4) [noise] {$\mathbf{v}_{k+1}$}; &
         \\
     };
     
