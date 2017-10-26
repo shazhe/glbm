@@ -12,3 +12,6 @@
 wiki/
 *cache/
 *rsconnect/
+*.aux
+*.log
+*.gz
