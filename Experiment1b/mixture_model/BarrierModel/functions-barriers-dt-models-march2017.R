@@ -30,13 +30,21 @@ bakka.square.polygon = function(xlim, ylim, ret.SP = F, id=runif(1)){
   }
 }
 
-dt.mesh.addon.posTri <- function(mesh){
+dt.mesh.addon.posTri <- function(mesh, globe = FALSE){
   # - Add on two attributes to the mesh object
   mesh$t = length(mesh$graph$tv[,1])
-  mesh$posTri = matrix(0, mesh$t, 2)
-  for (t in 1:mesh$t){
-    temp = mesh$loc[mesh$graph$tv[t, ], ]
-    mesh$posTri[t,] = colMeans(temp)[c(1,2)] 
+  if(globe){
+    mesh$posTri = matrix(0, mesh$t, 3)
+    for (t in 1:mesh$t){
+      temp = mesh$loc[mesh$graph$tv[t, ], ]
+      mesh$posTri[t,] = colMeans(temp)
+  }
+    }else{
+      mesh$posTri = matrix(0, mesh$t, 2)
+      for (t in 1:mesh$t){
+        temp = mesh$loc[mesh$graph$tv[t, ], ]
+        mesh$posTri[t,] = colMeans(temp)[c(1,2)] 
+        }
   }
   return(mesh)
 }
@@ -78,21 +86,50 @@ dt.Omega <- function(list_of_subdomains, mesh){
 }
 
 
-dt.polygon.omega = function (mesh, Omega) {
+dt.polygon.omega = function (mesh, Omega, globe = FALSE) {
   # - constructs SpatialPolygons for the different subdomains (areas)
   stopifnot(class(mesh) == 'inla.mesh')
   # - requires an inla mesh to work
   
   Omega.SP.list = list()
-  for (j in 1:length(Omega)) {
-    poly.list = list()
-    for (tri in Omega[[j]]){
-      px = mesh$graph$tv[tri, ]
-      temp = mesh$loc[px, ] # is a 3 by 3 matrix of node locations
-      poly.list = c(poly.list , Polygon(rbind(temp[ ,1:2], temp[1, 1:2]), hole=F))
+  
+  if(globe){
+    ## The listed polygons
+    for (j in 1:(length(Omega)-1)) {
+      poly.list = list()
+      for (tri in Omega[[j]]){
+        px = mesh$graph$tv[tri, ]
+        temp = mesh$loc[px, ] # is a 3 by 3 matrix of node locations
+        temp_ll <- GEOmap::Lxyz2ll(list(x=temp[,1], y = temp[,2], z = temp[,3]))
+        temp <- cbind(temp_ll$lon, temp_ll$lat)
+        poly.list = c(poly.list , Polygon(rbind(temp[ ,1:2], temp[1, 1:2]), hole=F))
+      }
+      mesh.polys = SpatialPolygons(list(Polygons(poly.list, ID='noid')))
+      Omega.SP.list[[j]] = gUnaryUnion(mesh.polys)
     }
-    mesh.polys = SpatialPolygons(list(Polygons(poly.list, ID='noid')))
-    Omega.SP.list[[j]] = gUnaryUnion(mesh.polys)
+    ## globe minus the listed polygons
+    globe_p <- Polygon(coords = cbind(c(-180, -180, 180, 180, -180), c(-90, 90, 90, -90, -90)))
+    ## remove the listed polygons from the globe
+    holes <- list()
+    for (j in 1:(length(Omega)-1)) {
+    holes <- lapply(Omega.SP@polygons, function(x) x@Polygons[[1]])
+    land_holes <- lapply(land_holes, function(x) {x@hole <- TRUE;return(x)})
+    land_holes[[length(land_holes) + 1]]  <- globe_p
+    Ocean <- Polygons(land_holes, ID = "a")
+    Ocean <- SpatialPolygons(list(Ocean), proj4string =CRS("+proj=longlat"))
+
+    
+  }else{
+    for (j in 1:length(Omega)) {
+      poly.list = list()
+      for (tri in Omega[[j]]){
+        px = mesh$graph$tv[tri, ]
+        temp = mesh$loc[px, ] # is a 3 by 3 matrix of node locations
+        poly.list = c(poly.list , Polygon(rbind(temp[ ,1:2], temp[1, 1:2]), hole=F))
+      }
+      mesh.polys = SpatialPolygons(list(Polygons(poly.list, ID='noid')))
+      Omega.SP.list[[j]] = gUnaryUnion(mesh.polys)
+    }
   }
   return(Omega.SP.list)
 }

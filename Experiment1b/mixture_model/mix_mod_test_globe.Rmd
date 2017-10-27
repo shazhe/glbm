@@ -1,5 +1,5 @@
 ---
-title: "Test misture model on the globe"
+title: "Test mixture model on the globe"
 author: "Z Sha"
 date: "26 October 2017"
 output: html_document
@@ -34,25 +34,6 @@ lands <- readOGR(dsn = "C:/ZSwork/glbm/Experiment2/ne_110m_land", layer = "ne_11
 landsareas <- sapply(lands@polygons, function(x) slot(x, "area"))
 lands2 <- lands[landsareas > 10,]
 
-AddHoleToPolygon <-function(poly,hole){
-    # invert the coordinates for Polygons to flag it as a hole
-    coordsHole <-  hole@polygons[[1]]@Polygons[[1]]@coords
-    newHole <- Polygon(coordsHole,hole=TRUE)
-
-    # punch the hole in the main poly
-    listPol <- poly@polygons[[1]]@Polygons
-    listPol[[length(listPol)+1]] <- newHole
-    punch <- Polygons(listPol,poly@polygons[[1]]@ID)
-
-    # make the polygon a SpatialPolygonsDataFrame as the entry
-    new <- SpatialPolygons(list(punch),proj4string=poly@proj4string)
-    new <- SpatialPolygonsDataFrame(new,data=as(poly,"data.frame"))
-
-    return(new)
-}
-
-
-
 ## Define the global polygons
 globe_p <- Polygon(coords = cbind(c(-180, -180, 180, 180, -180), c(-90, 90, 90, -90, -90)))
 
@@ -62,63 +43,93 @@ land_holes <- lapply(land_holes, function(x) {x@hole <- TRUE;return(x)})
 land_holes[[length(land_holes) + 1]]  <- globe_p
 Ocean <- Polygons(land_holes, ID = "a")
 Ocean <- SpatialPolygons(list(Ocean), proj4string =CRS("+proj=longlat"))
-
-
-segm.int = inla.mesh.segment(loc.int, is.bnd=FALSE)
-int.Poly <- SpatialPolygons(list(Polygons(list(Polygon(loc.int)), ID = "in")))
-out.Poly <- SpatialPolygons(list(Polygons(list(Polygon(loc.bnd)), ID = "out")))
 ```
 
 Generate the point locations for building up the mesh. We want the mesh to be dense over the oceans and sparse on the lands.
-```{r points, include = TRUE}
-## First create uniformly distributed points on the sphere
-loc_sphere <- spsample(Ocean, n = 1000, type = "Fibonacci")
+```{r points1, include = TRUE}
+## First create uniformly distributed points on the sphere -- Fibonacci Points
+#loc_sphere <- spsample(Ocean, n = 1000, type = "Fibonacci")
+## Could use spsample but there is a bug of coordinate translation so use my own Fibonacci code
+
+#### Generate Fibonacci points on the sphere 
+fiboSphere2 <- function(N = 1000L, L0 = FALSE) {
+  ## Reference (note that points generated from 2D are slightly different from 3D)
+  ## Measurement of Areas on a Sphere Using Fibonacci and Latitude–Longitude Lattices (2010)
+  phi <- (sqrt(5) + 1) / 2 - 1 # golden ratio
+  ga <- phi * 2 * pi           # golden angle
+  
+  i <- seq(-N, N)
+  P <- 2 * N + 1
+  lat <- asin(2*i / P) * 180 / pi
+  if(L0){
+  lon <- ((2 * pi * i / phi) %% pi) * 360 / pi
+  }else{
+    lon <- ((2 * pi * i / phi) %% pi) * 360 / pi - 180
+    }
+  cbind(lon = lon, lat = lat)
+}
+
+fibo_points <- fiboSphere2(N = 6000)
+## Remove points on the land
+pinocean <- unlist(over(Ocean, SpatialPoints(coords = fibo_points, proj4string = CRS("+proj=longlat")), returnList=T))
+fibo_inOceans <- fibo_points[pinocean,]
 plot(Ocean)
-plot(loc_sphere, add = TRUE)
-# remove points inside the polygon
-loc0_id <- unlist(over(int.Poly, loc0, returnList=T))
-loc0a <- loc0[-loc0_id,]
-
-# sparse grid for the inside
-loc1 <- spsample(int.Poly, n = 25, type = "hexagonal", offset = c(0,0))
-
-## add more points along the interior lines
-intLines <- Lines(list(Line(int.Poly@polygons[[1]]@Polygons[[1]]@coords)), ID = 1)
-intLines <- SpatialLines(list(intLines))
-loc2 <- spsample(intLines, n = 12, type = "regular", offset = c(0,0))
-loc2@coords <- jitter(loc2@coords)
-loc <- rbind(loc0a, loc1, loc2)
-plot(loc)
+points(fibo_inOceans, pch = ".")
 ```
 
-```{r mesh, include = TRUE}
-mesh = inla.mesh.2d(loc = loc, boundary = segm.bnd, interior = segm.int, max.edge = 0.5)
-# Note that when using interior here offset and max.edge can only be scalars.
-# Bondary defines the boundary of the domain of interest
-# interior defines a set of segments inside the domain of interest that are desired to the triagle edges.
-plot(mesh, asp = 1)
+Now generate sparse points on the land using the same trick.
+```{r points2, include = TRUE}
+fibo_points <- fiboSphere2(N = 500)
 
-## Do another iteration to make the boudary smooth
-loc_new <- mesh$loc
-mesh = inla.mesh.2d(loc = loc_new, boundary = segm.bnd, cutoff = 0.02, max.edge = 0.5)
-plot(mesh, asp = 1)
-plot(int.Poly, add = TRUE, border = "red", lwd = 2)
+## Find points on the land
+pinocean <- unlist(over(Ocean, SpatialPoints(coords = fibo_points, proj4string = CRS("+proj=longlat")), returnList=T))
+fibo_inLands <- fibo_points[-pinocean,]
+plot(Ocean)
+points(fibo_inLands, pch = "*", col = 2)
+points(fibo_inOceans, pch = ".")
+```
+
+Finally assmeble these points and define the coastlines to be interior lines.
+```{r points3, include = TRUE}
+## Combine the points
+mesh_points0 <- rbind(fibo_inOceans, fibo_inLands)
+## convert the longlat coordinates to xyz
+mesh_points0_xyz <- do.call(cbind, Lll2xyz(lat = mesh_points0[,2], lon = mesh_points0[,1]))
+
+## define the interior lies as the coastlines
+coast_seg <- inla.sp2segment(lands2)
+coast_xyz <- do.call(cbind, Lll2xyz(coast_seg$loc[,2], coast_seg$loc[,1])) # project longlat back to cartesian xyz
+coast_seg$loc <- coast_xyz
+## Now generate the initial mesh and plot
+mesh0 <- inla.mesh.2d(loc = mesh_points0_xyz, cutoff = 0.02, max.edge = 0.5)
+
+plot3d(coast_seg$loc, pch = "-", col = 2)
+plot(mesh0, rgl = T, add = TRUE)
+
+## Use these points to iterate and add in the coastline as interior lines
+mesh <- inla.mesh.2d(loc = mesh0$loc, interior= coast_seg , cutoff = 0.02, max.edge = 0.5)
+plot(mesh)
 ```
 
 Plot the mesh and see check which triangles are inside the polygons
 ```{r mesh2, include = TRUE}
-mesh = dt.mesh.addon.posTri(mesh)
+mesh = dt.mesh.addon.posTri(mesh, globe = TRUE)
 # - Add on mesh$posTri
 # - - contains the positions of the triangles
 
-TinP = unlist(over(int.Poly, SpatialPoints(mesh$posTri), returnList=T))
-# - checking which mesh triangles are inside the barrier area
-Omega = dt.Omega(list(TinP, 1:mesh$t), mesh)
-Omega.SP = dt.polygon.omega(mesh, Omega)
+## checking which mesh triangles are inside the land
+## First convert xyz to lonlat
+Tlonlat <- Lxyz2ll(list(x = mesh$posTri[,1], y = mesh$posTri[,2], z = mesh$posTri[,3]))
+mesh$Trill <- cbind(lon = Tlonlat$lon, lat =Tlonlat$lat)
+TinOcean <- unlist(over(Ocean, SpatialPoints(coords=mesh$Trill, proj4string = CRS("+proj=longlat")), returnList=T))
+TAll <- 1:mesh$t
+TinLand <- TAll[-TinOcean]
+Omega = dt.Omega(list(TinLand, 1:mesh$t), mesh)
+Omega.SP = dt.polygon.omega(mesh, Omega, globe = TRUE)
 
 plot(mesh, main ="Mesh and Omega", asp = 1)
-plot(Omega.SP[[1]], add=T, col='grey')
-plot(Omega.SP[[2]], add=T, col='lightblue')
+plot(Omega.SP[[1]],  col='grey')
+plot(Omega.SP[[2]],  col='lightblue')
 plot(mesh, add=T)
 
 ```
@@ -152,208 +163,3 @@ local.plot.field = function(field, ...){
 local.plot.field(u, main="The true (simulated) spatial field", asp = 1, zlim = c(-6, 2.5))
 ```
 
-
-
-Now sample observations from this fied. The real observations are usually all over the study region but for our "pseudo-polygons", we normally do not have real observations but we know what values they should be. 
-
-We try two different schemes here for the polygon area:
-
-(1) Observatiosn along the boundary only;
-
-(2) Use one single Polygon observations.
-
-The following code sample the observations uisng shceme 1. 
-```{r observations1, include = TRUE}
-## Scheme 1: boundary points
-obs0 <- spsample(out.Poly, n = 200, type = "random")
-ids <- unlist(over(int.Poly, obs0, returnList=T))
-obs0 <- obs0[-ids,]
-
-## add more points along the interior lines
-obs1 <- spsample(intLines, n = 40, type = "random")
-obs1@coords <- jitter(obs1@coords)
-obs1 <- rbind(obs0, obs1)
-plot(obs1)
-
-A1.data = inla.spde.make.A(mesh, obs1)
-# - the projector matrix required for any spatial model
-# - this matrix can transform the field-defined-on-the-mesh 
-#   to the field-defined-on-the-data-locations
-
-u.data1 = A1.data %*% u
-# - project the field from the finite element  
-#   representation to the data locations
-df1 = data.frame(obs1) # - df is the dataframe used for modeling
-names(df1) = c('locx', 'locy')
-sigma.epsilon = 0.2 # - size of the iid noise in the Gaussian likelihood
-df1$y = drop(u.data1 + sigma.epsilon*rnorm(nrow(df1)))
-# - sample observations with gaussian noise
-
-summary(df1)
-```
-
-The following code sample the observations uisng shceme 2. 
-```{r observations2, include = TRUE}
-## Scheme 2: polygon observation
-obs2 <- obs0
-
-## build the polygon block
-Vt_in <- unlist(over(int.Poly, SpatialPoints(coords = mesh$loc[,1:2]), returnList=T))
-
-## use a polygon observations -- average of triangle vertices inside the polygon
-obs2b <- SpatialPoints(coords = matrix(rep(c(0.5, 0.6), length(Vt_in)), ncol =2, byrow=TRUE)) # use a single location to represent this polygon at this stage
-obs2 <- rbind(obs2, obs2b)
-
-block_ind <- c(1:length(obs0), rep(length(obs0)+1, length(Vt_in)))
-A2.data <- inla.spde.make.A(mesh = mesh, loc = obs2, block = block_ind, block.rescale = "count") #polygon -- average
-
-
-
-
-
-u.data2 = A2.data %*% u
-# - project the field from the finite element  
-#   representation to the data locations
-df2 = data.frame(obs2[1:(length(obs0)+1)]) # - df is the dataframe used for modeling
-names(df2) = c('locx', 'locy')
-sigma.epsilon = 0.2 # - size of the iid noise in the Gaussian likelihood for the point data
-sigma.epsilon2 = 0.05 # - size of the iid noise in the Gaussian likelihood for the polygon data
-df2$y = drop(u.data2 + sigma.epsilon*rnorm(nrow(df2)))
-df2$y[nrow(df2)] = drop(u.data2[nrow(df2)] + sigma.epsilon2*rnorm(1))
-# - sample observations with gaussian noise
-
-summary(df2)
-```
-
-
-## 2 Inference -- stationary
-```{r stationary, include=TRUE}
-stk1 <- inla.stack(data=list(y=df1$y), A=list(A1.data),
-                  effects=list(s=1:mesh$n), 
-                  remove.unused = FALSE, tag='est')
-
-stk2 <- inla.stack(data=list(y=df2$y), A=list(A2.data),
-                  effects=list(s=1:mesh$n), 
-                  remove.unused = FALSE, tag='est')
-
-model.stat = inla.spde2.matern(mesh)
-# - Set up the model component for the spatial SPDE model: 
-#   Stationary Matern model
-# - I assume you are somewhat familiar with this model
-
-formula <- y ~ -1 + f(s, model=model.stat)
-# - Remove the default intercept
-# - - Having it in the stack instead improves the numerical 
-#     accuracy of the INLA algorithm
-# - Fixed effects + random effects
-
-hyper <- list(prec = list(fixed = TRUE, initial = log(1)))
-  
-  
-res.stationary1 <- inla(formula, data=inla.stack.data(stk1),
-            control.predictor=list(A = inla.stack.A(stk1)),
-            family = 'gaussian', scale = rep(1/0.04, length(obs1)),
-            control.family = list(hyper = hyper))
-
-summary(res.stationary1)
-res_pars1 <- inla.spde2.result(res.stationary1, "s", model.stat, do.transf=TRUE)
-plot(res_pars1$marginals.range.nominal[[1]], type = "l", main = "range")
-plot(res_pars1$marginals.variance.nominal[[1]], type = "l", main = "variance")
-
-
-prec_scale <- 1/c(rep(0.2^2, length(obs0)), 0.05^2)
-res.stationary2 <- inla(formula, data=inla.stack.data(stk2),
-            control.predictor=list(A = inla.stack.A(stk2)),
-            family = 'gaussian',
-            control.family = list(hyper = hyper),
-            scale = prec_scale)
-
-summary(res.stationary2)
-
-res_pars2 <- inla.spde2.result(res.stationary2, "s", model.stat, do.transf=TRUE)
-plot(res_pars2$marginals.range.nominal[[1]], type = "l", main = "range")
-plot(res_pars2$marginals.variance.nominal[[1]], type = "l", main = "variance")
-
-
-local.plot.field(res.stationary1$summary.random$s$mean, asp =1,  zlim = c(-6, 2.5),
-          main="Spatial estimate with the stationary model -- mean")
-local.plot.field(res.stationary2$summary.random$s$mean, asp =1,  zlim = c(-6, 2.5),
-          main="Spatial estimate with the stationary model -- mean")
-
-
-local.plot.field(res.stationary1$summary.random$s$sd, asp =1, zlim = c(0, 3),
-          main="Spatial estimate with the stationary model -- uncertainty")
-
-local.plot.field(res.stationary2$summary.random$s$sd, asp =1,zlim = c(0, 3),
-          main="Spatial estimate with the stationary model -- uncertainty")
-```
-
-## 2 Inference -- barrier model
-```{r barrier, include = TRUE}
-Q.barrier = dt.create.Q(mesh, Omega, fixed.ranges = c(5, NA))
-# - We fix the barrier range to a different value than we 
-#   used for simulations
-# - - Why? It does not matter, as long as it is 'small' 
-#     the models are very
-#     similar
-# - - This shows that you do not need to know the 
-#     true 'barrier range'!
-
-log.prior = dt.create.prior.log.exp(prior.param = c(1,1))
-# - The prior parameters are the lambdas in the exponential 
-#   priors for standard deviation and inverse-range
-
-barrier.model = dt.inla.model(Q = Q.barrier, log.prior=log.prior)
-
-formula2 <- y ~ -1 + f(s, model=barrier.model)
-# - The spatial model component is different from before
-# - The rest of the model setup is the same! 
-#   (as in the stationary case)
-# - - e.g. the inla(...) call below is the same, 
-#     only this formula is different
-
-res.barrier1 = inla(formula2, data=inla.stack.data(stk1),
-       control.predictor=list(A = inla.stack.A(stk1)),
-       family = 'gaussian',
-       control.family = list(hyper = hyper),
-            scale = 1/0.04)
-
-summary(res.barrier1)
-theta1 <- res.barrier1$marginals.hyperpar$`Theta1 for s`
-theta2 <- res.barrier1$marginals.hyperpar$`Theta2 for s`
-
-Vmar1 <- inla.tmarginal(exp, theta1)
-Rmar1 <- inla.tmarginal(exp, theta2)
-plot(Vmar1, type = "l", main = "posterior varianace")
-plot(Rmar1, type = "l", main = "posterior range")
-
-
-
-res.barrier2 = inla(formula2, data=inla.stack.data(stk2),
-       control.predictor=list(A = inla.stack.A(stk2)),
-       family = 'gaussian',
-       control.family = list(hyper = hyper),
-            scale = prec_scale)
-
-summary(res.barrier2)
-
-theta1 <- res.barrier2$marginals.hyperpar$`Theta1 for s`
-theta2 <- res.barrier2$marginals.hyperpar$`Theta2 for s`
-
-Vmar2 <- inla.tmarginal(exp, theta1)
-Rmar2 <- inla.tmarginal(exp, theta2)
-plot(Vmar2, type = "l", main = "posterior varianace")
-plot(Rmar2, type = "l", main = "posterior range")
-
-
-local.plot.field(res.barrier1$summary.random$s$mean, asp = 1,  zlim = c(-6, 2.5),
-                 main="Spatial posterior for Barrier model -- mean")
-local.plot.field(res.barrier1$summary.random$s$sd, asp = 1, zlim = c(0, 3),
-                 main="Spatial posterior for Barrier model -- uncertainty")
-
-local.plot.field(res.barrier2$summary.random$s$mean, asp = 1,  zlim = c(-6, 2.5),
-                 main="Spatial posterior for Barrier model -- mean")
-local.plot.field(res.barrier2$summary.random$s$sd, asp = 1,zlim = c(0, 3),
-                 main="Spatial posterior for Barrier model -- uncertainty")
-
-```
