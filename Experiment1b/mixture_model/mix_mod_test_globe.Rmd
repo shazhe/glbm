@@ -129,6 +129,9 @@ Omega.SP = dt.polygon.omega(mesh, Omega, globe = TRUE)
 ## Plot the result in 3d
 plot(mesh, t.sub = Omega[[2]], col = "lightblue", rgl = TRUE )
 plot(mesh, t.sub = Omega[[1]], col = "yellow",  rgl = TRUE, add = TRUE)
+writeWebGL(dir = "C:/ZSwork/glbm/Experiment1b/mixture_model/", 
+           filename= "C:/ZSwork/glbm/Experiment1b/mixture_model/mixtureMesh.html",  # save the plot as an html
+           width = 600, reuse = TRUE)
 
 ## Plot the result in 2d
 plot(mesh, t.sub = Omega[[1]])
