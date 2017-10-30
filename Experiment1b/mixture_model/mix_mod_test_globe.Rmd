@@ -51,13 +51,13 @@ Generate the point locations for building up the mesh. We want the mesh to be de
 #loc_sphere <- spsample(Ocean, n = 1000, type = "Fibonacci")
 ## Could use spsample but there is a bug of coordinate translation so use my own Fibonacci code
 
-#### Generate Fibonacci points on the sphere 
+#### Generate Fibonacci points on the sphere
 fiboSphere2 <- function(N = 1000L, L0 = FALSE) {
   ## Reference (note that points generated from 2D are slightly different from 3D)
   ## Measurement of Areas on a Sphere Using Fibonacci and Latitude–Longitude Lattices (2010)
   phi <- (sqrt(5) + 1) / 2 - 1 # golden ratio
   ga <- phi * 2 * pi           # golden angle
-  
+
   i <- seq(-N, N)
   P <- 2 * N + 1
   lat <- asin(2*i / P) * 180 / pi
@@ -126,40 +126,169 @@ TAll <- 1:mesh$t
 TinLand <- TAll[-TinOcean]
 Omega = dt.Omega(list(TinLand, 1:mesh$t), mesh)
 Omega.SP = dt.polygon.omega(mesh, Omega, globe = TRUE)
+## Plot the result in 3d
+plot(mesh, t.sub = Omega[[2]], col = "lightblue", rgl = TRUE )
+plot(mesh, t.sub = Omega[[1]], col = "yellow",  rgl = TRUE, add = TRUE)
 
-plot(mesh, main ="Mesh and Omega", asp = 1)
-plot(Omega.SP[[1]],  col='grey')
-plot(Omega.SP[[2]],  col='lightblue')
-plot(mesh, add=T)
-
+## Plot the result in 2d
+plot(mesh, t.sub = Omega[[1]])
 ```
 
 Now use this mesh to build the model and simulate data.
 ```{r simData, include = TRUE}
 ## Create the precsion matrix function
 Q.function = dt.create.Q(mesh, Omega)
-ranges = c(10, 0.17)
+ranges = c(5, 0.1)
 # - the first range is for the barrier area
-# - - it is not sensitive to the exact value here, 
+# - - it is not sensitive to the exact value here,
 # - the second range is for the normal area
 Q = Q.function(theta = c(log(1), log(ranges)))
 # - the precision matrix for fixed ranges
 
 ## Simulate the field
-u = inla.qsample(n=1, Q=Q, seed = 3)
+u = inla.qsample(n=1, Q=Q, seed = 2017)
 u = u[ ,1]
 
 ## A wrapper for plotting the result
 local.plot.field = function(field, ...){
-  xlim = c(0, 1); ylim = xlim;
-  proj = inla.mesh.projector(mesh, xlim = xlim, 
-                             ylim = ylim, dims=c(300, 300))
+  proj = inla.mesh.projector(mesh,  projection = "longlat", dims = c(360,180), xlim = c(-180, 180), ylim = c(-90, 90))
   field.proj = inla.mesh.project(proj, field)
-  image.plot(list(x = proj$x, y=proj$y, z = field.proj), 
-             xlim = xlim, ylim = ylim, ...)  
+  image.plot(list(x = proj$x, y=proj$y, z = field.proj),
+              ...)
 }
 
 ## Plot the simulated field
-local.plot.field(u, main="The true (simulated) spatial field", asp = 1, zlim = c(-6, 2.5))
+local.plot.field(u, main="The true (simulated) spatial field", asp = 1)
+plot(Ocean, add = TRUE)
 ```
 
+Now sample observations. The real observations are usually all over the Ocean and the pseudo-observations are along the polygon boundaries.
+```{r observations1, include = TRUE}
+## sample points in the ocean
+obs_ocean <- spsample(Ocean, n = 2000, type = "random")
+
+## sample points on the polygon boundaries
+landslines <- as(lands2, 'SpatialLines') 
+obs_coast <- spsample(landslines, n = 200, type = "random") # not points more than specified
+
+proj4string(obs_coast) <- proj4string(obs_ocean)
+obs_all<- rbind(obs_ocean, obs_coast)
+plot(obs_all)
+obs_allxyz <- do.call(cbind, Lll2xyz(lat = obs_all@coords[,2], lon = obs_all@coords[,1]))
+
+A1.data = inla.spde.make.A(mesh, obs_allxyz)
+# - the projector matrix required for any spatial model
+# - this matrix can transform the field-defined-on-the-mesh 
+#   to the field-defined-on-the-data-locations
+
+u.data1 = A1.data %*% u
+# - project the field from the finite element  
+#   representation to the data locations
+df = data.frame(obs_allxyz) # - df is the dataframe used for modeling
+names(df) = c('locx', 'locy', 'locz')
+sigma.epsilon <- c(rep(0.2,2000), rep(0.05, length(obs_coast))) # - size of the iid noise in the Gaussian likelihood
+df$y = drop(u.data1 + sigma.epsilon*rnorm(nrow(df)))
+# - sample observations with gaussian noise
+
+summary(df)
+```
+
+## 2 Inference -- stationary
+```{r stationary, include=TRUE}
+stk1 <- inla.stack(data=list(y=df$y), A=list(A1.data),
+                  effects=list(s=1:mesh$n), 
+                  remove.unused = FALSE, tag='est')
+
+model.stat = inla.spde2.matern(mesh)
+# - Set up the model component for the spatial SPDE model: 
+#   Stationary Matern model
+# - I assume you are somewhat familiar with this model
+
+formula <- y ~ -1 + f(s, model=model.stat)
+# - Remove the default intercept
+# - - Having it in the stack instead improves the numerical 
+#     accuracy of the INLA algorithm
+# - Fixed effects + random effects
+
+hyper <- list(prec = list(fixed = TRUE, initial = log(1)))
+scales = 1/sigma.epsilon^2  
+  
+res.stationary <- inla(formula, data=inla.stack.data(stk1),
+            control.predictor=list(A = inla.stack.A(stk1)),
+            family = 'gaussian', scale = scales,
+            control.family = list(hyper = hyper))
+
+summary(res.stationary)
+res_pars <- inla.spde2.result(res.stationary, "s", model.stat, do.transf=TRUE)
+
+plot(res_pars$marginals.range.nominal[[1]], type = "l", main = "range")
+plot(res_pars$marginals.variance.nominal[[1]], type = "l", main = "variance")
+
+local.plot.field(u, main="The true (simulated) spatial field", asp = 1，zlim = c(-25, 20))
+plot(Ocean, add = TRUE)
+
+local.plot.field(res.stationary$summary.random$s$mean, asp =1, zlim = c(-25, 20),
+          main="Spatial estimate with the stationary model -- mean")
+plot(Ocean, add = TRUE)
+plot(obs_all, pch = ".", add = TRUE)
+local.plot.field(res.stationary$summary.random$s$sd, asp =1,  
+          main="Spatial estimate with the stationary model -- uncertainty")
+plot(Ocean, add = TRUE)
+
+```
+
+## 2 Inference -- mixture model
+```{r barrier, include = TRUE}
+Q.mixture = dt.create.Q(mesh, Omega, fixed.ranges = c(5, NA))
+# - We fix the barrier range to a different value than we 
+#   used for simulations
+# - - Why? It does not matter, as long as it is 'small' 
+#     the models are very
+#     similar
+# - - This shows that you do not need to know the 
+#     true 'barrier range'!
+
+log.prior = dt.create.prior.log.exp(prior.param = c(1,1))
+# - The prior parameters are the lambdas in the exponential 
+#   priors for standard deviation and inverse-range
+
+mixture.model = dt.inla.model(Q = Q.mixture, log.prior=log.prior)
+
+formula2 <- y ~ -1 + f(s, model=mixture.model)
+# - The spatial model component is different from before
+# - The rest of the model setup is the same! 
+#   (as in the stationary case)
+# - - e.g. the inla(...) call below is the same, 
+#     only this formula is different
+
+res.mixture = inla(formula2, data=inla.stack.data(stk1),
+       control.predictor=list(A = inla.stack.A(stk1)),
+       family = 'gaussian',
+       control.family = list(hyper = hyper),
+            scale = scales)
+
+summary(res.mixture)
+theta1 <- res.mixture$marginals.hyperpar$`Theta1 for s`
+theta2 <- res.mixture$marginals.hyperpar$`Theta2 for s`
+
+Vmar<- inla.tmarginal(exp, theta1)
+Rmar <- inla.tmarginal(exp, theta2)
+
+plot(Vmar, type = "l", main = "posterior varianace")
+plot(Rmar, type = "l", main = "posterior range")
+
+
+local.plot.field(u, main="The true (simulated) spatial field", asp = 1, zlim = c(-25, 20))
+plot(Ocean, add = TRUE)
+
+local.plot.field(res.mixture$summary.random$s$mean, asp = 1,zlim = c(-25, 20)，
+                 main="Spatial posterior for Barrier model -- mean")
+plot(Ocean, add = TRUE)
+plot(obs_all, pch = ".", add = TRUE)
+
+local.plot.field(res.mixture$summary.random$s$sd, asp = 1, 
+                 main="Spatial posterior for Barrier model -- uncertainty")
+plot(Ocean, add = TRUE)
+plot(obs_all, pch = ".", add = TRUE)
+
+```
