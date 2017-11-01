@@ -94,7 +94,7 @@ Omega = dt.Omega(list(TinPoly, 1:mesh$t), mesh)
 plot(mesh, t.sub = Omega[[2]], col = "lightblue", rgl = TRUE )
 plot(mesh, t.sub = Omega[[1]], col = "yellow",  rgl = TRUE, add = TRUE)
 
-## get the subset of the mesh
+## get the subset of the mesh for buiding the Q
 # mesh.sub <- function(mesh, Omega, i = 2){
 # mesh_sub <- mesh
 # mesh_sub$t <- length(Omega[[i]]) # number of triangles
