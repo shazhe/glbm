@@ -86,7 +86,7 @@ dt.Omega <- function(list_of_subdomains, mesh){
 }
 
 
-dt.polygon.omega <- function (mesh, Omega, globe = FALSE) {
+dt.polygon.omega <- function (mesh, Omega, globe = FALSE, round = 5) {
   # - constructs SpatialPolygons for the different subdomains (areas)
   stopifnot(class(mesh) == 'inla.mesh')
   # - requires an inla mesh to work
@@ -111,10 +111,15 @@ dt.polygon.omega <- function (mesh, Omega, globe = FALSE) {
     globe_p <- Polygon(coords = cbind(c(-180, -180, 180, 180, -180), c(-90, 90, 90, -90, -90)))
     ## remove the listed polygons from the globe
     holes <- list()
+    poly_change <- function(x, round){
+      x@hole <- !x@hole
+      x@coords <- round(x@coords, digits = round)
+      return(x)
+    }
     for (j in 1:(length(Omega)-1)) {
-        holes_j <- lapply(Omega.SP.list[[j]]@polygons[[1]]@Polygons, function(x) {x@hole <- TRUE;return(x)})
+        holes_j <- lapply(Omega.SP.list[[j]]@polygons[[1]]@Polygons, poly_change)
         holes <- c(holes, holes_j)
-        }
+    }
       holes[[length(holes) + 1]]  <- globe_p
       globe_h <- Polygons(holes, ID = "b")
       Omega.SP.list[[n.Omega]]<- SpatialPolygons(list(globe_h), proj4string =CRS("+proj=longlat"))

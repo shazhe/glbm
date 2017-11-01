@@ -23,13 +23,13 @@ We need the following packages and extra functions from the sourced file.
 ```{r init, include=TRUE, message = FALSE, warning=FALSE}
 ## load libraries and source codes
 library(INLA); library(rgdal); library(maptools); library(GEOmap); library(rgl)
-source("C:/ZSwork/glbm/Experiment1b/mixture_model/BarrierModel/functions-barriers-dt-models-march2017.R")
+source("~/glbm/Experiment1b//mixture_model/BarrierModel/functions-barriers-dt-models-march2017.R")
 set.seed(18)
 ```
 
 Load the coastline and define polygons.
 ```{r polygons, include=TRUE}
-lands <- readOGR(dsn = "C:/ZSwork/glbm/Experiment2/ne_110m_land", layer = "ne_110m_land")
+lands <- readOGR(dsn = "/home/zs16444/glbm/Experiment2/ne_110m_land", layer = "ne_110m_land")
 ## Remove tiny islands
 landsareas <- sapply(lands@polygons, function(x) slot(x, "area"))
 lands2 <- lands[landsareas > 10,]
@@ -129,8 +129,8 @@ Omega.SP = dt.polygon.omega(mesh, Omega, globe = TRUE)
 ## Plot the result in 3d
 plot(mesh, t.sub = Omega[[2]], col = "lightblue", rgl = TRUE )
 plot(mesh, t.sub = Omega[[1]], col = "yellow",  rgl = TRUE, add = TRUE)
-writeWebGL(dir = "C:/ZSwork/glbm/Experiment1b/mixture_model/", 
-           filename= "C:/ZSwork/glbm/Experiment1b/mixture_model/mixtureMesh.html",  # save the plot as an html
+writeWebGL(dir = "~/glbm/Experiment1b/mixture_model/", 
+           filename= "~/glbm/Experiment1b/mixture_model/mixtureMesh.html",  # save the plot as an html
            width = 600, reuse = TRUE)
 
 ## Plot the result in 2d
@@ -227,9 +227,6 @@ res_pars <- inla.spde2.result(res.stationary, "s", model.stat, do.transf=TRUE)
 plot(res_pars$marginals.range.nominal[[1]], type = "l", main = "range")
 plot(res_pars$marginals.variance.nominal[[1]], type = "l", main = "variance")
 
-local.plot.field(u, main="The true (simulated) spatial field", asp = 1，zlim = c(-25, 20))
-plot(Ocean, add = TRUE)
-
 local.plot.field(res.stationary$summary.random$s$mean, asp =1, zlim = c(-25, 20),
           main="Spatial estimate with the stationary model -- mean")
 plot(Ocean, add = TRUE)
@@ -280,17 +277,13 @@ Rmar <- inla.tmarginal(exp, theta2)
 plot(Vmar, type = "l", main = "posterior varianace")
 plot(Rmar, type = "l", main = "posterior range")
 
-
-local.plot.field(u, main="The true (simulated) spatial field", asp = 1, zlim = c(-25, 20))
-plot(Ocean, add = TRUE)
-
-local.plot.field(res.mixture$summary.random$s$mean, asp = 1,zlim = c(-25, 20)，
-                 main="Spatial posterior for Barrier model -- mean")
+local.plot.field(res.mixture$summary.random$s$mean, asp = 1,zlim = c(-25, 20),
+                 main="Spatial posterior for mixture model -- mean")
 plot(Ocean, add = TRUE)
 plot(obs_all, pch = ".", add = TRUE)
 
 local.plot.field(res.mixture$summary.random$s$sd, asp = 1, 
-                 main="Spatial posterior for Barrier model -- uncertainty")
+                 main="Spatial posterior for mixture model -- uncertainty")
 plot(Ocean, add = TRUE)
 plot(obs_all, pch = ".", add = TRUE)
 
