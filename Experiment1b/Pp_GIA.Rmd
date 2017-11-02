@@ -15,9 +15,15 @@ In this document, we apply the pseudo polygon method on GIA. The idea is that GI
 First we generate the mesh for a discreate reparesentation of the GIA process. The mesh is restricted on a subset of the sphere defined by the pseudo-polygons. More details about choosing and generating the polygons can be found [here](http://rpubs.com/zs_sz/PseudoObs02). The following chunk generate the pseudo polygons using the ensemble mean of 13 GIA mode solutions for a given threshold value, say $0.2$.
 
 ```{r polygons, include=TRUE, eval=FALSE}
-### Load the GIA forward solutions 
+### Load the GIA forward solutions
+if(Sys.info()["sysname"] == "Windows"){
+  GIA_path <- "Z:/WP2-SolidEarth/GIAforwardModels/textfiles/" 
+}else if(Sys.info()["sysname"] == "Ubuntu"){
 GIA_path <- "~/globalmass/WP2-SolidEarth/GIAforwardModels/textfiles/" #(on ubuntu desktop )
-#GIA_path <- "/./projects/GlobalMass/WP2-SolidEarth/GIAforwardModels/textfiles/" #(on server)
+}else{
+GIA_path <- "/./projects/GlobalMass/WP2-SolidEarth/GIAforwardModels/textfiles/" #(on server)
+}
+
 file_names <- system(paste("ls", GIA_path), intern = TRUE)
 ## Remove unwanted files: no.13 ice6g-ewh, no.11 W&O-EGOD and readme files
 file_names <- file_names[-c(1, 13, 16)]
@@ -68,7 +74,8 @@ fiboSphere2 <- function(N = 1000L, L0 = FALSE) {
 
 
 fibo_points <- fiboSphere2(N = 12960)
-
+library(GEOmap);library(INLA)
+if(Sys.info()['sysname'] == "Linux"){INLA:::inla.dynload.workaround()}
 mesh_points_xyz <- do.call(cbind, Lll2xyz(lat = fibo_points[,2], lon = fibo_points[,1]))
 mesh <- inla.mesh.2d(loc = mesh_points_xyz, cutoff = 0.01, max.edge = 0.5)
 summary(mesh) # give the desired number of vertices and triangles.
@@ -77,6 +84,7 @@ summary(mesh) # give the desired number of vertices and triangles.
 Now separate the triangles by the pseudo-polygons.
 
 ```{r mesh2, include = TRUE}
+source("C:/ZSwork/glbm/Experiment1b/mixture_model/BarrierModel/functions-barriers-dt-models-march2017.R")
 mesh = dt.mesh.addon.posTri(mesh, globe = TRUE)
 # - Add on mesh$posTri
 # - - contains the positions of the triangles
@@ -95,14 +103,78 @@ plot(mesh, t.sub = Omega[[2]], col = "lightblue", rgl = TRUE )
 plot(mesh, t.sub = Omega[[1]], col = "yellow",  rgl = TRUE, add = TRUE)
 
 ## get the subset of the mesh for buiding the Q
-# mesh.sub <- function(mesh, Omega, i = 2){
-# mesh_sub <- mesh
-# mesh_sub$t <- length(Omega[[i]]) # number of triangles
-# sub_nodes <- unique(as.vector(mesh_sub$graph$tt[Omega[[i]], ])) # vertices index of all triangles
-# mesh_sub$n <- length(sub_nodes) # number of verticies
+mesh.sub <- function(mesh, Omega, i = 2){
+  mesh_sub <- mesh
+  id_tri <- Omega[[i]] # triangel id in the subset
+  id_vet <- unique(as.vector(mesh$graph$tv[Omega[[i]], ])) # vertex id in the subset
+  
+  ## Now update the index for all
+  id_all_v <- mesh$idx$loc
+  id_all_v[-id_vet] <- NA
+  id_all_v[which(!is.na(id_all_v))] <- 1:length(id_vet)
+  
+  id_all_t <- 1:mesh$t
+  id_all_t[-id_tri] <- NA
+  id_all_t[which(!is.na(id_all_t))] <- 1:length(id_tri)
+  ## Modify the mesh to be the subset
+  
+  
+  ## get the subset of the graph
+  sub_tv <- mesh$graph$tv[Omega[[i]], ]
+  sub_vt <- mesh$graph$vt[id_vet,]
+  sub_tt <- mesh$graph$tt[Omega[[i]],]
+  sub_tti <- mesh$graph$tti[Omega[[i]],]
+  sub_vv <- mesh$graph$vv[id_vet,id_vet]
+  
+  ## Change the triangle indics of the subset
+  sub_tv <- cbind(id_all_v[sub_tv[,1]], id_all_v[sub_tv[,2]], id_all_v[sub_tv[,3]])
+  #sub_vt <- id_all_t[sub_vt]
+  #sub_tt <- cbind(id_all_t[sub_tt[,1]], id_all_t[sub_tt[,2]], id_all_t[sub_tt[,3]])
+  
+  ## Now assemble 
+  mesh_sub$t <- length(id_tri) 
+  mesh_sub$n <- length(id_vet)
+  mesh_sub$loc <- mesh_sub$loc[id_vet, ]
+  mesh_sub$graph$tv <- sub_tv
+  mesh_sub$graph$vt <- sub_vt
+  mesh_sub$graph$tt <- sub_tt
+  mesh_sub$graph$tti <- sub_tti
+  mesh_sub$graph$vv <- sub_vv
+  mesh_sub$idx$loc <- 1:length(id_vet)
+  mesh_sub$posTri <- mesh_sub$posTri[Omega[[i]],]
+  mesh_sub$Trill <- mesh_sub$Trill[Omega[[i]],]
+  return(mesh_sub)
+}
+
+mesh_outPoly <- mesh.sub(mesh, Omega, 2)
+plot(mesh_outPoly, rgl = TRUE)
+
+mu_r <- 500/6371
+v_r <- (1000/6371)^2
+mu_s <- 20
+v_s <- 40^2
+
+## Transform the parameters for the SPDE_GMRF approximation
+Tlognorm <- function(mu, v){
+  logv <- log(1 + v/mu^2)
+  logmu <- log(mu^2) - 0.5*log(mu^2 + v)
+  return(c(logmu, logv))
+}
+trho <- Tlognorm(mu_r, v_r)
+tsigma <- Tlognorm(mu_s, v_s)
 
 
-
+ lsigma0 <- tsigma[1]
+  theta1_s <- tsigma[2]
+  lrho0 <- trho[1]
+  theta2_s <- trho[2]
+  lkappa0 <- log(8)/2 - lrho0
+  ltau0 <- 0.5*log(1/(4*pi)) - lsigma0 - lkappa0
+GIA_spde <- inla.spde2.matern(mesh_outPoly, B.tau = matrix(c(ltau0, -1, 1),1,3), B.kappa = matrix(c(lkappa0, 0, -1), 1,3),
+                                theta.prior.mean = c(0,0), theta.prior.prec = c(sqrt(1/theta1_s), sqrt(1/theta2_s)))
+Q <- inla.spde.precision(spde = GIA_spde, theta = c(0,0))
+u <- inla.qsample(n=1, Q=Q, seed = 2)
+  
 ```
 
 ## 2 Data preparation
