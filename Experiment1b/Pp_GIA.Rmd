@@ -14,7 +14,7 @@ In this document, we apply the pseudo polygon method on GIA. The idea is that GI
 ## 1 Generate the polygons and mesh
 First we generate the mesh for a discreate reparesentation of the GIA process. The mesh is restricted on a subset of the sphere defined by the pseudo-polygons. More details about choosing and generating the polygons can be found [here](http://rpubs.com/zs_sz/PseudoObs02). The following chunk generate the pseudo polygons using the ensemble mean of 13 GIA mode solutions for a given threshold value, say $0.2$.
 
-```{r polygons, include=TRUE, eval=FALSE}
+```{r polygons, include=TRUE, cache=TRUE}
 ### Load the GIA forward solutions
 if(Sys.info()["sysname"] == "Windows"){
   GIA_path <- "Z:/WP2-SolidEarth/GIAforwardModels/textfiles/" 
@@ -42,18 +42,31 @@ library(raster)
 GIA_sp <- GIA_ensemble[, c(2,3,4,5)]
 GIA_sp$inPoly <- abs(GIA_sp$trend) < 0.2
 coordinates(GIA_sp) <- c("x_center", "y_center")
-## Convert 0 ~ 360 to -180 ~ 180
-GIA_sp@coords[,1] <- ifelse(GIA_sp@coords[,1] <=180, GIA_sp@coords[,1], GIA_sp@coords[,1]-360)
 gridded(GIA_sp) <- TRUE
 
 GIA_ras <- raster(GIA_sp, layer = 3) # 3 is the column no of inPoly
 zeroPoly <- rasterToPolygons(GIA_ras, fun=function(inPoly) {inPoly == TRUE}, dissolve=TRUE )
+## Define the global polygons
 plot(zeroPoly, col = "blue", main = "zero regions -- threshold = 0.2")
+
+## Remove polygons that are too small
+zeroPolys <- zeroPoly@polygons[[1]]@Polygons
+polyareas <- sapply(zeroPolys, function(x) x@area)
+polyholes <- sapply(zeroPolys, function(x) x@hole)
+
+zeropolys2 <- zeroPolys[polyareas > 250 ] 
+polyareas2 <- sapply(zeropolys2, function(x) x@area)
+polyholes2 <- sapply(zeropolys2, function(x) x@hole)
+
+zeroPoly@polygons[[1]]@Polygons <- zeropolys2
+  
+plot(zeroPoly, col = "blue", main = "zero regions -- threshold = 0.2 (refined) ")
+
 ```
 
 Next we generate the mesh and separate the triangles in/out-side of the polygons. We spread fibonacci points on the sphere as initial locations of the triangle vertices. The number of the points controls the resolution. The goal is to produce a map with approximately one degree resolution, hence we also need a similar resolution for the triangulation. Not that the triangle edge be no larger than the process correlation length. A one degree grid is about $110 \times 110 km$ which corresponds to a correlation length about $110/6371 = 0.017$. The number of triangles should be $f = 180 * 360 = 64800$ corresponding to number of vertices of $v \approx = (f+2)*2/5= 25921$.
 
-```{r mesh, include=TRUE, eval=FALSE}
+```{r mesh, include=TRUE, cache=TRUE}
 #### Generate Fibonacci points on the sphere
 fiboSphere2 <- function(N = 1000L, L0 = FALSE) {
   ## Reference (note that points generated from 2D are slightly different from 3D)
@@ -74,6 +87,7 @@ fiboSphere2 <- function(N = 1000L, L0 = FALSE) {
 
 
 fibo_points <- fiboSphere2(N = 12960)
+#fibo_points <- fiboSphere2(N = 1000)
 library(GEOmap);library(INLA)
 if(Sys.info()['sysname'] == "Linux"){INLA:::inla.dynload.workaround()}
 mesh_points_xyz <- do.call(cbind, Lll2xyz(lat = fibo_points[,2], lon = fibo_points[,1]))
@@ -83,15 +97,16 @@ summary(mesh) # give the desired number of vertices and triangles.
 
 Now separate the triangles by the pseudo-polygons.
 
-```{r mesh2, include = TRUE}
+```{r mesh2, include = TRUE, cache=TRUE}
 source("C:/ZSwork/glbm/Experiment1b/mixture_model/BarrierModel/functions-barriers-dt-models-march2017.R")
-mesh = dt.mesh.addon.posTri(mesh, globe = TRUE)
+mesh <- dt.mesh.addon.posTri(mesh = mesh, globe = TRUE)
 # - Add on mesh$posTri
 # - - contains the positions of the triangles
 
 ## checking which mesh triangles are inside the land
 ## First convert xyz to lonlat
 Tlonlat <- Lxyz2ll(list(x = mesh$posTri[,1], y = mesh$posTri[,2], z = mesh$posTri[,3]))
+Tlonlat$lon <- ifelse(Tlonlat$lon >=0, Tlonlat$lon, Tlonlat$lon + 360)
 mesh$Trill <- cbind(lon = Tlonlat$lon, lat =Tlonlat$lat)
 TinPoly <- unlist(over(zeroPoly, SpatialPoints(coords=mesh$Trill), returnList=T))
 TAll <- 1:mesh$t
@@ -101,7 +116,11 @@ Omega = dt.Omega(list(TinPoly, 1:mesh$t), mesh)
 ## Plot the result in 3d
 plot(mesh, t.sub = Omega[[2]], col = "lightblue", rgl = TRUE )
 plot(mesh, t.sub = Omega[[1]], col = "yellow",  rgl = TRUE, add = TRUE)
+```
 
+Need to build an mesh from the subset of triangles that can be used in INLA independently. Find the subset of the vertices, and change all indices, etc.
+
+```{r mesh3, inlude = TRUE, cahce=TRUE}
 ## get the subset of the mesh for buiding the Q
 mesh.sub <- function(mesh, Omega, i = 2){
   mesh_sub <- mesh
@@ -120,36 +139,40 @@ mesh.sub <- function(mesh, Omega, i = 2){
   
   
   ## get the subset of the graph
-  sub_tv <- mesh$graph$tv[Omega[[i]], ]
+  sub_tv <- mesh$graph$tv[id_tri, ]
   sub_vt <- mesh$graph$vt[id_vet,]
-  sub_tt <- mesh$graph$tt[Omega[[i]],]
-  sub_tti <- mesh$graph$tti[Omega[[i]],]
+  sub_tt <- mesh$graph$tt[id_tri,]
+  sub_tti <- mesh$graph$tti[id_tri,]
   sub_vv <- mesh$graph$vv[id_vet,id_vet]
   
-  ## Change the triangle indics of the subset
-  sub_tv <- cbind(id_all_v[sub_tv[,1]], id_all_v[sub_tv[,2]], id_all_v[sub_tv[,3]])
-  sub_vt <- id_all_t[sub_vt]
-  sub_tt <- cbind(id_all_t[sub_tt[,1]], id_all_t[sub_tt[,2]], id_all_t[sub_tt[,3]])
+  ## Change the triangle indices of the subset
+  sub_tv2 <- cbind(id_all_v[sub_tv[,1]], id_all_v[sub_tv[,2]], id_all_v[sub_tv[,3]])
+  sub_vt2 <- id_all_t[sub_vt]
+  sub_tt2 <- cbind(id_all_t[sub_tt[,1]], id_all_t[sub_tt[,2]], id_all_t[sub_tt[,3]])
   
   ## Now assemble 
   mesh_sub$t <- length(id_tri) 
   mesh_sub$n <- length(id_vet)
-  mesh_sub$loc <- mesh_sub$loc[id_vet, ]
-  mesh_sub$graph$tv <- sub_tv
-  mesh_sub$graph$vt <- sub_vt
-  mesh_sub$graph$tt <- sub_tt
+  mesh_sub$loc <- mesh_sub$loc[sort(id_vet), ]
+  mesh_sub$graph$tv <- sub_tv2
+  mesh_sub$graph$vt <- sub_vt2
+  mesh_sub$graph$tt <- sub_tt2
   mesh_sub$graph$tti <- sub_tti
   mesh_sub$graph$vv <- sub_vv
-  #mesh_sub$idx$loc <- intersect(id_vet, mesh$idx$loc)
+  
   mesh_sub$idx$loc <- 1:length(id_vet)
   mesh_sub$posTri <- mesh_sub$posTri[Omega[[i]],]
   mesh_sub$Trill <- mesh_sub$Trill[Omega[[i]],]
   return(mesh_sub)
 }
 
-mesh_outPoly <- mesh.sub(mesh, Omega, 1)
-plot(mesh_outPoly, rgl = TRUE)
+mesh_outPoly <- mesh.sub(mesh, Omega, 2)
+plot(mesh_outPoly, rgl = T, col = "lightblue")
+```
 
+Build an SPDE model from this mesh and simulate some data. Plot the data and compare them with the subset of the complete mesh.
+
+```{r mesh4, include=TRUE, cache=TRUE}
 mu_r <- 500/6371
 v_r <- (1000/6371)^2
 mu_s <- 20
@@ -176,114 +199,247 @@ GIA_spde <- inla.spde2.matern(mesh_outPoly, B.tau = matrix(c(ltau0, -1, 1),1,3),
 idd <- mesh_outPoly$idx$loc
 GIA_spde2 <- inla.spde2.matern(mesh, B.tau = matrix(c(ltau0, -1, 1),1,3), B.kappa = matrix(c(lkappa0, 0, -1), 1,3),
                                 theta.prior.mean = c(0,0), theta.prior.prec = c(sqrt(1/theta1_s), sqrt(1/theta2_s)))
-Q <- inla.spde.precision(spde = GIA_spde, theta = c(0,0))[idd, idd]
+Q <- inla.spde.precision(spde = GIA_spde, theta = c(0,0))
 Q2 <- inla.spde.precision(spde = GIA_spde2, theta = c(0,0))[idd, idd]
 u1 <- inla.qsample(n=1, Q=Q, seed = 23)[,1]
 u2 <- inla.qsample(n=1, Q=Q2, seed = 23)[,1]
-ua <- ub <- rep(NA, mesh$n)
-ua[idd] <- u1
-ub[idd] <- u2
 
-local.plot.field = function(field, ...){
-  proj = inla.mesh.projector(mesh_outPoly,  projection = "longlat", dims = c(360,180), xlim = c(-180, 180), ylim = c(-90, 90))
+
+local.plot.field = function(field, mesh, ...){
+  proj = inla.mesh.projector(mesh,  projection = "longlat", dims = c(360,180), xlim = c(0, 360), ylim = c(-90, 90))
   field.proj = inla.mesh.project(proj, field)
   image.plot(list(x = proj$x, y=proj$y, z = field.proj),
               ...)
 }
 
-local.plot.field(u1, main="The true (simulated) spatial field", asp = 1)  
-local.plot.field(ub, main="The true (simulated) spatial field", asp = 1) 
+local.plot.field(u1, mesh = mesh_outPoly, main="The true (simulated) spatial field", asp = 1, zlim = c(-30, 30))  
+local.plot.field(u2, mesh = mesh_outPoly, main="The true (simulated) spatial field", asp = 1, zlim = c(-30, 30)) 
 ```
 
 ## 2 Data preparation
 
 ## 2.1 GIA forward model solution
 Load the GIA forward solution and project the values to the mesh grid
-```{r gia_data, include=TRUE}
-ice6g <- read.table("~/globalmass/WP2-SolidEarth/GIAforwardModels/textfiles/GIA_Pel-6-VM5.txt", header = T)
+```{r gia_data, include=TRUE, cache= TRUE}
+if(Sys.info()["sysname"] == "Windows"){
+  ice6g <- read.table("Z:/WP2-SolidEarth/GIAforwardModels/textfiles/GIA_Pel-6-VM5.txt", header = T)
+}else if(Sys.info()["sysname"] == "Ubuntu"){
+  ice6g <- read.table("~/globalmass/WP2-SolidEarth/GIAforwardModels/textfiles/GIA_Pel-6-VM5.txt", header = T)
+}else{
+  ice6g <- read.table("/./projects/GlobalMass/WP2-SolidEarth/GIAforwardModels/textfiles/GIA_Pel-6-VM5.txt", header = T)
+}
 
-  polycoords <- ice6g[,c(6:13, 6,7)] 
-  plist <- lapply(ice6g$ID, function(x) Polygons(list(Polygon(cbind(lon = as.numeric(polycoords[x, c(1,3,5,7,9)]), 
+polycoords <- ice6g[,c(6:13, 6,7)] 
+plist <- lapply(ice6g$ID, function(x) Polygons(list(Polygon(cbind(lon = as.numeric(polycoords[x, c(1,3,5,7,9)]), 
                                                                   lat = as.numeric(polycoords[x, c(2,4,6,8,10)])))), ID = x))
-  Plist <- SpatialPolygons(plist, proj4string = CRS("+proj=longlat"))
-  ## Convert the Cartesian to longlat with long in [0, 360)
-  MlocLL <- Lxyz2ll(list(x=mesh$loc[,1], y = mesh$loc[,2], z = mesh$loc[,3]))
-  MlocLL$lon <- ifelse(MlocLL$lon <0, MlocLL$lon + 359, MlocLL$lon)
-  M_sp <- SpatialPoints(data.frame(lon = MlocLL$lon, lat = MlocLL$lat), proj4string = CRS("+proj=longlat")) 
-  Midx <- over(M_sp, Plist)
-  GIA_prior <- ice6g$trend[Midx]
-  
+Plist <- SpatialPolygons(plist, proj4string = CRS("+proj=longlat"))
+## Convert the Cartesian to longlat with long in [0, 360)
+MlocLL <- Lxyz2ll(list(x=mesh_outPoly$loc[,1], y = mesh_outPoly$loc[,2], z = mesh_outPoly$loc[,3]))
+MlocLL$lon <- ifelse(MlocLL$lon >= -0.5, MlocLL$lon, MlocLL$lon + 360)
+M_sp <- SpatialPoints(data.frame(lon = MlocLL$lon, lat = MlocLL$lat), proj4string = CRS("+proj=longlat")) 
+Midx <- over(M_sp, Plist)
+GIA_prior <- ice6g$trend[Midx]
+
 ```
 
 ## 2.2 GPS data
-
 Load the processed GPS data and remove those inside the pseudo-polygons. Stitch the polygon boundaries with pseudo observations.
 
-```{r data, include = TRUE}
-GPSV3d <- read.table("~/globalmass/WP2-SolidEarth/GPS_version03/GPSdataset_v03c_QC_20170809_comb.txt", header = T)
+```{r data, include = TRUE, cache=TRUE}
+if(Sys.info()["sysname"] == "Windows"){
+  GPSV4b <- read.table("Z:/WP2-SolidEarth/GPS/NGL/BHMinputFiles/GPS_v04b.txt", header = T)
+}else if(Sys.info()["sysname"] == "Ubuntu"){
+  GPSV4b <- read.table("~/globalmass/WP2-SolidEarth/GPS/NGL/BHMinputFiles/GPS_v04b.txt", header = T)
+}else{
+  GPSV4b <- read.table("/./projects/GlobalMass/WP2-SolidEarth/GPS/NGL/BHMinputFiles/GPS_v04b.txt", header = T)
+}
 
-GPS_inPoly <- unlist(over(zeroPoly, SpatialPoints(coords = cbind(GPSV3d$lon, GPSV3d$lat)), returnList=T))
-GPS_All <- 1:nrow(GPSV3d)
+
+GPS_inPoly <- unlist(over(zeroPoly, SpatialPoints(coords = cbind(GPSV4b$lon, GPSV4b$lat)), returnList=T))
+GPS_All <- 1:nrow(GPSV4b)
 GPS_outPoly <- GPS_All[-GPS_inPoly]
-plot(GPSV3d[GPS_outPoly,c("lon", "lat")], pch = "+")
+plot(GPSV4b[GPS_outPoly,c("lon", "lat")], pch = "+")
 
-GPS_data <- GPSV3d[GPS_outPoly,]
+GPS_data <- GPSV4b[GPS_outPoly,]
 GPS_loc <- do.call(cbind, Lll2xyz(lat = GPS_data$lat, lon = GPS_data$lon))
-GPS_sp <- SpatialPoints(data.frame(lon = GPS_data$lon, lat = GPS_data$lat), proj4string = CRS("+proj=longlat"))
+GPS_sp <- SpatialPoints(data.frame(lon = ifelse(GPS_data$lon>359.5, GPS_data$lon - 360, GPS_data$lon), 
+                                   lat = GPS_data$lat), proj4string = CRS("+proj=longlat"))
+
 Midx2 <- over(GPS_sp, Plist)
 GPS_mu <- ice6g$trend[Midx2]
 GPS_data$trend0 <- GPS_data$trend - GPS_mu
 
 ```
 
-## 3 Inference -- mixture model
-```{r barrier, include = TRUE}
-Q.mixture = dt.create.Q(mesh, Omega, fixed.ranges = c(5, NA))
-# - We fix the barrier range to a different value than we 
-#   used for simulations
-# - - Why? It does not matter, as long as it is 'small' 
-#     the models are very
-#     similar
-# - - This shows that you do not need to know the 
-#     true 'barrier range'!
+## 3 Inference on the subset
 
-log.prior = dt.create.prior.log.exp(prior.param = c(1,1))
-# - The prior parameters are the lambdas in the exponential 
-#   priors for standard deviation and inverse-range
+```{r inla, include = TRUE, cache = TRUE}
+## Link the process to observations and predictions
+Mesh_GIA <- mesh_outPoly
+A_data <- inla.spde.make.A(mesh = Mesh_GIA, loc = GPS_loc)
 
-mixture.model = dt.inla.model(Q = Q.mixture, log.prior=log.prior)
+## try predict in zero polygon and see what inla does
+zero_lat <- c(-40, 10, 25)
+zero_lon <- c(250, 150, 0)
+zero_loc <- do.call(cbind, Lll2xyz(lat = zero_lat, lon = zero_lon))
 
-formula2 <- y ~ -1 + f(s, model=mixture.model)
-# - The spatial model component is different from before
-# - The rest of the model setup is the same! 
-#   (as in the stationary case)
-# - - e.g. the inla(...) call below is the same, 
-#     only this formula is different
+A_pred <- inla.spde.make.A(mesh = Mesh_GIA, loc = rbind(GPS_loc, Mesh_GIA$loc, zero_loc))
 
-res.mixture = inla(formula2, data=inla.stack.data(stk1),
-       control.predictor=list(A = inla.stack.A(stk1)),
-       family = 'gaussian',
-       control.family = list(hyper = hyper),
-            scale = scales)
+A_zero <- inla.spde.make.A(mesh = Mesh_GIA, loc = zero_loc)
+## Create the estimation and prediction stack
+st.est <- inla.stack(data = list(y=GPS_data$trend0), A = list(A_data),
+                     effects = list(GIA = 1:GIA_spde$n.spde), tag = "est")
+st.pred <- inla.stack(data = list(y=NA), A = list(A_pred),
+                      effects = list(GIA=1:GIA_spde$n.spde), tag = "pred")
+stGIA <- inla.stack(st.est, st.pred)
 
-summary(res.mixture)
-theta1 <- res.mixture$marginals.hyperpar$`Theta1 for s`
-theta2 <- res.mixture$marginals.hyperpar$`Theta2 for s`
+## Fix the GPS errors
+hyper <- list(prec = list(fixed = TRUE, initial = 0))
+formula = y ~ -1 +  f(GIA, model = GIA_spde)
+prec_scale <- c(1/GPS_data$std^2, rep(1, nrow(A_pred)))
 
-Vmar<- inla.tmarginal(exp, theta1)
-Rmar <- inla.tmarginal(exp, theta2)
+## Run INLA
+res_inla <- inla(formula, data = inla.stack.data(stGIA, spde = GIA_spde), family = "gaussian",
+                 scale =prec_scale, control.family = list(hyper = hyper),
+                 control.predictor=list(A=inla.stack.A(stGIA), compute =TRUE))
+```
 
-plot(Vmar, type = "l", main = "posterior varianace")
-plot(Rmar, type = "l", main = "posterior range")
 
-local.plot.field(res.mixture$summary.random$s$mean, asp = 1,zlim = c(-25, 20),
-                 main="Spatial posterior for mixture model -- mean")
-plot(Ocean, add = TRUE)
-plot(obs_all, pch = ".", add = TRUE)
+Now assemble the inla inference and prediction results.
 
-local.plot.field(res.mixture$summary.random$s$sd, asp = 1, 
-                 main="Spatial posterior for mixture model -- uncertainty")
-plot(Ocean, add = TRUE)
-plot(obs_all, pch = ".", add = TRUE)
+```{r inla_res, include = TRUE, cache=TRUE}
+INLA_pred <- res_inla$summary.linear.predictor
 
+## Extract and project predictions
+pred_idx <- inla.stack.index(stGIA, tag = "pred")$data
+GPS_idx <- pred_idx[1:nrow(GPS_data)]
+GIA_idx <- pred_idx[(nrow(GPS_data)+1):(length(pred_idx) - 3)]
+zero_idx <- pred_idx[(length(pred_idx) - 2):length(pred_idx)]
+
+## GPS 
+GPS_u <- INLA_pred$sd[GPS_idx]
+GPS_pred <- data.frame(lon = GPS_data$lon, lat = GPS_data$lat, u = GPS_u)
+
+## GIA
+GIA_diff <- INLA_pred$mean[GIA_idx] 
+GIA_m <- GIA_diff + GIA_prior
+GIA_u <- INLA_pred$sd[GIA_idx]
+proj <- inla.mesh.projector(Mesh_GIA, projection = "longlat", dims = c(360,180), xlim = c(0,360), ylim = c(-90, 90))
+GIA_grid <- expand.grid(proj$x, proj$y)
+GIA_pred <- data.frame(lon = GIA_grid[,1], lat = GIA_grid[,2],
+                       diff = as.vector(inla.mesh.project(proj, as.vector(GIA_diff))),
+                       mean = as.vector(inla.mesh.project(proj, as.vector(GIA_m))),
+                       u = as.vector(inla.mesh.project(proj, as.vector(GIA_u))))
+## zero
+zero_m <- INLA_pred$mean[zero_idx]
+zero_m
+# inla predicts all zero
+zero_sd <- INLA_pred$sd[zero_idx]
+zero_sd
+# inla predicts all zero
+ress <- list(res_inla = res_inla, spde = GIA_spde, st = stGIA, 
+            mesh = Mesh_GIA, GPS_pred = GPS_pred, GIA_pred = GIA_pred)
+```
+
+
+Plot the posteriors of the hyper parameters.
+
+```{r hyper, include=TRUE}
+res_inla <- ress$res_inla
+GIA_spde <- ress$spde
+pars_GIA <- inla.spde2.result(res_inla, "GIA", GIA_spde, do.transf=TRUE)
+theta_mean <- pars_GIA$summary.theta$mean
+theta_sd <- pars_GIA$summary.theta$sd
+
+## Find the mode of rho and sigma^2
+lrho_mode <- pars_GIA$summary.log.range.nominal$mode
+lrho_mean <- pars_GIA$summary.log.range.nominal$mean
+lrho_sd <- pars_GIA$summary.log.range.nominal$sd
+rho_mode <- exp(lrho_mean - lrho_sd^2)
+
+lsigma_mode <- pars_GIA$summary.log.variance.nominal$mode
+lsigma_mean <- pars_GIA$summary.log.variance.nominal$mean
+lsigma_sd <- pars_GIA$summary.log.variance.nominal$sd
+sigma_mode <- exp(lsigma_mean - lsigma_sd^2)
+
+plot(pars_GIA$marginals.range.nominal[[1]], type = "l",
+     main = bquote(bold(rho("mode") == .(round(rho_mode, 4))))) # The posterior from inla output
+plot(pars_GIA$marginals.variance.nominal[[1]], type = "l", 
+     main = bquote(bold({sigma^2}("mode") == .(round(sigma_mode, 4))))) # The posterior from inla output
+
+## The estimated correlation length is about 568km
+rho_mode*6371
+```
+
+
+Plot the predictions.
+
+```{r predict, include=TRUE}
+library(ggplot2)
+library(grid)
+library(gridExtra)
+
+GPS_pred <- ress$GPS_pred
+GIA_pred <- ress$GIA_pred
+
+GIA_pred$mean2 <- GIA_pred$mean
+GIA_pred$mean2[is.na(GIA_pred$mean2)] <- 0
+colpal <- colorRamps::matlab.like(12)
+
+## Plot predicted mean
+map_res <- function(data, xname, yname, fillvar, colpal, limits=NULL, title){
+  plot_data <- data[c(xname, yname, fillvar)]
+  names(plot_data) <- c("X", "Y", "Fill")
+  
+  beauty <- 
+    theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), 
+          panel.background = element_rect(fill = "white", colour = 'white'), 
+          legend.text = element_text(size = 10),
+          legend.title = element_text(size = 10), 
+          axis.text = element_text(size = 10),
+          axis.title = element_text(size = 10),
+          axis.line = element_line(size = 1),
+          plot.title = element_text(hjust = 0.5, size = 15),
+          plot.subtitle = element_text(hjust = 0.5, size = 10),
+          panel.border = element_blank())
+  world_map <- map_data("world2")
+  baseworld <- geom_polygon(data = world_map, aes(x=long, y=lat, group=group), colour="grey", fill = NA, alpha = 0.5)  
+  
+  colbar <- guide_colorbar(barwidth = 2, barheight = 10, label.position = "right", title.position = "bottom")
+  
+  Map <- ggplot(plot_data) + geom_raster(aes(x = X, y = Y, fill = Fill)) + coord_fixed() + 
+    xlab("Longitude") + ylab("Latitude") + 
+    scale_x_continuous(limits=c(0,360),  expand = c(0, 0)) + 
+    scale_y_continuous(limits=c(-90,90),  expand = c(0, 0)) + 
+    scale_fill_gradientn(colors = colpal, name = "mm/yr", limits = limits,  guide = colbar) 
+  
+  Map <- Map +  baseworld + ggtitle(title) + beauty
+  return(Map)
+}
+
+map_prior <- map_res(data = ice6g, xname = "x_center", yname = "y_center", fillvar = "trend", 
+                     colpal = colpal,  limits = c(-7, 22), title = "Prior GIA mean field")
+
+## Plot the GIA predicted mean
+map_GIA <- map_res(data = GIA_pred, xname = "lon", yname = "lat", fillvar = "mean", 
+                   colpal = colpal,  limits = c(-7, 22), title = "Predicted GIA")
+
+map_GIA2 <- map_res(data = GIA_pred, xname = "lon", yname = "lat", fillvar = "mean2", 
+                   colpal = colpal,  limits = c(-7, 22), title = "Predicted GIA patched")
+
+## Plot the GIA difference map
+map_diff <- map_res(data = GIA_pred, xname = "lon", yname = "lat", fillvar = "diff", 
+                    colpal = colpal, limits = c(-8, 8), title = "GIA difference: Updated - Prior")
+
+## Plot the GIA difference map
+map_sd <- map_res(data = GIA_pred, xname = "lon", yname = "lat", fillvar = "u", 
+                    colpal = colpal, limits = c(0, 4), title = "Predicted uncertainties")
+
+ 
+## Display
+print(map_prior)
+print(map_GIA)
+print(map_GIA2)
+print(map_diff)
+print(map_sd)
 ```

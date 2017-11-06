@@ -23,13 +23,13 @@ We need the following packages and extra functions from the sourced file.
 ```{r init, include=TRUE, message = FALSE, warning=FALSE}
 ## load libraries and source codes
 library(INLA); library(rgdal); library(maptools); library(GEOmap); library(rgl)
-source("~/glbm/Experiment1b//mixture_model/BarrierModel/functions-barriers-dt-models-march2017.R")
+source("c:/ZSwork/glbm/Experiment1b//mixture_model/BarrierModel/functions-barriers-dt-models-march2017.R")
 set.seed(18)
 ```
 
 Load the coastline and define polygons.
 ```{r polygons, include=TRUE}
-lands <- readOGR(dsn = "/home/zs16444/glbm/Experiment2/ne_110m_land", layer = "ne_110m_land")
+lands <- readOGR(dsn = "c:/ZSwork/glbm/Experiment2/ne_110m_land", layer = "ne_110m_land")
 ## Remove tiny islands
 landsareas <- sapply(lands@polygons, function(x) slot(x, "area"))
 lands2 <- lands[landsareas > 10,]
