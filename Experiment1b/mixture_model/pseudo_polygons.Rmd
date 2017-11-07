@@ -17,27 +17,27 @@ In the following we explore the data sets individually as well as in an ensemble
 
 ### 0 Load useful packages and the data
 
-```{r load}
+```{r load, message = FALSE}
 ### Load the 14 GIA data 
-data_path <- "Z:/WP2-SolidEarth/GIAforwardModels/textfiles/"
-file_names <- system(paste("ls", data_path), intern = TRUE)[1:14]
-## Remove the no.11 W&O-EGOD
-file_names <- file_names[-11]
+data_path <- "Z:/WP2-SolidEarth/BHMinputs/GIA/"
+file_names <- system(paste("ls", data_path), intern = TRUE)[1:15]
+## Remove the no1-4 old version of peltier vm, no.12 W&O-EGOD
+file_names <- file_names[-c(1:4,12)]
 GIA_name <- unlist(strsplit(file_names, split = ".txt"))
 GIA_priors <- list()
-for (i in 1:13){
+for (i in 1:10){
 GIA_priors[[i]] <- read.table(paste0(data_path, file_names[i]), header = T)
 }
 
 ## create the ensemble data sets
 GIA_ensemble <- GIA_priors[[1]]
 GIA_ensemble$trend <- rowMeans(sapply(GIA_priors, "[[", "trend"))
-GIA_ensemble$std <- sqrt((rowSums(sapply(GIA_priors, function(x) (x$std)^2)))/13)
+GIA_ensemble$std <- sqrt((rowSums(sapply(GIA_priors, function(x) (x$std)^2)))/10)
 ```
 
 ### 1 Criteria for selecting zero-value regions
 To select the reasonable regions where the GIA are zero with high certainty, we first examine the distributions of the GIA values from the 13 forward models and their ensemble mean.
-```{r eda}
+```{r eda, message = FALSE}
 ## All 13 datasets together
 alltrend <- sapply(GIA_priors, "[[", "trend")
 range(alltrend)
@@ -52,8 +52,8 @@ Plot the original 13 dataset and the ensemble means.
 ```{r eda_plot}
 ## combine the 13 lists to one dataframe
 alltrend <- data.frame(alltrend)
-names(alltrend) <- paste0("trend", 1:13)
-alltrend$trend_ens <- GIA_ensemble$trend
+names(alltrend) <- c("Pel6VM5", "Pur6VM5", "SnS1", "SnS3", "SKMOR", "SVv3REF", "SVvLALT", "WnW4", "WnW5", "vdW5")    
+alltrend$ensemble <- GIA_ensemble$trend
 alltrend$x_center <- GIA_priors[[1]]$x_center
 alltrend$y_center <- GIA_priors[[1]]$y_center
 
@@ -73,9 +73,9 @@ Rescale the colorbar to show more details for values within [-2, 2].
 plot_rescale <- function(breaks, abs = FALSE, title = NULL){
   n.brks <- length(breaks)
   if(abs){
-    trends<- lapply(abs(alltrend[,1:14]), function(x) cut(x, breaks))
+    trends<- lapply(abs(alltrend[,1:11]), function(x) cut(x, breaks))
   }else{
-     trends<- lapply(alltrend[,1:14], function(x) cut(x, breaks))
+     trends<- lapply(alltrend[,1:11], function(x) cut(x, breaks))
   }
   new_trend <- do.call(data.frame, trends)
   new_trend$x_center <-alltrend$x_center
@@ -115,9 +115,9 @@ plot_rescale(breaks, abs = TRUE, title = "threshold = 0.2")
 breaks <- c(0, 0.3, 25.5)
 plot_rescale(breaks, abs = TRUE, title = "threshold = 0.3")
 
-## 0.5
-breaks <- c(0, 0.5, 25.5)
-plot_rescale(breaks, abs = TRUE, title = "threshold = 0.5")
+## 0.4
+breaks <- c(0, 0.4, 25.5)
+plot_rescale(breaks, abs = TRUE, title = "threshold = 0.4")
 ```
 
 The map using ensemble mean and thresholds at 0.2 and 0.3 looks reasonable and we use these two in the following processing.
@@ -131,16 +131,16 @@ In the following, we fisrt do the porcessing for threshold value 0.1 and later w
 ## from Spatialpixels to raster to polygons
 library(raster)
 GIA_sp <- GIA_ensemble[, c(2,3,4,5)]
-GIA_sp$trend01 <- abs(GIA_sp$trend) <0.1
-GIA_sp$trend02 <- abs(GIA_sp$trend) <0.2
-GIA_sp$trend03 <- abs(GIA_sp$trend) <0.3
+GIA_sp$trend01 <- abs(GIA_sp$trend) <0.2
+GIA_sp$trend02 <- abs(GIA_sp$trend) <0.3
+GIA_sp$trend03 <- abs(GIA_sp$trend) <0.4
 coordinates(GIA_sp) <- c("x_center", "y_center")
 gridded(GIA_sp) <- TRUE
 
 
 GIA_ras01 <- raster(GIA_sp, layer = 3) # 3 is the column no of trend01
 zeroPoly01 <- rasterToPolygons(GIA_ras01, fun=function(trend01) {trend01 == TRUE}, dissolve=TRUE ) 
-plot(zeroPoly01, col = "blue", main = "zero regions -- threshold = 0.1")
+plot(zeroPoly01, col = "blue", main = "zero regions -- threshold = 0.2")
 ```
 
 Note that there are holes in the large polygons and check if they are correctly labeled.
@@ -178,21 +178,24 @@ fiboSphere1 <- function(n = 1000L) {
   return(cbind(x,y,z))
 }
 
-##lonlat -- Generate equally distributed points around a sphere -- Fibonacci spiral
-fiboSphere2 <- function(n = 1000L) {
+fiboSphere2 <- function(N = 1000L, L0 = FALSE) {
+  ## Reference (note that points generated from 2D are slightly different from 3D)
+  ## Measurement of Areas on a Sphere Using Fibonacci and Latitude–Longitude Lattices (2010)
   phi <- (sqrt(5) + 1) / 2 - 1 # golden ratio
   ga <- phi * 2 * pi           # golden angle
-  
-  i <- 1L:n
-  lon <- ga * i / (2 * pi)
-  lon <- 2 * pi * (lon - floor(lon))
-  lon <- ifelse(lon <= pi, lon, lon - 2 * pi)/pi*180
-  lat <- asin(-1 + 2 * i / n)/pi*180
-  
+
+  i <- seq(-N, N)
+  P <- 2 * N + 1
+  lat <- asin(2*i / P) * 180 / pi
+  if(L0){
+  lon <- ((2 * pi * i / phi) %% pi) * 360 / pi
+  }else{
+    lon <- ((2 * pi * i / phi) %% pi) * 360 / pi - 180
+    }
   cbind(lon = lon, lat = lat)
 }
 
-fibopoints <- fiboSphere2(n = 3000) 
+fibopoints <- fiboSphere2(N = 3000) 
 fibopoints <- data.frame(fibopoints)
 fibopoints$lon <- ifelse(fibopoints$lon < 0, fibopoints$lon+359, fibopoints$lon)
 
@@ -217,7 +220,7 @@ fibin01 <- ifelse(is.na(fibin01), FALSE, TRUE)
 fibpoint_in01 <- data.frame(fibopoints[fibin01, ])
 
 map_fiboZero01 <- zeropoly_map01 + geom_point(data=fibpoint_in01, aes(x=lon, y=lat), pch=19, 
-                                    col = "blue", alpha=0.5)  + ggtitle("fibpoints in the zero polygons -- threshold = 0.1")
+                                    col = "blue", alpha=0.5)  + ggtitle("fibpoints in the zero polygons -- threshold = 0.2")
 map_fiboZero01
 ```
 
@@ -225,7 +228,7 @@ map_fiboZero01
 ### 4 Exclude the GPS area
 Given the zero value region, we also want to exclude the region that include real GPS readings. Now we plot the latest GPS data for inspection.
 ```{r GPSdata}
-GPS_data <- read.table("Z:/WP2-SolidEarth/GPS/NGL/BHMinputFiles/GPS_v03d.txt",  header = T)
+GPS_data <- read.table("Z:/WP2-SolidEarth/BHMinputs/GPS/GPS_v03d.txt",  header = T)
 GPS_data$lon <- ifelse(GPS_data$lon < 0, GPS_data$lon + 359, GPS_data$lon)
 
 world_map <- map_data("world2")
@@ -245,7 +248,7 @@ map_fibo01 <- zeropoly_map01 + geom_point(data=fibpoint_in01gps, aes(x=lon, y=la
                                     col = "blue", alpha=0.5)  +
   geom_point(data=GPS_data, aes(x=lon, y=lat), pch=19, 
                                     col = "red", fill = "red", alpha=0.7) +
-  ggtitle("fibpoints in the zero polygons and away from GPS -- threshold = 0.1")
+  ggtitle("fibpoints in the zero polygons and away from GPS -- threshold = 0.2")
 map_fibo01
 ```
 
@@ -260,7 +263,7 @@ obs_all01$source <- ifelse(obs_all01$ID == "pseudo", "pseudo", "real")
 map_final01 <- ggplot() + coord_fixed() + geom_polygon(data=world_map, aes(x=long, y=lat, group=group), colour="black", fill = NA) + 
   geom_polygon(data = GIA_zeroDF01, aes(x=long, y=lat, group = group), colour="red", fill = NA) +
   geom_point(data=obs_all01, aes(x=lon, y=lat, colour = source), pch=19) + 
-  ggtitle("Final map of real and pseudo observations -- threhold = 0.1")
+  ggtitle("Final map of real and pseudo observations -- threhold = 0.2")
 
 map_final01
 ```
@@ -272,21 +275,21 @@ map_final01 + coord_map(projection = "orthographic")
 ```
 
 
-### 5 Threshold = 0.2
+### 5 Threshold = 0.3
 
-Now we do the same using threshold value 0.2. First create the admissible polygons.
+Now we do the same using threshold value 0.3. First create the admissible polygons.
 ```{r polygons02}
 ## Generate the polygons
 GIA_ras02 <- raster(GIA_sp, layer = 4) # 4 is the column no of trend02
 zeroPoly02 <- rasterToPolygons(GIA_ras02, fun=function(trend02) {trend02 == TRUE}, dissolve=TRUE ) 
-plot(zeroPoly02, col = "blue", main = "zero regions -- threshold = 0.2")
+plot(zeroPoly02, col = "blue", main = "zero regions -- threshold = 0.3")
 
 ## Checking holes
 sapply(zeroPoly02@polygons[[1]]@Polygons, function(x) slot(x, "hole"))
 
 ## plot in ggplot2
 GIA_zeroDF02 <- tidy(zeroPoly02)
-zeropoly_map02 <- ggplot()+ coord_fixed()+ geom_polygon(data = GIA_zeroDF02, aes(x=long, y=lat, group = group, fill = !hole),colour="black") + ggtitle("Threshold = 0.2")
+zeropoly_map02 <- ggplot()+ coord_fixed()+ geom_polygon(data = GIA_zeroDF02, aes(x=long, y=lat, group = group, fill = !hole),colour="black") + ggtitle("Threshold = 0.3")
 print(zeropoly_map02)
 ```
 
@@ -300,7 +303,7 @@ fibin02 <- ifelse(is.na(fibin02), FALSE, TRUE)
 fibpoint_in02 <- data.frame(fibopoints[fibin02, ])
 
 map_fiboZero02 <- zeropoly_map02 + geom_point(data=fibpoint_in02, aes(x=lon, y=lat), pch=19, 
-                                    col = "blue", alpha=0.5)  + ggtitle("fibpoints in the zero polygons -- threshold = 0.2")
+                                    col = "blue", alpha=0.5)  + ggtitle("fibpoints in the zero polygons -- threshold = 0.3")
 map_fiboZero02
 ```
 
@@ -315,7 +318,7 @@ map_fibo02 <- zeropoly_map02 + geom_point(data=fibpoint_in02gps, aes(x=lon, y=la
                                     col = "blue", alpha=0.5)  +
   geom_point(data=GPS_data, aes(x=lon, y=lat), pch=19, 
                                     col = "red", fill = "red", alpha=0.7) +
-  ggtitle("fibpoints in the zero polygons and away from GPS -- threshold = 0.2")
+  ggtitle("fibpoints in the zero polygons and away from GPS -- threshold = 0.3")
 map_fibo02
 ```
 
@@ -333,7 +336,7 @@ write.table(obs_all02, file = "Z:/WP1-BHM/Experiment1b/GIA_RGL/pseudo02.txt",
 map_final02 <- ggplot() + coord_fixed() + geom_polygon(data=world_map, aes(x=long, y=lat, group=group), colour="black", fill = NA) + 
   geom_polygon(data = GIA_zeroDF02, aes(x=long, y=lat, group = group), colour="red", fill = NA) +
   geom_point(data=obs_all02, aes(x=lon, y=lat, colour = source), pch=19) + 
-  ggtitle("Final map of real and pseudo observations -- threhold = 0.2")
+  ggtitle("Final map of real and pseudo observations -- threhold = 0.3")
 
 map_final02
 
@@ -341,21 +344,21 @@ map_final02 + coord_map(projection = "orthographic")
 ```
 
 
-### 6 Threshold = 0.3
+### 6 Threshold = 0.4
 
-Now we do the same using threshold value 0.3. First create the admissible polygons.
+Now we do the same using threshold value 0.4. First create the admissible polygons.
 ```{r polygons3}
 ## Generate the polygons
 GIA_ras03 <- raster(GIA_sp, layer = 5) # 5 is the column no of trend03
 zeroPoly03 <- rasterToPolygons(GIA_ras03, fun=function(trend03) {trend03 == TRUE}, dissolve=TRUE ) 
-plot(zeroPoly03, col = "blue", main = "zero regions -- threshold = 0.3")
+plot(zeroPoly03, col = "blue", main = "zero regions -- threshold = 0.4")
 
 ## Checking holes
 sapply(zeroPoly03@polygons[[1]]@Polygons, function(x) slot(x, "hole"))
 
 ## plot in ggplot2
 GIA_zeroDF03 <- tidy(zeroPoly03)
-zeropoly_map03 <- ggplot()+ coord_fixed()+ geom_polygon(data = GIA_zeroDF03, aes(x=long, y=lat, group = group, fill = !hole),colour="black") + ggtitle("Threshold = 0.3")
+zeropoly_map03 <- ggplot()+ coord_fixed()+ geom_polygon(data = GIA_zeroDF03, aes(x=long, y=lat, group = group, fill = !hole),colour="black") + ggtitle("Threshold = 0.4")
 print(zeropoly_map03)
 ```
 
@@ -368,7 +371,7 @@ fibin03 <- ifelse(is.na(fibin03), FALSE, TRUE)
 fibpoint_in03 <- data.frame(fibopoints[fibin03, ])
 
 map_fiboZero03 <- zeropoly_map03 + geom_point(data=fibpoint_in03, aes(x=lon, y=lat), pch=19, 
-                                    col = "blue", alpha=0.5)  + ggtitle("fibpoints in the zero polygons -- threshold = 0.3")
+                                    col = "blue", alpha=0.5)  + ggtitle("fibpoints in the zero polygons -- threshold = 0.4")
 map_fiboZero03
 ```
 
@@ -383,7 +386,7 @@ map_fibo03 <- zeropoly_map03 + geom_point(data=fibpoint_in03gps, aes(x=lon, y=la
                                     col = "blue", alpha=0.5)  +
   geom_point(data=GPS_data, aes(x=lon, y=lat), pch=19, 
                                     col = "red", fill = "red", alpha=0.7) +
-  ggtitle("fibpoints in the zero polygons and away from GPS -- threshold = 0.3")
+  ggtitle("fibpoints in the zero polygons and away from GPS -- threshold = 0.4")
 map_fibo03
 ```
 
@@ -401,7 +404,7 @@ write.table(obs_all03, file = "Z:/WP1-BHM/Experiment1b/GIA_RGL/pseudo03.txt",
 map_final03 <- ggplot() + coord_fixed() + geom_polygon(data=world_map, aes(x=long, y=lat, group=group), colour="black", fill = NA) + 
   geom_polygon(data = GIA_zeroDF03, aes(x=long, y=lat, group = group), colour="red", fill = NA) +
   geom_point(data=obs_all03, aes(x=lon, y=lat, colour = source), pch=19) + 
-  ggtitle("Final map of real and pseudo observations -- threshold = 0.3")
+  ggtitle("Final map of real and pseudo observations -- threshold = 0.4")
 
 map_final03
 
@@ -413,7 +416,7 @@ map_final03 + coord_map(projection = "orthographic")
 ```{r writePoly, eval = FALSE}
 library(rgdal)
 outpath <- "Z:/WP1-BHM/Experiment1b/shapefiles"
-writeOGR(zeroPoly01, dsn = outpath, layer = "zero01", driver="ESRI Shapefile")
-writeOGR(zeroPoly02, dsn = outpath, layer = "zero02", driver="ESRI Shapefile")
-writeOGR(zeroPoly03, dsn = outpath, layer = "zero03", driver="ESRI Shapefile")
+writeOGR(zeroPoly01, dsn = outpath, layer = "zero02", driver="ESRI Shapefile")
+writeOGR(zeroPoly02, dsn = outpath, layer = "zero03", driver="ESRI Shapefile")
+writeOGR(zeroPoly03, dsn = outpath, layer = "zero04", driver="ESRI Shapefile")
 ```
