@@ -12,12 +12,12 @@ output: html_document
 In this document, we apply the pseudo polygon method on GIA. The idea is that GIA is a stationary porcess on a subset of $S^2$. The subset is given by removing polygons where the values are certainly zero according to experts from the entire sphere.
 
 ## 1 Generate the polygons and mesh
-First we generate the mesh for a discreate reparesentation of the GIA process. The mesh is restricted on a subset of the sphere defined by the pseudo-polygons. More details about choosing and generating the polygons can be found [here](http://rpubs.com/zs_sz/PseudoObs02). The following chunk generate the pseudo polygons using the ensemble mean of 13 GIA mode solutions for a given threshold value, say $0.2$.
+First we generate the mesh for a discreate reparesentation of the GIA process. The mesh is restricted on a subset of the sphere defined by the pseudo-polygons. More details about choosing and generating the polygons can be found [here](http://rpubs.com/zs_sz/PseudoObs02). The following chunk generate the pseudo polygons using the ensemble mean of 13 GIA mode solutions for a given threshold value, say $0.3$.
 
 ```{r polygons, include=TRUE, cache=TRUE}
 ### Load the GIA forward solutions
 if(Sys.info()["sysname"] == "Windows"){
-  GIA_path <- "Z:/WP2-SolidEarth/GIAforwardModels/textfiles/" 
+  GIA_path <- "Z:/WP2-SolidEarth/BHMinputs/GIA/" 
 }else if(Sys.info()["sysname"] == "Ubuntu"){
 GIA_path <- "~/globalmass/WP2-SolidEarth/GIAforwardModels/textfiles/" #(on ubuntu desktop )
 }else{
@@ -25,42 +25,46 @@ GIA_path <- "/./projects/GlobalMass/WP2-SolidEarth/GIAforwardModels/textfiles/" 
 }
 
 file_names <- system(paste("ls", GIA_path), intern = TRUE)
-## Remove unwanted files: no.13 ice6g-ewh, no.11 W&O-EGOD and readme files
-file_names <- file_names[-c(1, 13, 16)]
+## Remove unwanted files: no.1-4 ice6g old, n0.6 isce6g NA,  no.8 s&s1, no.12 SVvLALT, no.13 W&O-EGOD and no.17 readme files
+file_names <- file_names[-c(1:4,6, 8,  12, 13, 17)]
 GIA_name <- unlist(strsplit(file_names, split = ".txt"))
 GIA_priors <- list()
-for (i in 1:13){
+for (i in 1:8){
 GIA_priors[[i]] <- read.table(paste0(GIA_path, file_names[i]), header = T)
 }
+
 ## create the ensemble data sets
 GIA_ensemble <- GIA_priors[[1]]
 GIA_ensemble$trend <- rowMeans(sapply(GIA_priors, "[[", "trend"))
-GIA_ensemble$std <- sqrt((rowSums(sapply(GIA_priors, function(x) (x$std)^2)))/13)
+GIA_ensemble$std <- sqrt((rowSums(sapply(GIA_priors, function(x) (x$std)^2)))/8)
 
 ## from Spatialpixels to raster to polygons
 library(raster)
 GIA_sp <- GIA_ensemble[, c(2,3,4,5)]
-GIA_sp$inPoly <- abs(GIA_sp$trend) < 0.2
+GIA_sp$inPoly1 <- abs(GIA_sp$trend) < 0.3 & abs(GIA_sp$std) < 0.4
+GIA_sp$inPoly2 <- abs(GIA_sp$trend) < 0.3 
 coordinates(GIA_sp) <- c("x_center", "y_center")
 gridded(GIA_sp) <- TRUE
+spplot(GIA_sp, c("inPoly1", "inPoly2"))
 
 GIA_ras <- raster(GIA_sp, layer = 3) # 3 is the column no of inPoly
 zeroPoly <- rasterToPolygons(GIA_ras, fun=function(inPoly) {inPoly == TRUE}, dissolve=TRUE )
-## Define the global polygons
-plot(zeroPoly, col = "blue", main = "zero regions -- threshold = 0.2")
+plot(zeroPoly, col = "blue", main = "zero regions -- threshold = 0.3")
+
 
 ## Remove polygons that are too small
 zeroPolys <- zeroPoly@polygons[[1]]@Polygons
 polyareas <- sapply(zeroPolys, function(x) x@area)
 polyholes <- sapply(zeroPolys, function(x) x@hole)
 
-zeropolys2 <- zeroPolys[polyareas > 250 ] 
+zeropolys2 <- zeroPolys[polyareas > 200 ] 
 polyareas2 <- sapply(zeropolys2, function(x) x@area)
 polyholes2 <- sapply(zeropolys2, function(x) x@hole)
 
-zeroPoly@polygons[[1]]@Polygons <- zeropolys2
+zeroPoly2 <- zeroPoly
+zeroPoly2@polygons[[1]]@Polygons <- zeropolys2
   
-plot(zeroPoly, col = "blue", main = "zero regions -- threshold = 0.2 (refined) ")
+plot(zeroPoly2, col = "blue",  main = "zero regions -- threshold = 0.3 (refined) ")
 
 ```
 
@@ -106,9 +110,9 @@ mesh <- dt.mesh.addon.posTri(mesh = mesh, globe = TRUE)
 ## checking which mesh triangles are inside the land
 ## First convert xyz to lonlat
 Tlonlat <- Lxyz2ll(list(x = mesh$posTri[,1], y = mesh$posTri[,2], z = mesh$posTri[,3]))
-Tlonlat$lon <- ifelse(Tlonlat$lon >=0, Tlonlat$lon, Tlonlat$lon + 360)
+Tlonlat$lon <- ifelse(Tlonlat$lon >=0, Tlonlat$lon, Tlonlat$lon + 359)
 mesh$Trill <- cbind(lon = Tlonlat$lon, lat =Tlonlat$lat)
-TinPoly <- unlist(over(zeroPoly, SpatialPoints(coords=mesh$Trill), returnList=T))
+TinPoly <- unlist(over(zeroPoly2, SpatialPoints(coords=mesh$Trill), returnList=T))
 TAll <- 1:mesh$t
 ToutPoly <- TAll[-TinPoly]
 Omega = dt.Omega(list(TinPoly, 1:mesh$t), mesh)
@@ -167,7 +171,8 @@ mesh.sub <- function(mesh, Omega, i = 2){
 }
 
 mesh_outPoly <- mesh.sub(mesh, Omega, 2)
-plot(mesh_outPoly, rgl = T, col = "lightblue")
+plot(mesh_outPoly, rgl = T)
+plot(mesh_outPoly)
 ```
 
 Build an SPDE model from this mesh and simulate some data. Plot the data and compare them with the subset of the complete mesh.
@@ -222,7 +227,7 @@ local.plot.field(u2, mesh = mesh_outPoly, main="The true (simulated) spatial fie
 Load the GIA forward solution and project the values to the mesh grid
 ```{r gia_data, include=TRUE, cache= TRUE}
 if(Sys.info()["sysname"] == "Windows"){
-  ice6g <- read.table("Z:/WP2-SolidEarth/GIAforwardModels/textfiles/GIA_Pel-6-VM5.txt", header = T)
+  ice6g <- read.table("Z:/WP2-SolidEarth/BHMinputs/GIA/GIA_Pel-6-VM5.txt", header = T)
 }else if(Sys.info()["sysname"] == "Ubuntu"){
   ice6g <- read.table("~/globalmass/WP2-SolidEarth/GIAforwardModels/textfiles/GIA_Pel-6-VM5.txt", header = T)
 }else{
@@ -247,7 +252,7 @@ Load the processed GPS data and remove those inside the pseudo-polygons. Stitch 
 
 ```{r data, include = TRUE, cache=TRUE}
 if(Sys.info()["sysname"] == "Windows"){
-  GPSV4b <- read.table("Z:/WP2-SolidEarth/GPS/NGL/BHMinputFiles/GPS_v04b.txt", header = T)
+  GPSV4b <- read.table("Z:/WP2-SolidEarth/BHMinputs/GPS/GPS_v04b.txt", header = T)
 }else if(Sys.info()["sysname"] == "Ubuntu"){
   GPSV4b <- read.table("~/globalmass/WP2-SolidEarth/GPS/NGL/BHMinputFiles/GPS_v04b.txt", header = T)
 }else{
@@ -271,23 +276,39 @@ GPS_data$trend0 <- GPS_data$trend - GPS_mu
 
 ```
 
+We also need to add some pseudo observations along the boudaries of the polygons to make smooth transition of the predictions.
+
+```{r data2, include = TRUE, cache=TRUE}
+## get the boundary of the polygons
+boundlines <- as(zeroPoly2, 'SpatialLines') 
+obs_bounds <- spsample(boundlines, n = 200, type = "random") # not points more than specified
+nobsb <-nrow(obs_bounds@coords) 
+obs_df <- data.frame(ID = rep("pseudo", nobsb), lon = obs_bounds@coords[,1], lat = obs_bounds@coords[,2],
+                     trend = rep(0, nobsb), std = rep(0.05, nobsb), trend0 = rep(0, nobsb))
+obs_xyz <- do.call(cbind, Lll2xyz(lat = obs_bounds@coords[,2], lon = obs_bounds@coords[,1]))
+
+GPS_all <- rbind(GPS_data, obs_df)
+GPS_allxyz <- rbind(GPS_loc, obs_xyz)
+```
+
+
 ## 3 Inference on the subset
 
 ```{r inla, include = TRUE, cache = TRUE}
 ## Link the process to observations and predictions
 Mesh_GIA <- mesh_outPoly
-A_data <- inla.spde.make.A(mesh = Mesh_GIA, loc = GPS_loc)
+A_data <- inla.spde.make.A(mesh = Mesh_GIA, loc = GPS_allxyz)
 
 ## try predict in zero polygon and see what inla does
 zero_lat <- c(-40, 10, 25)
 zero_lon <- c(250, 150, 0)
 zero_loc <- do.call(cbind, Lll2xyz(lat = zero_lat, lon = zero_lon))
 
-A_pred <- inla.spde.make.A(mesh = Mesh_GIA, loc = rbind(GPS_loc, Mesh_GIA$loc, zero_loc))
+A_pred <- inla.spde.make.A(mesh = Mesh_GIA, loc = rbind(GPS_allxyz, Mesh_GIA$loc, zero_loc))
 
 A_zero <- inla.spde.make.A(mesh = Mesh_GIA, loc = zero_loc)
 ## Create the estimation and prediction stack
-st.est <- inla.stack(data = list(y=GPS_data$trend0), A = list(A_data),
+st.est <- inla.stack(data = list(y=GPS_all$trend0), A = list(A_data),
                      effects = list(GIA = 1:GIA_spde$n.spde), tag = "est")
 st.pred <- inla.stack(data = list(y=NA), A = list(A_pred),
                       effects = list(GIA=1:GIA_spde$n.spde), tag = "pred")
@@ -296,7 +317,7 @@ stGIA <- inla.stack(st.est, st.pred)
 ## Fix the GPS errors
 hyper <- list(prec = list(fixed = TRUE, initial = 0))
 formula = y ~ -1 +  f(GIA, model = GIA_spde)
-prec_scale <- c(1/GPS_data$std^2, rep(1, nrow(A_pred)))
+prec_scale <- c(1/GPS_all$std^2, rep(1, nrow(A_pred)))
 
 ## Run INLA
 res_inla <- inla(formula, data = inla.stack.data(stGIA, spde = GIA_spde), family = "gaussian",
@@ -312,13 +333,13 @@ INLA_pred <- res_inla$summary.linear.predictor
 
 ## Extract and project predictions
 pred_idx <- inla.stack.index(stGIA, tag = "pred")$data
-GPS_idx <- pred_idx[1:nrow(GPS_data)]
-GIA_idx <- pred_idx[(nrow(GPS_data)+1):(length(pred_idx) - 3)]
+GPS_idx <- pred_idx[1:nrow(GPS_all)]
+GIA_idx <- pred_idx[(nrow(GPS_all)+1):(length(pred_idx) - 3)]
 zero_idx <- pred_idx[(length(pred_idx) - 2):length(pred_idx)]
 
 ## GPS 
 GPS_u <- INLA_pred$sd[GPS_idx]
-GPS_pred <- data.frame(lon = GPS_data$lon, lat = GPS_data$lat, u = GPS_u)
+GPS_pred <- data.frame(lon = GPS_all$lon, lat = GPS_all$lat, u = GPS_u)
 
 ## GIA
 GIA_diff <- INLA_pred$mean[GIA_idx] 
