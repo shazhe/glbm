@@ -86,7 +86,7 @@ dt.Omega <- function(list_of_subdomains, mesh){
 }
 
 
-dt.polygon.omega <- function (mesh, Omega, globe = FALSE, round = 5) {
+dt.polygon.omega <- function (mesh, Omega, globe = FALSE, rd = 5) {
   # - constructs SpatialPolygons for the different subdomains (areas)
   stopifnot(class(mesh) == 'inla.mesh')
   # - requires an inla mesh to work
@@ -113,7 +113,7 @@ dt.polygon.omega <- function (mesh, Omega, globe = FALSE, round = 5) {
     holes <- list()
     poly_change <- function(x, round){
       x@hole <- !x@hole
-      x@coords <- round(x@coords, digits = round)
+      x@coords <- round(x@coords, digits = rd)
       return(x)
     }
     for (j in 1:(length(Omega)-1)) {
