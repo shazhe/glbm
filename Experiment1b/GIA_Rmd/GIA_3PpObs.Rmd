@@ -218,10 +218,6 @@ hyper <- list(prec = list(fixed = TRUE, initial = 0))
 formula = y ~ -1 +  f(GIA, model = GIA_spde)
 prec_scale <- c(1/GPS_data$std^2, rep(1/0.05^2, nb), 1/0.01^2, rep(1, nrow(A_pred)))
 
-## Run INLA
-res_inla <- inla(formula, data = inla.stack.data(stGIA, spde = GIA_spde), family = "gaussian",
-                 scale =prec_scale, control.family = list(hyper = hyper),
-                 control.predictor=list(A=inla.stack.A(stGIA), compute =TRUE))
 ```
 
 Then we run the INLA model. Note that this will take more than 10min and require memory larger than 32GB. We ran this on a server with 56 cores and 256GB memory.
@@ -250,8 +246,8 @@ INLA_pred <- res_inla$summary.linear.predictor
 
 ## Extract and project predictions
 pred_idx <- inla.stack.index(stGIA, tag = "pred")$data
-GPS_idx <- pred_idx[1:(nrow(GPS_data)+1)]
-GIA_idx <- pred_idx[-c(1:(nrow(GPS_all)+1))]
+GPS_idx <- pred_idx[1:nrow(GPS_all_loc)]
+GIA_idx <- pred_idx[-c(1:nrow(GPS_all_loc))]
 
 ## GPS 
 GPS_u <- INLA_pred$sd[GPS_idx] 
