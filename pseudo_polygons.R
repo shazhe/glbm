@@ -1,21 +1,7 @@
----
-title: "Define Pseudo Observation Polygons -- Version 02"
-author: "Z Sha"
-date: "21 September 2017"
-output: html_document
----
-
-```{r setup, include=FALSE}
+## ----setup, include=FALSE------------------------------------------------
 knitr::opts_chunk$set(echo = TRUE)
-```
 
-In this document, we use the 14 GIA forward model solutions to find regions where the observations are certain and close to zero. The 13 GIA forward model solutions are given at 1 degree resolution with the mean trend and estimated errors.
-
-In the following we explore the data sets individually as well as in an ensemble approach.
-
-# Load useful packages and the data
-
-```{r load, message = FALSE}
+## ----load, message = FALSE-----------------------------------------------
 if(Sys.info()["sysname"] == "Windows"){
   GIA_path <- "Z:/WP2-SolidEarth/BHMinputs/GIA/" 
   file_names <- system(paste("ls", GIA_path), intern = TRUE)
@@ -33,6 +19,7 @@ file_names <- system(paste("ls", GIA_path), intern = TRUE)
 file_names <- file_names[-c(1:6,10,  13, 15, 18)]
 }
 
+
 GIA_name <- unlist(strsplit(file_names, split = ".txt"))
 GIA_priors <- list()
 for (i in 1:8){
@@ -43,12 +30,8 @@ GIA_priors[[i]] <- read.table(paste0(GIA_path, file_names[i]), header = T)
 GIA_ensemble <- GIA_priors[[1]]
 GIA_ensemble$trend <- rowMeans(sapply(GIA_priors, "[[", "trend"))
 GIA_ensemble$std <- sqrt((rowSums(sapply(GIA_priors, function(x) (x$std)^2)))/8)
-```
 
-# Criteria for selecting zero-value regions
-
-To select the reasonable regions where the GIA are zero with high certainty, we first examine the distributions of the GIA values from the 13 forward models and their ensemble mean.
-```{r eda, message = FALSE}
+## ----eda, message = FALSE------------------------------------------------
 ## All 13 datasets together
 alltrend <- sapply(GIA_priors, "[[", "trend")
 range(alltrend)
@@ -57,10 +40,8 @@ boxplot.stats(alltrend)$conf
 ## the esemble mean
 range(GIA_ensemble$trend)
 boxplot.stats(GIA_ensemble$trend)$conf
-```
 
-Plot the original 13 dataset and the ensemble means.
-```{r eda_plot}
+## ----eda_plot------------------------------------------------------------
 ## combine the 13 lists to one dataframe
 alltrend <- data.frame(alltrend)
 names(alltrend) <- c("Pel6VM5", "Pur6VM5", "SnS3", "SKMOR", "SVv3REF", "WnW4", "WnW5", "vdW5")    
@@ -76,11 +57,8 @@ gridded(raw_trend) <- TRUE
 brks <- seq(-8.5, 25.5, 2)
 colpal <- colorRamps::matlab.like(length(brks) - 1)
 spplot(raw_trend,  colorkey = list(at = brks), col.regions=colpal)
-```
 
-
-Rescale the colorbar to show more details for values within [-2, 2].
-```{r eda_plot2}
+## ----eda_plot2-----------------------------------------------------------
 plot_rescale <- function(breaks, abs = FALSE, title = NULL){
   n.brks <- length(breaks)
   if(abs){
@@ -103,16 +81,12 @@ plot_rescale <- function(breaks, abs = FALSE, title = NULL){
 breaks <- c(-8.5, -2, -1, -0.5, -0.1, 0, 0.1, 0.5, 1, 2, 25.5)
 plot_rescale(breaks)
 
-```
 
-Remove signs and rescale the colorbar down to details within 0.5 in absolute value.
-```{r eda_plot3}
+## ----eda_plot3-----------------------------------------------------------
 breaks <- c( 0, 0.1, 0.2, 0.5, 1, 25.5)
 plot_rescale(breaks, abs = TRUE)
-```
 
-Down to the value of 0.5, most of the plots are very similar to each other except for trend3. They include most of the zero value regions. For a final comparison, we plot the zero value regions with threshold 0.1, 0.2, 0.3 and 0.5.
-```{r eda_plot4}
+## ----eda_plot4-----------------------------------------------------------
 
 ## 0.1
 breaks <- c(0, 0.1, 25.5)
@@ -129,15 +103,8 @@ plot_rescale(breaks, abs = TRUE, title = "threshold = 0.3")
 ## 0.4
 breaks <- c(0, 0.4, 25.5)
 plot_rescale(breaks, abs = TRUE, title = "threshold = 0.4")
-```
 
-The map using ensemble mean and thresholds at 0.3 looks reasonable and we use it in the following processing.
-
-
-# Create the zero value polygons.
-
-Now we convert the region defined by the above criteria from pixels to polygons.
-```{r polygons1}
+## ----polygons1-----------------------------------------------------------
 ## from Spatialpixels to raster to polygons
 library(raster)
 GIA_sp <- GIA_ensemble[, c(2,3,4,5)]
@@ -145,16 +112,12 @@ GIA_sp$inPoly1 <- abs(GIA_sp$trend) < 0.3
 coordinates(GIA_sp) <- c("x_center", "y_center")
 gridded(GIA_sp) <- TRUE
 spplot(GIA_sp, "inPoly1")
-```
 
-The polygon above shows some undesirable features, especially near the coast lines. We remove these by considering the error estimates.
-```{r polygons2}
+## ----polygons2-----------------------------------------------------------
 GIA_sp$inPoly <- abs(GIA_sp$trend) < 0.3 & abs(GIA_sp$std) < 0.4
 spplot(GIA_sp, "inPoly")
-```
 
-Most undesirable regions are removed. Now we transform the raster object into polygons and remove those tiny regions and holes incside the large polygons.
-```{r polygons3}
+## ----polygons3-----------------------------------------------------------
 GIA_ras <- raster(GIA_sp, layer = 4) # 4 is the column no of inPoly
 zeroPoly <- rasterToPolygons(GIA_ras, fun=function(inPoly) {inPoly == TRUE}, dissolve=TRUE )
 plot(zeroPoly, col = "blue", main = "zero regions -- threshold = 0.3")
@@ -168,10 +131,8 @@ zeropolys2 <- zeroPolys[polyareas > 200 ]
 zeroPolygon <- zeroPoly
 zeroPolygon@polygons[[1]]@Polygons <- zeropolys2
 plot(zeroPolygon, col = "blue", main = "zero regions -- threshold = 0.3 (refined)")
-```
 
-We can convert the spatialPolygonDataFrame object to a data frame that can be plotted by ggplot2.
-```{r ggpolygons}
+## ----ggpolygons----------------------------------------------------------
 library(broom)
 library(ggplot2)
 zeroPolygon@polygons[[1]]@plotOrder <- 1:6
@@ -179,13 +140,9 @@ GIA_zeroDF <- tidy(zeroPolygon)
 zeropoly_map <- ggplot()+ coord_fixed()+ geom_polygon(data = GIA_zeroDF, aes(x=long, y=lat, group = group, fill = !hole),colour="black") + ggtitle("Threshold = 0.1")
 
 print(zeropoly_map)
-```
 
-
-
-# Output the polygons
-```{r writePoly, eval = FALSE}
+## ----writePoly, eval = FALSE---------------------------------------------
 library(rgdal)
 outpath <- "Z:/WP1-BHM/Experiment1b/shapefiles"
 writeOGR(zeroPoly, dsn = outpath, layer = "zero03", driver="ESRI Shapefile")
-```
+

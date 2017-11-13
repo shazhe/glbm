@@ -40,8 +40,30 @@ source("functions.R")
 ```
 
 ```{r load_data0, include=FALSE, eval = TRUE, cache = TRUE}
-load_only<- TRUE
-source("loadprep.R")
+#### 1 Load GIA prior
+if(Sys.info()["sysname"] == "Windows"){
+  ice6g <- read.table("Z:/WP2-SolidEarth/BHMinputs/GIA/GIA_Pel-6-VM5.txt", header = T)
+}else if(Sys.info()["sysname"] == "Ubuntu"){
+  ice6g <- read.table("~/globalmass/WP2-SolidEarth/GIAforwardModels/textfiles/GIA_Pel-6-VM5.txt", header = T)
+}else{
+  ice6g <- read.table("/./projects/GlobalMass/WP2-SolidEarth/BHMinputs/GIA/GIA_Pel-6-VM5.txt", header = T)
+}
+
+polycoords <- ice6g[,c(6:13, 6,7)] 
+plist <- lapply(ice6g$ID, 
+                function(x) Polygons(list(Polygon(cbind(lon = as.numeric(polycoords[x, c(1,3,5,7,9)]), 
+                                                        lat = as.numeric(polycoords[x, c(2,4,6,8,10)])))), ID = x))
+Plist <- SpatialPolygons(plist, proj4string = CRS("+proj=longlat"))
+
+
+#### 2 Load GPS data
+if(Sys.info()["sysname"] == "Windows"){
+  GPSV4b <- read.table("Z:/WP2-SolidEarth/BHMinputs/GPS/GPS_v04b.txt", header = T)
+}else if(Sys.info()["sysname"] == "Ubuntu"){
+  GPSV4b <- read.table("~/globalmass/WP2-SolidEarth/GPS/NGL/BHMinputFiles/GPS_v04b.txt", header = T)
+}else{
+  GPSV4b <- read.table("/./projects/GlobalMass/WP2-SolidEarth/BHMinputs/GPS/GPS_v04b.txt", header = T)
+}
 ```
 
 ```{r gia_data, include=TRUE, eval = FALSE}
@@ -181,7 +203,6 @@ GIA_pred <- data.frame(lon = GIA_grid[,1], lat = GIA_grid[,2],
                        mean = as.vector(inla.mesh.project(proj, as.vector(GIA_m))),
                        u = as.vector(inla.mesh.project(proj, as.vector(GIA_u))))
 
-# inla predicts all zero
 ress <- list(res_inla = res_inla, spde = GIA_spde, st = stGIA, 
             mesh = Mesh_GIA, GPS_pred = GPS_pred, GIA_pred = GIA_pred)
 ```

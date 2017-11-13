@@ -225,3 +225,59 @@ map_zoom <-function(data_field, data_obs, zoom_coords, colpal, limits=NULL){
 }
 
 
+## 7 get the subset of the mesh for buiding the Q
+mesh.sub <- function(mesh, Omega, i = 2){
+  mesh_sub <- mesh
+  id_tri <- Omega[[i]] # triangel id in the subset
+  id_vet <- unique(as.vector(mesh$graph$tv[Omega[[i]], ])) # vertex id in the subset
+  
+  ## Now update the index for all
+  id_all_v <- mesh$idx$loc
+  id_all_v[-id_vet] <- NA
+  id_all_v[which(!is.na(id_all_v))] <- 1:length(id_vet)
+  
+  id_all_t <- 1:mesh$t
+  id_all_t[-id_tri] <- NA
+  id_all_t[which(!is.na(id_all_t))] <- 1:length(id_tri)
+  ## Modify the mesh to be the subset
+  
+  
+  ## get the subset of the graph
+  sub_tv <- mesh$graph$tv[id_tri, ]
+  sub_vt <- mesh$graph$vt[id_vet,]
+  sub_tt <- mesh$graph$tt[id_tri,]
+  sub_tti <- mesh$graph$tti[id_tri,]
+  sub_vv <- mesh$graph$vv[id_vet,id_vet]
+  
+  ## Change the triangle indices of the subset
+  sub_tv2 <- cbind(id_all_v[sub_tv[,1]], id_all_v[sub_tv[,2]], id_all_v[sub_tv[,3]])
+  sub_vt2 <- id_all_t[sub_vt]
+  sub_tt2 <- cbind(id_all_t[sub_tt[,1]], id_all_t[sub_tt[,2]], id_all_t[sub_tt[,3]])
+  
+  ## Now assemble 
+  mesh_sub$t <- length(id_tri) 
+  mesh_sub$n <- length(id_vet)
+  mesh_sub$loc <- mesh_sub$loc[sort(id_vet), ]
+  mesh_sub$graph$tv <- sub_tv2
+  mesh_sub$graph$vt <- sub_vt2
+  mesh_sub$graph$tt <- sub_tt2
+  mesh_sub$graph$tti <- sub_tti
+  mesh_sub$graph$vv <- sub_vv
+  
+  mesh_sub$idx$loc <- 1:length(id_vet)
+  mesh_sub$posTri <- mesh_sub$posTri[Omega[[i]],]
+  mesh_sub$Trill <- mesh_sub$Trill[Omega[[i]],]
+  return(mesh_sub)
+}
+
+
+## additional plot function
+
+local.plot.field = function(field, mesh, ...){
+  proj = inla.mesh.projector(mesh,  projection = "longlat", dims = c(360,180), xlim = c(0, 360), ylim = c(-90, 90))
+  field.proj = inla.mesh.project(proj, field)
+  image.plot(list(x = proj$x, y=proj$y, z = field.proj),
+             ...)
+}
+
+
