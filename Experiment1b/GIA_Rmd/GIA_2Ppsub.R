@@ -111,7 +111,7 @@ GIA_pobs <- ice6g$trend[pobs_idx]
 
 nobsb <-nrow(obs_bounds@coords) 
 obs_df <- data.frame(ID = rep("pseudo", nobsb), lon = obs_bounds@coords[,1], lat = obs_bounds@coords[,2],
-                     trend = rep(0, nobsb), std = rep(0.05, nobsb), trend0 = rep(-GIA_pobs, nobsb))
+                     trend = rep(0, nobsb), std = rep(0.05, nobsb), trend0 = -GIA_pobs)
 obs_xyz <- do.call(cbind, Lll2xyz(lat = obs_bounds@coords[,2], lon = obs_bounds@coords[,1]))
 
 GPS_all <- rbind(GPS_data, obs_df)

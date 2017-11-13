@@ -166,17 +166,22 @@ GPS_mu <- ice6g$trend[GPS_idx]
 GPS_data$trend0 <- GPS_data$trend - GPS_mu
 ```
 
-We also add some pseudo observations along the boudaries of the polygons to make smooth transition of the predictions and very sparse observations incide the polygons.  These values are set to be the ice6 values at those locations with opposite signs.
+We also add some pseudo observations along the boudaries of the polygons to make smooth transition of the predictions and the mesh nodes incide the polygons. These values are set to be the ice6 values at those locations with opposite signs.
 ```{r data2, include = TRUE, cache=TRUE}
 ## get the boundary of the polygons
 boundlines <- as(zeroPoly, 'SpatialLines') 
 obs_bounds <- spsample(boundlines, n = 50, type = "regular") # note points more than specified
-## get some points inside the polygons
-obs_inpoly <- spsample(zeroPoly, n = 1, type = "regular") # note points more than specified
+## The mesh nodes incide the polygons
+obs_inpoly <- 
+obs_pseudo <- rbind(obs_bounds, obs_inpoly)
+proj4string(obs_bounds) <- proj4string(Plist)
+## Find the ice6g values
+pobs_idx <- over(obs_pseudo, Plist)
+GIA_pobs <- ice6g$trend[pobs_idx]
 
-obs_pseudo <- obs_bounds
 
-nobsb <-nrow(fibo_inPoly)
+
+nobsb <-nrow(obs_pseudo)
 obs_df1 <- data.frame(ID = rep("pseudo", nobsb), lon = fibo_inPoly[,1], lat = fibo_inPoly[,2],
                      trend = rep(0, nobsb), std = rep(0.05,nobsb), trend0 = rep(0, nobsb))
 obs_xyz1 <- do.call(cbind, Lll2xyz(lat = fibo_inPoly[,2], lon = fibo_inPoly[,1]))
