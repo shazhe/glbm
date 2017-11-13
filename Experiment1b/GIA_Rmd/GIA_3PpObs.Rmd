@@ -14,96 +14,52 @@ output:
 In this document, we apply the pseudo polygon within mixture Gaussian model on GIA. The idea is that GIA is a stationary porcess on a subset of $S^2$. The subset is given by removing polygons where the values are certainly zero according to experts from the entire sphere. In previous experiments, we have done a global stationary model, pseudo polygons with point observations at the polygon boundaries. In this document, we use a single pseudo polygon observation to update the process. 
 
 
+
 ## 1 Generate the polygons and mesh
-First we generate the mesh for a discreate reparesentation of the GIA process. The mesh is restricted on a subset of the sphere defined by the pseudo-polygons. More details about choosing and generating the polygons can be found [here](http://rpubs.com/zs_sz/PseudoObs02). The following chunk generate the pseudo polygons using the ensemble mean of 13 GIA mode solutions for a given threshold value, say $0.3$.
 
-```{r polygons, include=TRUE, cache=TRUE}
-### Load the GIA forward solutions
+Same as previous we load the generated psudo polygons and generate dense mesh outside the polygon and sparse mesh inside.
+```{r ini_poly, message = FALSE, warning=FALSE}
+## load library and functions
+library(sp); library(INLA); library(GEOmap); library(rgdal)
+library(ggplot2); library(grid); library(gridExtra)
+if(Sys.info()['sysname'] == "Linux"){INLA:::inla.dynload.workaround()}
+source("functions.R")
+source("functions-barriers-dt-models-march2017.R")
+
+## Load the pseudo polygon
+#### 1 Load GIA prior
 if(Sys.info()["sysname"] == "Windows"){
-  GIA_path <- "Z:/WP2-SolidEarth/BHMinputs/GIA/" 
+  zeroPolygon <- readOGR(dsn = "Z:/WP1-BHM/Experiment1b/shapefiles", layer = "zero03")
 }else if(Sys.info()["sysname"] == "Ubuntu"){
-  GIA_path <- "~/globalmass/WP2-SolidEarth/GIAforwardModels/textfiles/" #(on ubuntu desktop )
+  zeroPolygon <- readOGR(dsn = "Z:/WP1-BHM/Experiment1b/shapefiles", layer = "zero03")
 }else{
-  GIA_path <- "/./projects/GlobalMass/WP2-SolidEarth/GIAforwardModels/textfiles/" #(on server)
+  zeroPolygon <- readOGR(dsn = "/./projects/GlobalMass/WP1-BHM/Experiment1b/shapefiles", layer = "zero03")
 }
-
-file_names <- system(paste("ls", GIA_path), intern = TRUE)
-## Remove unwanted files: no.1-4 ice6g old, n0.6 isce6g NA,  no.8 s&s1, no.12 SVvLALT, no.13 W&O-EGOD and no.17 readme files
-file_names <- file_names[-c(1:3,5,6,7, 9,  13, 14, 18)]
-GIA_name <- unlist(strsplit(file_names, split = ".txt"))
-GIA_priors <- list()
-for (i in 1:8){
-  GIA_priors[[i]] <- read.table(paste0(GIA_path, file_names[i]), header = T)
-}
-
-## create the ensemble data sets
-GIA_ensemble <- GIA_priors[[1]]
-GIA_ensemble$trend <- rowMeans(sapply(GIA_priors, "[[", "trend"))
-GIA_ensemble$std <- sqrt((rowSums(sapply(GIA_priors, function(x) (x$std)^2)))/8)
-
-## from Spatialpixels to raster to polygons
-library(raster)
-GIA_sp <- GIA_ensemble[, c(2,3,4,5)]
-GIA_sp$inPoly1 <- abs(GIA_sp$trend) < 0.3 & abs(GIA_sp$std) < 0.4
-GIA_sp$inPoly2 <- abs(GIA_sp$trend) < 0.3 
-coordinates(GIA_sp) <- c("x_center", "y_center")
-gridded(GIA_sp) <- TRUE
-spplot(GIA_sp, c("inPoly1", "inPoly2"))
-
-GIA_ras <- raster(GIA_sp, layer = 3) # 3 is the column no of inPoly
-zeroPoly <- rasterToPolygons(GIA_ras, fun=function(inPoly) {inPoly == TRUE}, dissolve=TRUE )
-plot(zeroPoly, col = "blue", main = "zero regions -- threshold = 0.3")
-
-
 ## Remove polygons that are too small
-zeroPolys <- zeroPoly@polygons[[1]]@Polygons
+zeroPolys <- zeroPolygon@polygons[[1]]@Polygons
 polyareas <- sapply(zeroPolys, function(x) x@area)
 polyholes <- sapply(zeroPolys, function(x) x@hole)
 
 zeropolys2 <- zeroPolys[polyareas > 200 ] 
-polyareas2 <- sapply(zeropolys2, function(x) x@area)
-polyholes2 <- sapply(zeropolys2, function(x) x@hole)
-
-zeroPoly2 <- zeroPoly
-zeroPoly2@polygons[[1]]@Polygons <- zeropolys2
-
-plot(zeroPoly2, col = "blue",  main = "zero regions -- threshold = 0.3 (refined) ")
-
+zeroPoly <- zeroPolygon
+zeroPoly@polygons[[1]]@Polygons <- zeropolys2
+plot(zeroPoly, col = "blue", main = "zero regions -- threshold = 0.3 (refined)")
 ```
 
-Next we generate the mesh and separate the triangles in/out-side of the polygons. We spread fibonacci points on the sphere as initial locations of the triangle vertices. The number of the points controls the resolution. The goal is to produce a map with approximately one degree resolution, hence we also need a similar resolution for the triangulation. Not that the triangle edge be no larger than the process correlation length. A one degree grid is about $110 \times 110 km$ which corresponds to a correlation length about $110/6371 = 0.017$. The number of triangles should be $f = 180 * 360 = 64800$ corresponding to number of vertices of $v \approx = (f+2)*2/5= 25921$.
-
+Next we generate the mesh and separate the triangles in/out-side of the polygons. 
 ```{r mesh, include=TRUE, cache=TRUE}
-#### Generate Fibonacci points on the sphere
-fiboSphere2 <- function(N = 1000L, L0 = FALSE) {
-  ## Reference (note that points generated from 2D are slightly different from 3D)
-  ## Measurement of Areas on a Sphere Using Fibonacci and Latitude–Longitude Lattices (2010)
-  phi <- (sqrt(5) + 1) / 2 - 1 # golden ratio
-  ga <- phi * 2 * pi           # golden angle
-  
-  i <- seq(-N, N)
-  P <- 2 * N + 1
-  lat <- asin(2*i / P) * 180 / pi
-  if(L0){
-    lon <- ((2 * pi * i / phi) %% pi) * 360 / pi
-  }else{
-    lon <- ((2 * pi * i / phi) %% pi) * 360 / pi - 180
-  }
-  cbind(lon = lon, lat = lat)
-}
-
 #### Dense points over in the subset
-fibo_points <- fiboSphere2(N = 12960, L0 = TRUE)
-pinPoly <- unlist(over(zeroPoly2, SpatialPoints(coords = fibo_points), returnList=T))
+fibo_points <- fiboSphere(N = 12960, L0 = TRUE)
+pinPoly <- unlist(over(zeroPoly, SpatialPoints(coords = fibo_points), returnList=T))
 fibo_inSub<- fibo_points[-pinPoly,]
-plot(zeroPoly2)
+plot(zeroPoly)
 points(fibo_inSub, pch = ".")
 
 #### Sparse points in the polygons
-fibo_points <- fiboSphere2(N = 500, L0=TRUE)
-pinPoly <- unlist(over(zeroPoly2, SpatialPoints(coords = fibo_points), returnList=T))
+fibo_points <- fiboSphere(N = 500, L0=TRUE)
+pinPoly <- unlist(over(zeroPoly, SpatialPoints(coords = fibo_points), returnList=T))
 fibo_inPoly<- fibo_points[pinPoly,]
-plot(zeroPoly2)
+plot(zeroPoly)
 points(fibo_inPoly, pch = ".")
 points(fibo_inSub, pch = ".")
 
@@ -116,23 +72,15 @@ summary(mesh) # give the desired number of vertices and triangles.
 ```
 
 Now separate the triangles by the pseudo-polygons.
-
 ```{r mesh2, include = TRUE, cache=TRUE}
-source("C:/ZSwork/glbm/Experiment1b/mixture_model/BarrierModel/functions-barriers-dt-models-march2017.R")
 mesh <- dt.mesh.addon.posTri(mesh = mesh, globe = TRUE)
-# - Add on mesh$posTri
-# - - contains the positions of the triangles
-
-## checking which mesh triangles are inside the land
-## First convert xyz to lonlat
 Tlonlat <- Lxyz2ll(list(x = mesh$posTri[,1], y = mesh$posTri[,2], z = mesh$posTri[,3]))
 Tlonlat$lon <- ifelse(Tlonlat$lon >=0, Tlonlat$lon, Tlonlat$lon + 359)
 mesh$Trill <- cbind(lon = Tlonlat$lon, lat =Tlonlat$lat)
-TinPoly <- unlist(over(zeroPoly2, SpatialPoints(coords=mesh$Trill), returnList=T))
+TinPoly <- unlist(over(zeroPoly, SpatialPoints(coords=mesh$Trill), returnList=T))
 TAll <- 1:mesh$t
 ToutPoly <- TAll[-TinPoly]
 Omega = dt.Omega(list(TinPoly, 1:mesh$t), mesh)
-#Omega.SP = dt.polygon.omega(mesh, Omega, globe = TRUE)
 
 ## Plot the result in 3d
 plot(mesh, t.sub = Omega[[2]], col = "lightblue", rgl = TRUE )
@@ -148,12 +96,6 @@ v_r <- (1000/6371)^2
 mu_s <- 20
 v_s <- 40^2
 
-## Transform the parameters for the SPDE_GMRF approximation
-Tlognorm <- function(mu, v){
-  logv <- log(1 + v/mu^2)
-  logmu <- log(mu^2) - 0.5*log(mu^2 + v)
-  return(c(logmu, logv))
-}
 trho <- Tlognorm(mu_r, v_r)
 tsigma <- Tlognorm(mu_s, v_s)
 
@@ -167,66 +109,49 @@ ltau0 <- 0.5*log(1/(4*pi)) - lsigma0 - lkappa0
 
 GIA_spde <- inla.spde2.matern(mesh, B.tau = matrix(c(ltau0, -1, 1),1,3), B.kappa = matrix(c(lkappa0, 0, -1), 1,3),
                               theta.prior.mean = c(0,0), theta.prior.prec = c(sqrt(1/theta1_s), sqrt(1/theta2_s)))
-Q <- inla.spde.precision(spde = GIA_spde, theta = c(0,0))
-u1 <- inla.qsample(n=1, Q=Q, seed = 23)[,1]
-sd <- diag(solve(Q))
-
-local.plot.field = function(field, mesh, ...){
-  proj = inla.mesh.projector(mesh,  projection = "longlat", dims = c(360,180), xlim = c(0, 360), ylim = c(-90, 90))
-  field.proj = inla.mesh.project(proj, field)
-  image.plot(list(x = proj$x, y=proj$y, z = field.proj),
-             ...)
-}
-
-local.plot.field(u1, mesh = mesh, main="The true (simulated) spatial field", asp = 1, zlim = c(-30, 30))  
-local.plot.field(sd, mesh = mesh , main="The true (simulated) spatial field", asp = 1) 
 ```
 
-## 2 Data preparation
+# Load Data
 
-## 2.1 GIA forward model solution
-Load the GIA forward solution and project the values to the mesh grid
-```{r gia_data, include=TRUE, cache= TRUE}
+Load the GIA prior mean and GPS data and do the same prepreation as previous.
+```{r load_data0, include=FALSE, eval = TRUE, cache = TRUE}
+#### 1 Load GIA prior
 if(Sys.info()["sysname"] == "Windows"){
   ice6g <- read.table("Z:/WP2-SolidEarth/BHMinputs/GIA/GIA_Pel-6-VM5.txt", header = T)
 }else if(Sys.info()["sysname"] == "Ubuntu"){
   ice6g <- read.table("~/globalmass/WP2-SolidEarth/GIAforwardModels/textfiles/GIA_Pel-6-VM5.txt", header = T)
 }else{
-  ice6g <- read.table("/./projects/GlobalMass/WP2-SolidEarth/GIAforwardModels/textfiles/GIA_Pel-6-VM5.txt", header = T)
+  ice6g <- read.table("/./projects/GlobalMass/WP2-SolidEarth/BHMinputs/GIA/GIA_Pel-6-VM5.txt", header = T)
 }
 
-## Set the prior at the pseudo polygon region to be zero
-p0 <- unlist(over(zeroPoly2, SpatialPoints(coords = cbind(lon = ice6g$x_center, lat = ice6g$y_center)), returnList = TRUE))
-ice6g$trend2 <- ice6g$trend
-ice6g$trend2[p0 ] <- 0
-
 polycoords <- ice6g[,c(6:13, 6,7)] 
-plist <- lapply(ice6g$ID, function(x) Polygons(list(Polygon(cbind(lon = as.numeric(polycoords[x, c(1,3,5,7,9)]), 
-                                                                  lat = as.numeric(polycoords[x, c(2,4,6,8,10)])))), ID = x))
+plist <- lapply(ice6g$ID, 
+                function(x) Polygons(list(Polygon(cbind(lon = as.numeric(polycoords[x, c(1,3,5,7,9)]), 
+                                                        lat = as.numeric(polycoords[x, c(2,4,6,8,10)])))), ID = x))
 Plist <- SpatialPolygons(plist, proj4string = CRS("+proj=longlat"))
-## Convert the Cartesian to longlat with long in [0, 360)
-MlocLL <- Lxyz2ll(list(x=mesh$loc[,1], y = mesh$loc[,2], z = mesh$loc[,3]))
-MlocLL$lon <- ifelse(MlocLL$lon >= -0.5, MlocLL$lon, MlocLL$lon + 360)
-M_sp <- SpatialPoints(data.frame(lon = MlocLL$lon, lat = MlocLL$lat), proj4string = CRS("+proj=longlat")) 
-Midx <- over(M_sp, Plist)
-GIA_prior <- ice6g$trend[Midx]
 
-```
+meshLL <- Lxyz2ll(list(x=mesh$loc[,1], y = mesh$loc[,2], z = mesh$loc[,3]))
+meshLL$lon <- ifelse(meshLL$lon >= -0.5, meshLL$lon,meshLL$lon + 360)
+mesh_sp <- SpatialPoints(data.frame(lon = meshLL$lon, lat = meshLL$lat), proj4string = CRS("+proj=longlat")) 
+mesh_idx <- over(mesh_sp, Plist)
+GIA_prior <- ice6g$trend[mesh_idx]
 
-## 2.2 GPS data
-Load the processed GPS data and remove those inside the pseudo-polygons. Stitch the polygon boundaries with pseudo observations.
-
-```{r data, include = TRUE, cache=TRUE}
+#### 2 Load GPS data
 if(Sys.info()["sysname"] == "Windows"){
   GPSV4b <- read.table("Z:/WP2-SolidEarth/BHMinputs/GPS/GPS_v04b.txt", header = T)
 }else if(Sys.info()["sysname"] == "Ubuntu"){
   GPSV4b <- read.table("~/globalmass/WP2-SolidEarth/GPS/NGL/BHMinputFiles/GPS_v04b.txt", header = T)
 }else{
-  GPSV4b <- read.table("/./projects/GlobalMass/WP2-SolidEarth/GPS/NGL/BHMinputFiles/GPS_v04b.txt", header = T)
+  GPSV4b <- read.table("/./projects/GlobalMass/WP2-SolidEarth/BHMinputs/GPS/GPS_v04b.txt", header = T)
 }
+```
 
 
-GPS_inPoly <- unlist(over(zeroPoly2, SpatialPoints(coords = cbind(GPSV4b$lon, GPSV4b$lat)), returnList=T))
+## GPS data
+
+Remove GPS data inside the pseudo-polygons.
+```{r data, include = TRUE, cache=TRUE}
+GPS_inPoly <- unlist(over(zeroPoly, SpatialPoints(coords = cbind(GPSV4b$lon, GPSV4b$lat)), returnList=T))
 GPS_All <- 1:nrow(GPSV4b)
 GPS_outPoly <- GPS_All[-GPS_inPoly]
 plot(GPSV4b[GPS_outPoly,c("lon", "lat")], pch = "+")
@@ -236,20 +161,18 @@ GPS_loc <- do.call(cbind, Lll2xyz(lat = GPS_data$lat, lon = GPS_data$lon))
 GPS_sp <- SpatialPoints(data.frame(lon = ifelse(GPS_data$lon>359.5, GPS_data$lon - 360, GPS_data$lon), 
                                    lat = GPS_data$lat), proj4string = CRS("+proj=longlat"))
 
-Midx2 <- over(GPS_sp, Plist)
-GPS_mu <- ice6g$trend[Midx2]
+GPS_idx <- over(GPS_sp, Plist)
+GPS_mu <- ice6g$trend[GPS_idx]
 GPS_data$trend0 <- GPS_data$trend - GPS_mu
-
 ```
 
-We also need to add some pseudo observations along the boudaries of the polygons to make smooth transition of the predictions.
-
+We also add some pseudo observations along the boudaries of the polygons to make smooth transition of the predictions and very sparse observations incide the polygons.  These values are set to be the ice6 values at those locations with opposite signs.
 ```{r data2, include = TRUE, cache=TRUE}
 ## get the boundary of the polygons
-boundlines <- as(zeroPoly2, 'SpatialLines') 
-obs_bounds <- spsample(boundlines, n = 50, type = "regular") # not points more than specified
+boundlines <- as(zeroPoly, 'SpatialLines') 
+obs_bounds <- spsample(boundlines, n = 50, type = "regular") # note points more than specified
 ## get some points inside the polygons
-obs_inpoly <- spsample(zeroPoly2, n = 1, type = "regular") # not points more than specified
+obs_inpoly <- spsample(zeroPoly, n = 1, type = "regular") # note points more than specified
 
 obs_pseudo <- obs_bounds
 

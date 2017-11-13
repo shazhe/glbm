@@ -146,14 +146,19 @@ GPS_mu <- ice6g$trend[GPS_idx]
 GPS_data$trend0 <- GPS_data$trend - GPS_mu
 ```
 
-We also need to add some pseudo observations along the boudaries of the polygons to make smooth transition of the predictions.
+We also need to add some pseudo observations along the boudaries of the polygons to make smooth transition of the predictions. The values of these pseudo observations are set to be the ice6g values at the same locations with opposite signs.
 ```{r data2, include = TRUE, cache=TRUE}
 ## get the boundary of the polygons
 boundlines <- as(zeroPoly, 'SpatialLines') 
-obs_bounds <- spsample(boundlines, n = 200, type = "random") # not points more than specified
+obs_bounds <- spsample(boundlines, n = 200, type = "random") # note points more than specified
+proj4string(obs_bounds) <- proj4string(Plist)
+## Find the ice6g values
+pobs_idx <- over(obs_bounds, Plist)
+GIA_pobs <- ice6g$trend[pobs_idx]
+
 nobsb <-nrow(obs_bounds@coords) 
 obs_df <- data.frame(ID = rep("pseudo", nobsb), lon = obs_bounds@coords[,1], lat = obs_bounds@coords[,2],
-                     trend = rep(0, nobsb), std = rep(0.05, nobsb), trend0 = rep(0, nobsb))
+                     trend = rep(0, nobsb), std = rep(0.05, nobsb), trend0 = rep(-GIA_pobs, nobsb))
 obs_xyz <- do.call(cbind, Lll2xyz(lat = obs_bounds@coords[,2], lon = obs_bounds@coords[,1]))
 
 GPS_all <- rbind(GPS_data, obs_df)
