@@ -124,7 +124,7 @@ trho <- Tlognorm(mu_r, v_r)
 tsigma <- Tlognorm(mu_s, v_s)
 
 ## ----inla, include = TRUE, cache = TRUE----------------------------------
-Mesh_GIA <- mesh
+Mesh_GIA <- mesh_outPoly
 ## The SPDE model
 lsigma0 <- tsigma[1]
 theta1_s <- tsigma[2]

@@ -2,10 +2,12 @@
 title: "Estimating GIA -- 3 Pseudo polygon with polygon observations"
 author: "Z Sha"
 date: "13 November 2017"
-output: html_document
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    number_sections: true
 ---
-
-***
 
 ## 0 Introduction
 

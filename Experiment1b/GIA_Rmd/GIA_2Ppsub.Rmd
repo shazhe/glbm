@@ -2,7 +2,11 @@
 title: "Estimating GIA -- 2 Pseudo Polygons defining subset of sphere as modelling region"
 author: "Z Sha"
 date: "13 Nov 2017"
-output: html_document
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    number_sections: true
 ---
 
 # Introduction
@@ -175,7 +179,7 @@ tsigma <- Tlognorm(mu_s, v_s)
 # INLA Inference on the subset
 
 ```{r inla, include = TRUE, cache = TRUE}
-Mesh_GIA <- mesh
+Mesh_GIA <- mesh_outPoly
 ## The SPDE model
 lsigma0 <- tsigma[1]
 theta1_s <- tsigma[2]
