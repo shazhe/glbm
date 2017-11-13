@@ -70,7 +70,7 @@ plist <- lapply(ice6g$ID,
                                                         lat = as.numeric(polycoords[x, c(2,4,6,8,10)])))), ID = x))
 Plist <- SpatialPolygons(plist, proj4string = CRS("+proj=longlat"))
 
-meshLL <- Lxyz2ll(list(x=mesh$loc[,1], y = mesh$loc[,2], z = mesh$loc[,3]))
+meshLL <- Lxyz2ll(list(x=mesh_outPoly$loc[,1], y = mesh_outPoly$loc[,2], z = mesh_outPoly$loc[,3]))
 meshLL$lon <- ifelse(meshLL$lon >= -0.5, meshLL$lon,meshLL$lon + 360)
 mesh_sp <- SpatialPoints(data.frame(lon = meshLL$lon, lat = meshLL$lat), proj4string = CRS("+proj=longlat")) 
 mesh_idx <- over(mesh_sp, Plist)

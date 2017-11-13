@@ -9,15 +9,10 @@ output:
     number_sections: true
 ---
 
-## 0 Introduction
+# Introduction
 
-In this document, we apply the pseudo polygon within mixture Gaussian model on GIA. The idea is that GIA is a stationary porcess on a subset of $S^2$. The subset is given by removing polygons where the values are certainly zero according to experts from the entire sphere. Then the entire sphere can be regarded as a mixture of two Gaussian processes on the interested subset and pseudo polygons. 
+In this document, we apply the pseudo polygon within mixture Gaussian model on GIA. The idea is that GIA is a stationary porcess on a subset of $S^2$. The subset is given by removing polygons where the values are certainly zero according to experts from the entire sphere. In previous experiments, we have done a global stationary model, pseudo polygons with point observations at the polygon boundaries. In this document, we use a single pseudo polygon observation to update the process. 
 
-We generate dense mesh in the subset and sparse mesh insise the pseudo polygons. Pseudo observations are placed sparsely incide the polygons and along the bouondaries. The correlations length of the pseudo polygons are set to be larege. Why?
-
-(1) process inside these polygons are uniformly zero. So either they are strongly correlated or they are independent but having tiny variance.
-
-(2) we want a sparse mesh for these regions and to have a good approximation requires longer correlation length.
 
 ## 1 Generate the polygons and mesh
 First we generate the mesh for a discreate reparesentation of the GIA process. The mesh is restricted on a subset of the sphere defined by the pseudo-polygons. More details about choosing and generating the polygons can be found [here](http://rpubs.com/zs_sz/PseudoObs02). The following chunk generate the pseudo polygons using the ensemble mean of 13 GIA mode solutions for a given threshold value, say $0.3$.
