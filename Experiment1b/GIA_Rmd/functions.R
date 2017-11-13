@@ -133,7 +133,8 @@ BayesDA_GIA <- function(GIA, GPS, trho, tsigma){
 
 
 ## 5 Plot predicted mean
-map_res <- function(data, xname, yname, fillvar, colpal, limits=NULL, title){
+## Plot predicted mean
+map_res <- function(data, xname, yname, fillvar, colpal = NULL, limits=NULL, title){
   plot_data <- data[c(xname, yname, fillvar)]
   names(plot_data) <- c("X", "Y", "Fill")
   
@@ -153,15 +154,25 @@ map_res <- function(data, xname, yname, fillvar, colpal, limits=NULL, title){
   
   colbar <- guide_colorbar(barwidth = 2, barheight = 10, label.position = "right", title.position = "bottom")
   
-  Map <- ggplot(plot_data) + geom_raster(aes(x = X, y = Y, fill = Fill)) + coord_fixed() + 
-    xlab("Longitude") + ylab("Latitude") + 
-    scale_x_continuous(limits=c(0,360),  expand = c(0, 0)) + 
-    scale_y_continuous(limits=c(-90,90),  expand = c(0, 0)) + 
-    scale_fill_gradientn(colors = colpal, name = "mm/yr", limits = limits,  guide = colbar) 
+  if(is.null(colpal)){
+    Map <- ggplot(plot_data) + geom_raster(aes(x = X, y = Y, fill = Fill)) + coord_fixed() + 
+      xlab("Longitude") + ylab("Latitude") + 
+      scale_x_continuous(limits=c(0,360),  expand = c(0, 0)) + 
+      scale_y_continuous(limits=c(-90,90),  expand = c(0, 0)) + 
+      scale_fill_gradient2(low = "#0000BF", mid = "white", high = "#BF0000", midpoint = 0, 
+                           name = "mm/yr", limits = limits,  guide = colbar) 
+  }else{
+    Map <- ggplot(plot_data) + geom_raster(aes(x = X, y = Y, fill = Fill)) + coord_fixed() + 
+      xlab("Longitude") + ylab("Latitude") + 
+      scale_x_continuous(limits=c(0,360),  expand = c(0, 0)) + 
+      scale_y_continuous(limits=c(-90,90),  expand = c(0, 0)) + 
+      scale_fill_gradientn(colors = colpal, name = "mm/yr", limits = limits,  guide = colbar) 
+  }
   
   Map <- Map +  baseworld + ggtitle(title) + beauty
   return(Map)
 }
+
 
 ## 6 Plot zoom in
 map_zoom <-function(data_field, data_obs, zoom_coords, colpal, limits=NULL){
