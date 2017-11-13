@@ -55,7 +55,7 @@ Generate the point locations for building up the mesh. We want the mesh to be de
 fiboSphere2 <- function(N = 1000L, L0 = FALSE) {
   ## Reference (note that points generated from 2D are slightly different from 3D)
   ## Measurement of Areas on a Sphere Using Fibonacci and Latitude–Longitude Lattices (2010)
-  phi <- (sqrt(5) + 1) / 2 - 1 # golden ratio
+  phi <- (sqrt(5) + 1) / 2 # golden ratio
   ga <- phi * 2 * pi           # golden angle
 
   i <- seq(-N, N)
