@@ -180,11 +180,6 @@ res_inla <- inla(formula, data = inla.stack.data(stGIA, spde = GIA_spde), family
                  scale =prec_scale, control.family = list(hyper = hyper),
                  control.predictor=list(A=inla.stack.A(stGIA), compute =TRUE))
 
-## ----inla_run, include = TRUE, eval = FALSE------------------------------
-## Run INLA
-res_inla <- inla(formula, data = inla.stack.data(stGIA, spde = GIA_spde), family = "gaussian",
-                 scale =prec_scale, control.family = list(hyper = hyper),
-                 control.predictor=list(A=inla.stack.A(stGIA), compute =TRUE))
 save(res_inla, file = "/./projects/GlobalMass/WP1-BHM/Experiment1b/GIA_RGL/res3.RData")
 
 
