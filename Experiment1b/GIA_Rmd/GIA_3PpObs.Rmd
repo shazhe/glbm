@@ -11,8 +11,7 @@ output:
 
 # Introduction
 
-In this document, we apply the pseudo polygon within mixture Gaussian model on GIA. The idea is that GIA is a stationary porcess on a subset of $S^2$. The subset is given by removing polygons where the values are certainly zero according to experts from the entire sphere. In previous experiments, we have done a global stationary model, pseudo polygons with point observations at the polygon boundaries. In this document, we use a single pseudo polygon observation to update the process. 
-
+Now we still assume a stationary process on the sphere but reduce the resolution within the pseudo polygons and use polygon observatiosn for update.
 
 
 ## 1 Generate the polygons and mesh
@@ -172,42 +171,43 @@ We also add some pseudo observations along the boudaries of the polygons to make
 boundlines <- as(zeroPoly, 'SpatialLines') 
 obs_bounds <- spsample(boundlines, n = 50, type = "regular") # note points more than specified
 ## The mesh nodes incide the polygons
-obs_inpoly <- 
+obs_inpoly <- SpatialPoints(coords = mesh$Trill[TinPoly,])
 obs_pseudo <- rbind(obs_bounds, obs_inpoly)
-proj4string(obs_bounds) <- proj4string(Plist)
+proj4string(obs_pseudo) <- proj4string(Plist)
+
 ## Find the ice6g values
 pobs_idx <- over(obs_pseudo, Plist)
 GIA_pobs <- ice6g$trend[pobs_idx]
+nb <- length(obs_bounds)
+ni <- length(obs_inpoly)
+## the average of these observations 
+GIA_Poly_obs <- -mean(GIA_pobs[-(1:nb)])
 
 
+nobsb <-nrow(obs_pseudo@coords)
+obs_df <- data.frame(ID = rep("pseudo", nobsb), lon = obs_pseudo@coords[,1], lat = obs_pseudo@coords[,2],
+                     trend = rep(0, nobsb), std = rep(0.05,nobsb), trend0 = -GIA_pobs)
+obs_xyz <- do.call(cbind, Lll2xyz(lat = obs_pseudo@coords[,2], lon = obs_pseudo@coords[,1]))
 
-nobsb <-nrow(obs_pseudo)
-obs_df1 <- data.frame(ID = rep("pseudo", nobsb), lon = fibo_inPoly[,1], lat = fibo_inPoly[,2],
-                     trend = rep(0, nobsb), std = rep(0.05,nobsb), trend0 = rep(0, nobsb))
-obs_xyz1 <- do.call(cbind, Lll2xyz(lat = fibo_inPoly[,2], lon = fibo_inPoly[,1]))
-
-obs_df2 <- data.frame(ID = rep("pseudo", 1), lon = 150, lat = 0,
-                     trend = rep(-mean(ice6g$trend[p0]), 1), std = rep(0.05,1), trend0 = rep(-mean(ice6g$trend[p0]), 1))
-obs_xyz2 <-ll2xyz(lat = 0, lon = 150) 
-
-GPS_all <- rbind(GPS_data, obs_df2)
-GPS_all_loc <- rbind(GPS_loc, obs_xyz2)
-GPS_all_locA <- rbind(GPS_loc, obs_xyz1)
+GPS_all <- rbind(GPS_data, obs_df)
+GPS_all_loc <- rbind(GPS_loc, obs_xyz)
 ```
 
 
 ## 3 Inference on the subset
 
+Like the observations to the process throught the Mesh. The pseudo observations inside the polygons are regarded to be within the same block and the block value is supposed to be the average of all the pseudo observations. The observatiosn along the boundaries remain point observations.
 ```{r inla, include = TRUE, cache = TRUE}
 ## Link the process to observations and predictions
 Mesh_GIA <- mesh
-block <- c(1:nrow(GPS_data), rep(nrow(GPS_data)+1, nrow(obs_df1)))
-A_data <- inla.spde.make.A(mesh = Mesh_GIA, loc = GPS_all_locA, block = block, n.block = nrow(GPS_data) + 1)
-
+npts <- nrow(GPS_data) + nb
+block <- c(1:npts, rep(npts+1, ni))
+A_data <- inla.spde.make.A(mesh = Mesh_GIA, loc = GPS_all_loc, 
+                           block = block, n.block = npts + 1, block.rescale = "count")
 A_pred <- inla.spde.make.A(mesh = Mesh_GIA, loc = rbind(GPS_all_loc, Mesh_GIA$loc))
 
 ## Create the estimation and prediction stack
-st.est <- inla.stack(data = list(y=GPS_all$trend0), A = list(A_data),
+st.est <- inla.stack(data = list(y=c(GPS_data$trend0, obs_df$trend0[1:nb], GIA_Poly_obs)), A = list(A_data),
                      effects = list(GIA = 1:GIA_spde$n.spde), tag = "est")
 st.pred <- inla.stack(data = list(y=NA), A = list(A_pred),
                       effects = list(GIA=1:GIA_spde$n.spde), tag = "pred")
@@ -216,7 +216,7 @@ stGIA <- inla.stack(st.est, st.pred)
 ## Fix the GPS errors
 hyper <- list(prec = list(fixed = TRUE, initial = 0))
 formula = y ~ -1 +  f(GIA, model = GIA_spde)
-prec_scale <- c(1/GPS_all$std^2, rep(1, nrow(A_pred)))
+prec_scale <- c(1/GPS_data$std^2, rep(1/0.05^2, nb), 1/0.01^2, rep(1, nrow(A_pred)))
 
 ## Run INLA
 res_inla <- inla(formula, data = inla.stack.data(stGIA, spde = GIA_spde), family = "gaussian",
@@ -224,16 +224,34 @@ res_inla <- inla(formula, data = inla.stack.data(stGIA, spde = GIA_spde), family
                  control.predictor=list(A=inla.stack.A(stGIA), compute =TRUE))
 ```
 
+Then we run the INLA model. Note that this will take more than 10min and require memory larger than 32GB. We ran this on a server with 56 cores and 256GB memory.
+```{r inla_run, include = TRUE, eval = FALSE}
+## Run INLA
+res_inla <- inla(formula, data = inla.stack.data(stGIA, spde = GIA_spde), family = "gaussian",
+                 scale =prec_scale, control.family = list(hyper = hyper),
+                 control.predictor=list(A=inla.stack.A(stGIA), compute =TRUE))
+
+INLA_pred <- res_inla$summary.linear.predictor
+```
+
+
+```{r inla_load, include = FALSE, eval = TRUE}
+#save(res_inla, file = "/./projects/GlobalMass/WP1-BHM/Experiment1b/GIA_RGL/res3.RData")
+
+load("Z:/WP1-BHM/Experiment1b/GIA_RGL/res3.RData")
+INLA_pred <- res_inla$summary.linear.predictor
+```
+
+# Analyse results
 
 Now assemble the inla inference and prediction results.
-
 ```{r inla_res, include = TRUE, cache=TRUE}
 INLA_pred <- res_inla$summary.linear.predictor
 
 ## Extract and project predictions
 pred_idx <- inla.stack.index(stGIA, tag = "pred")$data
-GPS_idx <- pred_idx[1:nrow(GPS_all)]
-GIA_idx <- pred_idx[-c(1:nrow(GPS_all))]
+GPS_idx <- pred_idx[1:(nrow(GPS_data)+1)]
+GIA_idx <- pred_idx[-c(1:(nrow(GPS_all)+1))]
 
 ## GPS 
 GPS_u <- INLA_pred$sd[GPS_idx] 
@@ -255,7 +273,7 @@ ress <- list(res_inla = res_inla, spde = GIA_spde, st = stGIA,
 ```
 
 
-Plot the posteriors of the hyper parameters.
+## Plot the posteriors of the hyper parameters
 
 ```{r hyper, include=TRUE}
 res_inla <- ress$res_inla
@@ -285,65 +303,27 @@ rho_mode*6371
 ```
 
 
-Plot the predictions.
+## Plot the predictions
 
 ```{r predict, include=TRUE}
-library(ggplot2)
-library(grid)
-library(gridExtra)
-
 GPS_pred <- ress$GPS_pred
 GIA_pred <- ress$GIA_pred
 
-colpal <- colorRamps::matlab.like(12)
-
-## Plot predicted mean
-map_res <- function(data, xname, yname, fillvar, colpal, limits=NULL, title){
-  plot_data <- data[c(xname, yname, fillvar)]
-  names(plot_data) <- c("X", "Y", "Fill")
-  
-  beauty <- 
-    theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), 
-          panel.background = element_rect(fill = "white", colour = 'white'), 
-          legend.text = element_text(size = 10),
-          legend.title = element_text(size = 10), 
-          axis.text = element_text(size = 10),
-          axis.title = element_text(size = 10),
-          axis.line = element_line(size = 1),
-          plot.title = element_text(hjust = 0.5, size = 15),
-          plot.subtitle = element_text(hjust = 0.5, size = 10),
-          panel.border = element_blank())
-  world_map <- map_data("world2")
-  baseworld <- geom_polygon(data = world_map, aes(x=long, y=lat, group=group), colour="grey", fill = NA, alpha = 0.5)  
-  
-  colbar <- guide_colorbar(barwidth = 2, barheight = 10, label.position = "right", title.position = "bottom")
-  
-  Map <- ggplot(plot_data) + geom_raster(aes(x = X, y = Y, fill = Fill)) + coord_fixed() + 
-    xlab("Longitude") + ylab("Latitude") + 
-    scale_x_continuous(limits=c(0,360),  expand = c(0, 0)) + 
-    scale_y_continuous(limits=c(-90,90),  expand = c(0, 0)) + 
-    scale_fill_gradient2(low = "#0000BF", mid = "white", high = "#BF0000", midpoint = 0, 
-                         name = "mm/yr", limits = limits,  guide = colbar) 
-  
-  Map <- Map +  baseworld + ggtitle(title) + beauty
-  return(Map)
-}
-
 map_prior <- map_res(data = ice6g, xname = "x_center", yname = "y_center", fillvar = "trend", 
-                     colpal = colpal,  limits = c(-7, 22), title = "Prior GIA mean field")
+                      limits = c(-7, 22), title = "Prior GIA mean field")
 
 ## Plot the GIA predicted mean
 map_GIA <- map_res(data = GIA_pred, xname = "lon", yname = "lat", fillvar = "mean", 
-                   colpal = colpal,  limits = c(-7, 22), title = "Predicted GIA")
+                   limits = c(-7, 22), title = "Predicted GIA")
+
 ## Plot the GIA difference map
 map_diff <- map_res(data = GIA_pred, xname = "lon", yname = "lat", fillvar = "diff", 
-                    colpal = colpal, limits = c(-8, 8), title = "GIA difference: Updated - Prior")
+                   limits = c(-8, 8), title = "GIA difference: Updated - Prior")
 
 ## Plot the GIA difference map
 map_sd <- map_res(data = GIA_pred, xname = "lon", yname = "lat", fillvar = "u", 
-                  colpal = colpal, limits = c(0, 4), title = "Predicted uncertainties")
+                    colpal = colorRamps::matlab.like(12),  title = "Predicted uncertainties")
 
-map_sd <- map_sd + geom_point(data = GPS_data, aes(x=lon, y =lat))
 ## Display 
 print(map_prior)
 print(map_GIA)
