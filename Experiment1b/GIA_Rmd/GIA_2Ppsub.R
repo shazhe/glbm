@@ -7,7 +7,14 @@ source("functions-barriers-dt-models-march2017.R")
 
 ## Load the pseudo polygon
 #### 1 Load GIA prior
-zeroPolygon <- readOGR(dsn = "/./projects/GlobalMass/WP1-BHM/Experiment1b/shapefiles", layer = "zero03")
+if(Sys.info()["sysname"] == "Windows"){
+  zeroPolygon <- readOGR(dsn = "Z:/WP1-BHM/Experiment1b/shapefiles", layer = "zero03")
+}else if(Sys.info()["nodename"] == "it064613"){
+  zeroPolygon <- readOGR(dsn = "Z:/WP1-BHM/Experiment1b/shapefiles", layer = "zero03")
+}else 
+  {
+  zeroPolygon <- readOGR(dsn = "/./projects/GlobalMass/WP1-BHM/Experiment1b/shapefiles", layer = "zero03")
+}
 plot(zeroPolygon, col = "blue",  main = "zero regions -- threshold = 0.3")
 
 ## Remove polygons that are too small

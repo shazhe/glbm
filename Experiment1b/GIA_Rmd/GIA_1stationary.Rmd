@@ -16,11 +16,11 @@ In this study, we apply the Bayesian data assimilation model on updatding the gl
 
 Here we first assume the updating process is stationary on the sphere; then we remove the stationarity constraint by using the information of expert defined pseudo polygons where the GIA should be zero in theroy. Three different approaches are used in modelling the non-stationarity:
 
-(1) Use pseudo-polygon observations --- [***Polygon observation***]()
+(1) Use pseudo-polygon observations --- [***Polygon observation***](http://rpubs.com/zs_sz/gia02)
 
-(2) Use pseudo-polygons to define the subset where GIA can be modelled as stationary process --- [***Subset model***]()
+(2) Use pseudo-polygons to define the subset where GIA can be modelled as stationary process --- [***Subset model***](http://rpubs.com/zs_sz/gia03)
 
-(3) Use psdeuo-polygons to define a mixture Gaussian process where the updating process has different spatial properties inside and outside of the pseudo-polygons --- [***Mixture model***]()
+(3) Use psdeuo-polygons to define a mixture Gaussian process where the updating process has different spatial properties inside and outside of the pseudo-polygons --- [***Mixture model***](http://rpubs.com/zs_sz/gia04)
 
 In the following, we demonstrate the global statinary approach step by step.
 

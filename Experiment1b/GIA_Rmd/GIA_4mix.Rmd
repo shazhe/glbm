@@ -114,24 +114,6 @@ lrho0 <- trho[1]
 theta2_s <- trho[2]
 lkappa0 <- log(8)/2 - lrho0
 ltau0 <- 0.5*log(1/(4*pi)) - lsigma0 - lkappa0
-
-
-## Create the precsion matrix function
-Q.function = dt.create.Q(mesh, Omega)
-ranges = c(log(0.001), lrho0)
-# - the first range is for the barrier area
-# - - it is not sensitive to the exact value here,
-# - the second range is for the normal area
-Q = Q.function(theta = c(lsigma0, ranges))
-# - the precision matrix for fixed ranges
-
-## Simulate the field
-u = inla.qsample(n=1, Q=Q, seed = 2017)
-u = u[ ,1]
-
-## Plot the simulated field
-local.plot.field(u, mesh = mesh, main="The true (simulated) spatial field", asp = 1)
-
 ```
 
 ## 2 Data preparation
@@ -281,7 +263,7 @@ INLA_pred <- res_inla$summary.linear.predictor
 Now assemble the inla inference and prediction results.
 
 ```{r inla_res, include = TRUE, cache=TRUE}
-INLA_pred <- res.mixture$summary.linear.predictor
+INLA_pred <- res_inla$summary.linear.predictor
 
 ## Extract and project predictions
 pred_idx <- inla.stack.index(stGIA, tag = "pred")$data
@@ -311,21 +293,21 @@ ress <- list(res_inla = res_inla, spde = GIA_spde, st = stGIA,
 ## Plot the posteriors of the hyper parameters
 
 ```{r hyper, include=TRUE}
-theta1 <- res.mixture$marginals.hyperpar$`Theta1 for GIA`
-theta2 <- res.mixture$marginals.hyperpar$`Theta2 for GIA`
+theta1 <- res_inla$marginals.hyperpar$`Theta1 for GIA`
+theta2 <- res_inla$marginals.hyperpar$`Theta2 for GIA`
 
 Vmar<- inla.tmarginal(exp, theta1)
 Rmar <- inla.tmarginal(exp, theta2)
 
 ## Find the mode of rho and sigma^2
-lrho_mode <- res.mixture$summary.hyperpar$mode[2]
-lrho_mean <- res.mixture$summary.hyperpar$mean[2]
-lrho_sd <- res.mixture$summary.hyperpar$sd[2]
+lrho_mode <- res_inla$summary.hyperpar$mode[2]
+lrho_mean <- res_inla$summary.hyperpar$mean[2]
+lrho_sd <- res_inla$summary.hyperpar$sd[2]
 rho_mode <- exp(lrho_mean - lrho_sd^2)
 
-lsigma_mode <- res.mixture$summary.hyperpar$mode[1]
-lsigma_mean <- res.mixture$summary.hyperpar$mean[1]
-lsigma_sd <- res.mixture$summary.hyperpar$sd[1]
+lsigma_mode <- res_inla$summary.hyperpar$mode[1]
+lsigma_mean <- res_inla$summary.hyperpar$mean[1]
+lsigma_sd <- res_inla$summary.hyperpar$sd[1]
 sigma_mode <- exp(lsigma_mean - lsigma_sd^2)
 plot(Vmar, type = "l", main = bquote(bold({sigma^2}("mode") == .(round(sigma_mode, 4)))))
 plot(Rmar, type = "l", main = bquote(bold(rho("mode") == .(round(rho_mode, 4)))))

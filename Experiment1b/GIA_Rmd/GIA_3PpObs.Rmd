@@ -1,5 +1,5 @@
 ---
-title: "Estimating GIA -- 3 Pseudo polygon with polygon observations"
+title: "Estimating GIA -- 2 Pseudo polygon with polygon observations"
 author: "Z Sha"
 date: "13 November 2017"
 output: 

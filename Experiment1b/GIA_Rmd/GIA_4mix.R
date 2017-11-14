@@ -167,7 +167,7 @@ hyper <- list(prec = list(fixed = TRUE, initial = 0))
 prec_scale <- c(1/GPS_all$std^2, rep(1, nrow(A_pred)))
 
 
-Q.mixture = dt.create.Q(mesh, Omega, fixed.ranges = c(0.01, NA))
+Q.mixture = dt.create.Q(mesh, Omega, fixed.ranges = c(0.001, NA))
 # - We fix the barrier range to a different value than we 
 #   used for simulations
 # - - Why? It does not matter, as long as it is 'small' 
@@ -194,80 +194,3 @@ res_inla <- inla(formula, data=inla.stack.data(stGIA), family = "gaussian",
                    scale =prec_scale, control.family = list(hyper = hyper),
                    control.predictor=list(A = inla.stack.A(stGIA), compute = TRUE))
 save(res_inla, file = "/./projects/GlobalMass/WP1-BHM/Experiment1b/GIA_RGL/res4.RData")
-
-INLA_pred <- res_inla$summary.linear.predictor
-
-## ----inla_res, include = TRUE, cache=TRUE--------------------------------
-INLA_pred <- res.mixture$summary.linear.predictor
-
-## Extract and project predictions
-pred_idx <- inla.stack.index(stGIA, tag = "pred")$data
-GPS_idx <- pred_idx[1:nrow(GPS_all)]
-GIA_idx <- pred_idx[-c(1:nrow(GPS_all))]
-
-## GPS 
-GPS_u <- INLA_pred$sd[GPS_idx] 
-GPS_pred <- data.frame(lon = GPS_all$lon, lat = GPS_all$lat, u = GPS_u)
-
-## GIA
-GIA_diff <- INLA_pred$mean[GIA_idx] 
-GIA_m <- GIA_diff + GIA_prior
-GIA_u <- INLA_pred$sd[GIA_idx]
-proj <- inla.mesh.projector(Mesh_GIA, projection = "longlat", dims = c(360,180), xlim = c(0,360), ylim = c(-90, 90))
-GIA_grid <- expand.grid(proj$x, proj$y)
-GIA_pred <- data.frame(lon = GIA_grid[,1], lat = GIA_grid[,2],
-                       diff = as.vector(inla.mesh.project(proj, as.vector(GIA_diff))),
-                       mean = as.vector(inla.mesh.project(proj, as.vector(GIA_m))),
-                       u = as.vector(inla.mesh.project(proj, as.vector(GIA_u))))
-
-ress <- list(res_inla = res_inla, spde = GIA_spde, st = stGIA, 
-             mesh = Mesh_GIA, GPS_pred = GPS_pred, GIA_pred = GIA_pred)
-
-## ----hyper, include=TRUE-------------------------------------------------
-theta1 <- res_inla$marginals.hyperpar$`Theta1 for GIA`
-theta2 <- res_inla$marginals.hyperpar$`Theta2 for GIA`
-
-Vmar<- inla.tmarginal(exp, theta1)
-Rmar <- inla.tmarginal(exp, theta2)
-
-## Find the mode of rho and sigma^2
-lrho_mode <- res_inla$summary.hyperpar$mode[2]
-lrho_mean <- res_inla$summary.hyperpar$mean[2]
-lrho_sd <- res_inla$summary.hyperpar$sd[2]
-rho_mode <- exp(lrho_mean - lrho_sd^2)
-
-lsigma_mode <- res_inla$summary.hyperpar$mode[1]
-lsigma_mean <- res_inlasummary.hyperpar$mean[1]
-lsigma_sd <- res_inla$summary.hyperpar$sd[1]
-sigma_mode <- exp(lsigma_mean - lsigma_sd^2)
-plot(Vmar, type = "l", main = bquote(bold({sigma^2}("mode") == .(round(sigma_mode, 4)))))
-plot(Rmar, type = "l", main = bquote(bold(rho("mode") == .(round(rho_mode, 4)))))
-
-## The estimated correlation length is about 568km
-rho_mode*6371
-
-## ----predict, include=TRUE-----------------------------------------------
-GPS_pred <- ress$GPS_pred
-GIA_pred <- ress$GIA_pred
-
-map_prior <- map_res(data = ice6g, xname = "x_center", yname = "y_center", fillvar = "trend", 
-                      limits = c(-7, 22), title = "Prior GIA mean field")
-
-## Plot the GIA predicted mean
-map_GIA <- map_res(data = GIA_pred, xname = "lon", yname = "lat", fillvar = "mean", 
-                   limits = c(-7, 22), title = "Predicted GIA")
-
-## Plot the GIA difference map
-map_diff <- map_res(data = GIA_pred, xname = "lon", yname = "lat", fillvar = "diff", 
-                   limits = c(-8, 8), title = "GIA difference: Updated - Prior")
-
-## Plot the GIA difference map
-map_sd <- map_res(data = GIA_pred, xname = "lon", yname = "lat", fillvar = "u", 
-                    colpal = colorRamps::matlab.like(12),  title = "Predicted uncertainties")
-
-## Display 
-print(map_prior)
-print(map_GIA)
-print(map_diff)
-print(map_sd)
-
