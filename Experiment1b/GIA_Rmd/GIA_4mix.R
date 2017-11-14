@@ -9,13 +9,8 @@ source("functions-barriers-dt-models-march2017.R")
 ## ----polygons, include = FALSE, message = FALSE, cache = TRUE------------
 ## Load the pseudo polygon
 #### 1 Load GIA prior
-if(Sys.info()["sysname"] == "Windows"){
-  zeroPolygon <- readOGR(dsn = "Z:/WP1-BHM/Experiment1b/shapefiles", layer = "zero03")
-}else if(grep("Ubuntu",Sys.info()["version"]) == 1){
-  zeroPolygon <- readOGR(dsn = "/home/zs16444/GMdata/shapefiles", layer = "zero03")
-}else{
-  zeroPolygon <- readOGR(dsn = "/./projects/GlobalMass/WP1-BHM/Experiment1b/shapefiles", layer = "zero03")
-}
+zeroPolygon <- readOGR(dsn = "/./projects/GlobalMass/WP1-BHM/Experiment1b/shapefiles", layer = "zero03")
+
 ## Remove polygons that are too small
 zeroPolys <- zeroPolygon@polygons[[1]]@Polygons
 polyareas <- sapply(zeroPolys, function(x) x@area)
@@ -100,13 +95,8 @@ local.plot.field(u, mesh = mesh, main="The true (simulated) spatial field", asp 
 
 ## ----load_data0, include=FALSE, eval = TRUE, cache = TRUE----------------
 #### 1 Load GIA prior
-if(Sys.info()["sysname"] == "Windows"){
-  ice6g <- read.table("Z:/WP2-SolidEarth/BHMinputs/GIA/GIA_Pel-6-VM5.txt", header = T)
-}else if(grep("Ubuntu",Sys.info()["version"]) == 1){
-  ice6g <- read.table("~/GMdata/BHMinputs/GIA/GIA_Pel-6-VM5.txt", header = T)
-}else{
-  ice6g <- read.table("/./projects/GlobalMass/WP2-SolidEarth/BHMinputs/GIA/GIA_Pel-6-VM5.txt", header = T)
-}
+ice6g <- read.table("/./projects/GlobalMass/WP2-SolidEarth/BHMinputs/GIA/GIA_Pel-6-VM5.txt", header = T)
+
 
 polycoords <- ice6g[,c(6:13, 6,7)] 
 plist <- lapply(ice6g$ID, 
@@ -121,13 +111,8 @@ mesh_idx <- over(mesh_sp, Plist)
 GIA_prior <- ice6g$trend[mesh_idx]
 
 #### 2 Load GPS data
-if(Sys.info()["sysname"] == "Windows"){
-  GPSV4b <- read.table("Z:/WP2-SolidEarth/BHMinputs/GPS/GPS_v04b.txt", header = T)
-}else if(grep("Ubuntu",Sys.info()["version"]) == 1){
-  GPSV4b <- read.table("~/GMdata/BHMinputs/GPS/GPS_v04b.txt", header = T)
-}else{
-  GPSV4b <- read.table("/./projects/GlobalMass/WP2-SolidEarth/BHMinputs/GPS/GPS_v04b.txt", header = T)
-}
+GPSV4b <- read.table("/./projects/GlobalMass/WP2-SolidEarth/BHMinputs/GPS/GPS_v04b.txt", header = T)
+
 
 ## ----data, include = TRUE, cache=TRUE------------------------------------
 GPS_inPoly <- unlist(over(zeroPoly, SpatialPoints(coords = cbind(GPSV4b$lon, GPSV4b$lat)), returnList=T))
@@ -205,19 +190,11 @@ formula <- y ~ -1 + f(GIA, model=GIA_spde)
 #     only this formula is different
 
 ## ----run_inla, include = TRUE, eval = FALSE------------------------------
-## res_inla <- inla(formula, data=inla.stack.data(stGIA), family = "gaussian",
-##                    scale =prec_scale, control.family = list(hyper = hyper),
-##                    control.predictor=list(A = inla.stack.A(stGIA), compute = TRUE))
-## INLA_pred <- res_inla$summary.linear.predictor
+res_inla <- inla(formula, data=inla.stack.data(stGIA), family = "gaussian",
+                   scale =prec_scale, control.family = list(hyper = hyper),
+                   control.predictor=list(A = inla.stack.A(stGIA), compute = TRUE))
+save(res_inla, file = "/./projects/GlobalMass/WP1-BHM/Experiment1b/GIA_RGL/res4.RData")
 
-## ----inla_load, include = FALSE, eval = TRUE-----------------------------
-#save(res_inla, file = "/./projects/GlobalMass/WP1-BHM/Experiment1b/GIA_RGL/res4.RData")
-
-if(Sys.info()["sysname"] == "Windows"){
-  load("Z:/WP1-BHM/Experiment1b/GIA_RGL/res4.RData")
-}else if(grep("Ubuntu",Sys.info()["version"]) == 1){
- load("~/GMdata/GIA_RGL/res4.RData")
-}
 INLA_pred <- res_inla$summary.linear.predictor
 
 ## ----inla_res, include = TRUE, cache=TRUE--------------------------------
