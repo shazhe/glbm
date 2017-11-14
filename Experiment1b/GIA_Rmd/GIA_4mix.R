@@ -224,21 +224,21 @@ ress <- list(res_inla = res_inla, spde = GIA_spde, st = stGIA,
              mesh = Mesh_GIA, GPS_pred = GPS_pred, GIA_pred = GIA_pred)
 
 ## ----hyper, include=TRUE-------------------------------------------------
-theta1 <- res.mixture$marginals.hyperpar$`Theta1 for GIA`
-theta2 <- res.mixture$marginals.hyperpar$`Theta2 for GIA`
+theta1 <- res_inla$marginals.hyperpar$`Theta1 for GIA`
+theta2 <- res_inla$marginals.hyperpar$`Theta2 for GIA`
 
 Vmar<- inla.tmarginal(exp, theta1)
 Rmar <- inla.tmarginal(exp, theta2)
 
 ## Find the mode of rho and sigma^2
-lrho_mode <- res.mixture$summary.hyperpar$mode[2]
-lrho_mean <- res.mixture$summary.hyperpar$mean[2]
-lrho_sd <- res.mixture$summary.hyperpar$sd[2]
+lrho_mode <- res_inla$summary.hyperpar$mode[2]
+lrho_mean <- res_inla$summary.hyperpar$mean[2]
+lrho_sd <- res_inla$summary.hyperpar$sd[2]
 rho_mode <- exp(lrho_mean - lrho_sd^2)
 
-lsigma_mode <- res.mixture$summary.hyperpar$mode[1]
-lsigma_mean <- res.mixture$summary.hyperpar$mean[1]
-lsigma_sd <- res.mixture$summary.hyperpar$sd[1]
+lsigma_mode <- res_inla$summary.hyperpar$mode[1]
+lsigma_mean <- res_inlasummary.hyperpar$mean[1]
+lsigma_sd <- res_inla$summary.hyperpar$sd[1]
 sigma_mode <- exp(lsigma_mean - lsigma_sd^2)
 plot(Vmar, type = "l", main = bquote(bold({sigma^2}("mode") == .(round(sigma_mode, 4)))))
 plot(Rmar, type = "l", main = bquote(bold(rho("mode") == .(round(rho_mode, 4)))))

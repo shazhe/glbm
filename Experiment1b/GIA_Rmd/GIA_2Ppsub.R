@@ -2,19 +2,12 @@
 ## load library and functions
 library(sp); library(INLA); library(GEOmap); library(rgdal)
 library(ggplot2); library(grid); library(gridExtra)
-#if(Sys.info()['sysname'] == "Linux"){INLA:::inla.dynload.workaround()}
 source("functions.R")
 source("functions-barriers-dt-models-march2017.R")
 
 ## Load the pseudo polygon
 #### 1 Load GIA prior
-if(Sys.info()["sysname"] == "Windows"){
-  zeroPolygon <- readOGR(dsn = "Z:/WP1-BHM/Experiment1b/shapefiles", layer = "zero03")
-}else if(Sys.info()["sysname"] == "Ubuntu"){
-  zeroPolygon <- readOGR(dsn = "Z:/WP1-BHM/Experiment1b/shapefiles", layer = "zero03")
-}else{
-  zeroPolygon <- readOGR(dsn = "/./projects/GlobalMass/WP1-BHM/Experiment1b/shapefiles", layer = "zero03")
-}
+zeroPolygon <- readOGR(dsn = "/./projects/GlobalMass/WP1-BHM/Experiment1b/shapefiles", layer = "zero03")
 plot(zeroPolygon, col = "blue",  main = "zero regions -- threshold = 0.3")
 
 ## Remove polygons that are too small
