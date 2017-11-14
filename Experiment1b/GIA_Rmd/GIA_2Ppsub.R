@@ -2,7 +2,7 @@
 ## load library and functions
 library(sp); library(INLA); library(GEOmap); library(rgdal)
 library(ggplot2); library(grid); library(gridExtra)
-if(Sys.info()['sysname'] == "Linux"){INLA:::inla.dynload.workaround()}
+#if(Sys.info()['sysname'] == "Linux"){INLA:::inla.dynload.workaround()}
 source("functions.R")
 source("functions-barriers-dt-models-march2017.R")
 

@@ -24,6 +24,7 @@ We need the following packages and extra functions from the sourced file.
 ## load libraries and source codes
 library(INLA); library(rgdal); library(maptools); library(GEOmap); library(rgl)
 source("c:/ZSwork/glbm/Experiment1b//mixture_model/BarrierModel/functions-barriers-dt-models-march2017.R")
+if(Sys.info()['sysname'] == "Linux"){INLA:::inla.dynload.workaround()}
 set.seed(18)
 ```
 
@@ -125,7 +126,7 @@ TinOcean <- unlist(over(Ocean, SpatialPoints(coords=mesh$Trill, proj4string = CR
 TAll <- 1:mesh$t
 TinLand <- TAll[-TinOcean]
 Omega = dt.Omega(list(TinLand, 1:mesh$t), mesh)
-Omega.SP = dt.polygon.omega(mesh, Omega, globe = TRUE)
+Omega.SP = dt.polygon.omega(mesh, Omega, globe = TRUE, round = 2)
 ## Plot the result in 3d
 plot(mesh, t.sub = Omega[[2]], col = "lightblue", rgl = TRUE )
 plot(mesh, t.sub = Omega[[1]], col = "yellow",  rgl = TRUE, add = TRUE)

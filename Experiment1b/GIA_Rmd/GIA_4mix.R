@@ -1,37 +1,12 @@
----
-title: "Estimating GIA -- 4 Pseudo polygon with mixture Gaussian"
-author: "Z Sha"
-date: "13 November 2017"
-output: 
-  html_document:
-    toc: true
-    toc_float: true
-    number_sections: true
----
-
-# Introduction
-
-In this document, we apply the pseudo polygon within mixture Gaussian model on GIA. The idea is that GIA is a stationary porcess on a subset of $S^2$. The subset is given by removing polygons where the values are certainly zero according to experts from the entire sphere. In previous experiments, we have done a global stationary model, pseudo polygons with point observations at the polygon boundaries. In this document, we use a single pseudo polygon observation to update the process. 
-
-We generate dense mesh in the subset and sparse mesh insise the pseudo polygons. Pseudo observations are placed sparsely incide the polygons and along the bouondaries. The correlations length of the pseudo polygons are set to be larege. Why?
-
-(1) process inside these polygons are uniformly zero. So either they are strongly correlated or they are independent but having tiny variance.
-
-(2) we want a sparse mesh for these regions and to have a good approximation requires longer correlation length.
-
-## 1 Generate the polygons and mesh
-First we generate the mesh for a discreate reparesentation of the GIA process. The mesh is restricted on a subset of the sphere defined by the pseudo-polygons. More details about choosing and generating the polygons can be found [here](http://rpubs.com/zs_sz/PseudoObs02). The following chunk generate the pseudo polygons using the ensemble mean of 13 GIA mode solutions for a given threshold value, say $0.3$.
-
-```{r load, message = FALSE}
+## ----load, message = FALSE-----------------------------------------------
 ## load library and functions
 library(INLA)
 library(sp); library(GEOmap); library(rgdal)
 library(ggplot2); library(grid); library(gridExtra)
 source("functions.R")
 source("functions-barriers-dt-models-march2017.R")
-```
 
-```{r polygons, include = FALSE, message = FALSE, cache = TRUE}
+## ----polygons, include = FALSE, message = FALSE, cache = TRUE------------
 ## Load the pseudo polygon
 #### 1 Load GIA prior
 if(Sys.info()["sysname"] == "Windows"){
@@ -49,10 +24,8 @@ polyholes <- sapply(zeroPolys, function(x) x@hole)
 zeropolys2 <- zeroPolys[polyareas > 200 ] 
 zeroPoly <- zeroPolygon
 zeroPoly@polygons[[1]]@Polygons <- zeropolys2
-```
 
-Next we generate the mesh and separate the triangles in/out-side of the polygons. 
-```{r mesh, include=TRUE, cache=TRUE}
+## ----mesh, include=TRUE, cache=TRUE--------------------------------------
 #### Dense points over in the subset
 fibo_points <- fiboSphere(N = 12960, L0 = TRUE)
 pinPoly <- unlist(over(zeroPoly, SpatialPoints(coords = fibo_points), returnList=T))
@@ -72,11 +45,8 @@ fibo_points_all <- rbind(fibo_inPoly, fibo_inSub)
 mesh_points_xyz <- do.call(cbind, Lll2xyz(lat = fibo_points_all[,2], lon = fibo_points_all[,1]))
 mesh <- inla.mesh.2d(loc = mesh_points_xyz, cutoff = 0.01, max.edge = 0.5)
 summary(mesh) # give the desired number of vertices and triangles.
-```
 
-
-Now separate the triangles by the pseudo-polygons.
-```{r mesh2, include = TRUE, cache=TRUE}
+## ----mesh2, include = TRUE, cache=TRUE-----------------------------------
 mesh <- dt.mesh.addon.posTri(mesh = mesh, globe = TRUE)
 Tlonlat <- Lxyz2ll(list(x = mesh$posTri[,1], y = mesh$posTri[,2], z = mesh$posTri[,3]))
 Tlonlat$lon <- ifelse(Tlonlat$lon >=0, Tlonlat$lon, Tlonlat$lon + 359)
@@ -87,13 +57,8 @@ ToutPoly <- TAll[-TinPoly]
 Omega = dt.Omega(list(TinPoly, 1:mesh$t), mesh)
 plot(mesh, t.sub = Omega[[2]])
 plot(mesh, t.sub = Omega[[1]])
-```
 
-
-## Set up prior
-
-We set up the SPDE priors for the mixture model and simulate some data using the prior. The correlation length in the zero polygon regions is not sensitive and we set it to be much smaller than the modelling regions. 
-```{r mesh4, include=TRUE, cache=TRUE}
+## ----mesh4, include=TRUE, cache=TRUE-------------------------------------
 mu_r <- 500/6371
 v_r <- (1000/6371)^2
 mu_s <- 20
@@ -132,13 +97,8 @@ u = u[ ,1]
 ## Plot the simulated field
 local.plot.field(u, mesh = mesh, main="The true (simulated) spatial field", asp = 1)
 
-```
 
-## 2 Data preparation
-
-## 2.1 GIA forward model solution
-Load the GIA prior mean and GPS data and do the same prepreation as previous.
-```{r load_data0, include=FALSE, eval = TRUE, cache = TRUE}
+## ----load_data0, include=FALSE, eval = TRUE, cache = TRUE----------------
 #### 1 Load GIA prior
 if(Sys.info()["sysname"] == "Windows"){
   ice6g <- read.table("Z:/WP2-SolidEarth/BHMinputs/GIA/GIA_Pel-6-VM5.txt", header = T)
@@ -168,13 +128,8 @@ if(Sys.info()["sysname"] == "Windows"){
 }else{
   GPSV4b <- read.table("/./projects/GlobalMass/WP2-SolidEarth/BHMinputs/GPS/GPS_v04b.txt", header = T)
 }
-```
 
-
-## GPS data
-
-Remove GPS data inside the pseudo-polygons.
-```{r data, include = TRUE, cache=TRUE}
+## ----data, include = TRUE, cache=TRUE------------------------------------
 GPS_inPoly <- unlist(over(zeroPoly, SpatialPoints(coords = cbind(GPSV4b$lon, GPSV4b$lat)), returnList=T))
 GPS_All <- 1:nrow(GPSV4b)
 GPS_outPoly <- GPS_All[-GPS_inPoly]
@@ -188,10 +143,8 @@ GPS_sp <- SpatialPoints(data.frame(lon = ifelse(GPS_data$lon>359.5, GPS_data$lon
 GPS_idx <- over(GPS_sp, Plist)
 GPS_mu <- ice6g$trend[GPS_idx]
 GPS_data$trend0 <- GPS_data$trend - GPS_mu
-```
 
-We also add some pseudo observations along the boudaries of the polygons to make smooth transition of the predictions and the mesh nodes incide the polygons. These values are set to be the ice6 values at those locations with opposite signs.
-```{r data2, include = TRUE, cache=TRUE}
+## ----data2, include = TRUE, cache=TRUE-----------------------------------
 ## get the boundary of the polygons
 boundlines <- as(zeroPoly, 'SpatialLines') 
 obs_bounds <- spsample(boundlines, n = 50, type = "regular") # note points more than specified
@@ -211,13 +164,8 @@ obs_xyz <- do.call(cbind, Lll2xyz(lat = obs_pseudo@coords[,2], lon = obs_pseudo@
 
 GPS_all <- rbind(GPS_data, obs_df)
 GPS_all_loc <- rbind(GPS_loc, obs_xyz)
-```
 
-
-
-## 3 Inference on the subset
-
-```{r inla, include = TRUE, cache = TRUE}
+## ----inla, include = TRUE, cache = TRUE----------------------------------
 Mesh_GIA <- mesh
 A_data <- inla.spde.make.A(mesh = Mesh_GIA, loc = GPS_all_loc)
 A_pred <- inla.spde.make.A(mesh = Mesh_GIA, loc = rbind(GPS_all_loc, Mesh_GIA$loc))
@@ -255,17 +203,14 @@ formula <- y ~ -1 + f(GIA, model=GIA_spde)
 #   (as in the stationary case)
 # - - e.g. the inla(...) call below is the same, 
 #     only this formula is different
-```
 
-Then we run the INLA model. Note that this will take more than 10min and require memory larger than 32GB. We ran this on a server with 56 cores and 256GB memory.
-```{r run_inla, include = TRUE, eval = FALSE}
-res_inla <- inla(formula, data=inla.stack.data(stGIA), family = "gaussian",
-                   scale =prec_scale, control.family = list(hyper = hyper),
-                   control.predictor=list(A = inla.stack.A(stGIA), compute = TRUE))
-INLA_pred <- res_inla$summary.linear.predictor
-```
+## ----run_inla, include = TRUE, eval = FALSE------------------------------
+## res_inla <- inla(formula, data=inla.stack.data(stGIA), family = "gaussian",
+##                    scale =prec_scale, control.family = list(hyper = hyper),
+##                    control.predictor=list(A = inla.stack.A(stGIA), compute = TRUE))
+## INLA_pred <- res_inla$summary.linear.predictor
 
-```{r inla_load, include = FALSE, eval = TRUE}
+## ----inla_load, include = FALSE, eval = TRUE-----------------------------
 #save(res_inla, file = "/./projects/GlobalMass/WP1-BHM/Experiment1b/GIA_RGL/res4.RData")
 
 if(Sys.info()["sysname"] == "Windows"){
@@ -274,13 +219,8 @@ if(Sys.info()["sysname"] == "Windows"){
  load("~/GMdata/GIA_RGL/res4.RData")
 }
 INLA_pred <- res_inla$summary.linear.predictor
-```
 
-# Analyse results
-
-Now assemble the inla inference and prediction results.
-
-```{r inla_res, include = TRUE, cache=TRUE}
+## ----inla_res, include = TRUE, cache=TRUE--------------------------------
 INLA_pred <- res.mixture$summary.linear.predictor
 
 ## Extract and project predictions
@@ -305,12 +245,8 @@ GIA_pred <- data.frame(lon = GIA_grid[,1], lat = GIA_grid[,2],
 
 ress <- list(res_inla = res_inla, spde = GIA_spde, st = stGIA, 
              mesh = Mesh_GIA, GPS_pred = GPS_pred, GIA_pred = GIA_pred)
-```
 
-
-## Plot the posteriors of the hyper parameters
-
-```{r hyper, include=TRUE}
+## ----hyper, include=TRUE-------------------------------------------------
 theta1 <- res.mixture$marginals.hyperpar$`Theta1 for GIA`
 theta2 <- res.mixture$marginals.hyperpar$`Theta2 for GIA`
 
@@ -332,12 +268,8 @@ plot(Rmar, type = "l", main = bquote(bold(rho("mode") == .(round(rho_mode, 4))))
 
 ## The estimated correlation length is about 568km
 rho_mode*6371
-```
 
-
-## Plot the predictions
-
-```{r predict, include=TRUE}
+## ----predict, include=TRUE-----------------------------------------------
 GPS_pred <- ress$GPS_pred
 GIA_pred <- ress$GIA_pred
 
@@ -361,4 +293,4 @@ print(map_prior)
 print(map_GIA)
 print(map_diff)
 print(map_sd)
-```
+
