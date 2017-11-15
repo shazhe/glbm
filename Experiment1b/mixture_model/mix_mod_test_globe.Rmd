@@ -24,7 +24,6 @@ We need the following packages and extra functions from the sourced file.
 ## load libraries and source codes
 library(INLA); library(rgdal); library(maptools); library(GEOmap); library(rgl)
 source("c:/ZSwork/glbm/Experiment1b//mixture_model/BarrierModel/functions-barriers-dt-models-march2017.R")
-if(Sys.info()['sysname'] == "Linux"){INLA:::inla.dynload.workaround()}
 set.seed(18)
 ```
 
@@ -70,7 +69,7 @@ fiboSphere2 <- function(N = 1000L, L0 = FALSE) {
   cbind(lon = lon, lat = lat)
 }
 
-fibo_points <- fiboSphere2(N = 6000)
+fibo_points <- fiboSphere2(N = 4000)
 ## Remove points on the land
 pinocean <- unlist(over(Ocean, SpatialPoints(coords = fibo_points, proj4string = CRS("+proj=longlat")), returnList=T))
 fibo_inOceans <- fibo_points[pinocean,]
@@ -126,7 +125,7 @@ TinOcean <- unlist(over(Ocean, SpatialPoints(coords=mesh$Trill, proj4string = CR
 TAll <- 1:mesh$t
 TinLand <- TAll[-TinOcean]
 Omega = dt.Omega(list(TinLand, 1:mesh$t), mesh)
-Omega.SP = dt.polygon.omega(mesh, Omega, globe = TRUE, round = 2)
+#Omega.SP = dt.polygon.omega(mesh, Omega, globe = TRUE, round = 2)
 ## Plot the result in 3d
 plot(mesh, t.sub = Omega[[2]], col = "lightblue", rgl = TRUE )
 plot(mesh, t.sub = Omega[[1]], col = "yellow",  rgl = TRUE, add = TRUE)
@@ -135,7 +134,7 @@ writeWebGL(dir = "~/glbm/Experiment1b/mixture_model/",
            width = 600, reuse = TRUE)
 
 ## Plot the result in 2d
-plot(mesh, t.sub = Omega[[1]])
+plot(mesh, t.sub = Omega[[2]], rgl = T)
 ```
 
 Now use this mesh to build the model and simulate data.
