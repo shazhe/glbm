@@ -7,7 +7,7 @@ source("functions-barriers-dt-models-march2017.R")
 
 ## Load data
 ## 1 Load GIA prior
-ice6g <- read.table("/./project/GlobalMass/WP2-SolidEarth/BHMinputs/GIA/GIA_Pel-6-VM5.txt", header = T)
+ice6g <- read.table("/./projects/GlobalMass/WP2-SolidEarth/BHMinputs/GIA/GIA_Pel-6-VM5.txt", header = T)
 polycoords <- ice6g[,c(6:13, 6,7)] 
 plist <- lapply(ice6g$ID, 
                 function(x) Polygons(list(Polygon(cbind(lon = as.numeric(polycoords[x, c(1,3,5,7,9)]), 
@@ -17,7 +17,7 @@ Plist <- SpatialPolygons(plist, proj4string = CRS("+proj=longlat"))
 ## Corresponding transformation is needed in the following in geometery operations.
 
 ## 2 Load GPS data
-GPSV4b <- read.table("/./project/GlobalMass/WP2-SolidEarth/BHMinputs/GPS/GPS_v04b.txt", header = T)
+GPSV4b <- read.table("/./projects/GlobalMass/WP2-SolidEarth/BHMinputs/GPS/GPS_v04b.txt", header = T)
 
 ## ----prior, cache = TRUE-------------------------------------------------
 ## Priors mean and variance for the parameters: rho and sigma
@@ -106,7 +106,7 @@ GPS_pred <- data.frame(lon = GPS_data$lon, lat = GPS_data$lat, u = GPS_u)
 GIA_diff <- INLA_pred$mean[GIA_idx] 
 GIA_m <- GIA_diff + GIA_prior
 GIA_u <- INLA_pred$sd[GIA_idx]
-proj <- inla.mesh.projector(Mesh_GIA, projection = "longlat", dims = c(360,180), xlim = c(0,360), ylim = c(-90, 90))
+proj <- inla.mesh.projector(mesh, projection = "longlat", dims = c(360,180), xlim = c(0,360), ylim = c(-90, 90))
 GIA_grid <- expand.grid(proj$x, proj$y)
 GIA_pred <- data.frame(lon = GIA_grid[,1], lat = GIA_grid[,2],
                        diff = as.vector(inla.mesh.project(proj, as.vector(GIA_diff))),
@@ -132,10 +132,10 @@ lsigma_mean <- pars_GIA$summary.log.variance.nominal$mean
 lsigma_sd <- pars_GIA$summary.log.variance.nominal$sd
 sigma_mode <- exp(lsigma_mean - lsigma_sd^2)
 
-plot(pars_GIA$marginals.range.nominal[[1]], type = "l",
-     main = bquote(bold(rho("mode") == .(round(rho_mode, 4))))) # The posterior from inla output
-plot(pars_GIA$marginals.variance.nominal[[1]], type = "l", 
-     main = bquote(bold({sigma^2}("mode") == .(round(sigma_mode, 4))))) # The posterior from inla output
+# plot(pars_GIA$marginals.range.nominal[[1]], type = "l",
+#      main = bquote(bold(rho("mode") == .(round(rho_mode, 4))))) # The posterior from inla output
+# plot(pars_GIA$marginals.variance.nominal[[1]], type = "l", 
+#      main = bquote(bold({sigma^2}("mode") == .(round(sigma_mode, 4))))) # The posterior from inla output
 
 ## The estimated correlation length
 rho_mode*6371
@@ -160,7 +160,7 @@ grid.arrange(map_prior, map_GIA, map_diff, map_sd, ncol = 2)
 
 ## ----polygons, include = FALSE, message = FALSE, cache = TRUE------------
 ## Load the pseudo polygon
-zeroPolygon <- readOGR(dsn = "/./project/GlobalMass/WP1-BHM/Experiment1b/shapefiles", layer = "zero03")
+zeroPolygon <- readOGR(dsn = "/./projects/GlobalMass/WP1-BHM/Experiment1b/shapefiles", layer = "zero03")
 
 ## Remove polygons that are too small
 zeroPolys <- zeroPolygon@polygons[[1]]@Polygons
@@ -174,14 +174,14 @@ zeroPoly@polygons[[1]]@Polygons <- zeropolys2
 #### Dense points outside the polygons
 pinPoly <- unlist(over(zeroPoly, SpatialPoints(coords = fibo_points), returnList=T))
 fibo_inSub<- fibo_points[-pinPoly,]
-plot(zeroPoly)
+#plot(zeroPoly)
 points(fibo_inSub, pch = ".")
 
 #### Sparse points in the polygons
 fibo_points2 <- fiboSphere(N = 500, L0=TRUE)
 pinPoly <- unlist(over(zeroPoly, SpatialPoints(coords = fibo_points2), returnList=T))
 fibo_inPoly<- fibo_points2[pinPoly,]
-plot(zeroPoly)
+#plot(zeroPoly)
 points(fibo_inPoly, pch = ".")
 points(fibo_inSub, pch = ".")
 
@@ -190,6 +190,13 @@ mesh_points_xyz <- do.call(cbind, Lll2xyz(lat = fibo_points_all[,2], lon = fibo_
 mesh2 <- inla.mesh.2d(loc = mesh_points_xyz, cutoff = 0.01, max.edge = 0.5)
 mesh2 <- inla.mesh.2d(loc = mesh2$loc, cutoff = 0.01, max.edge = 0.5)
 summary(mesh2) # give the desired number of vertices and triangles.
+
+## For this new mesh the GIA prior mean for the mesh vertices need to re-calculate.
+meshLL <- Lxyz2ll(list(x=mesh2$loc[,1], y = mesh2$loc[,2], z = mesh2$loc[,3]))
+meshLL$lon <- ifelse(meshLL$lon >= -0.5, meshLL$lon,meshLL$lon + 360)
+mesh_sp <- SpatialPoints(data.frame(lon = meshLL$lon, lat = meshLL$lat), proj4string = CRS("+proj=longlat")) 
+mesh_idx <- over(mesh_sp, Plist)
+GIA_prior2 <- ice6g$trend[mesh_idx]
 
 ## ----mesh3, include = TRUE, cache=TRUE-----------------------------------
 mesh2 <- dt.mesh.addon.posTri(mesh = mesh2, globe = TRUE)
@@ -200,15 +207,15 @@ TinPoly <- unlist(over(zeroPoly, SpatialPoints(coords=mesh2$Trill), returnList=T
 TAll <- 1:mesh2$t
 ToutPoly <- TAll[-TinPoly]
 Omega = dt.Omega(list(TinPoly, 1:mesh2$t), mesh2)
-plot(mesh2, t.sub = Omega[[2]])
-plot(mesh2, t.sub = Omega[[1]])
+#plot(mesh2, t.sub = Omega[[2]])
+#plot(mesh2, t.sub = Omega[[1]])
 
 ## ----data2, include = TRUE, cache=TRUE-----------------------------------
 ## Remove GPS data inside the polygon
 GPS_inPoly <- unlist(over(zeroPoly, SpatialPoints(coords = cbind(GPSV4b$lon, GPSV4b$lat)), returnList=T))
 GPS_All <- 1:nrow(GPS_data)
 GPS_outPoly <- GPS_All[-GPS_inPoly]
-plot(GPS_data[GPS_outPoly,c("lon", "lat")], pch = "+")
+#plot(GPS_data[GPS_outPoly,c("lon", "lat")], pch = "+")
 
 GPS_data2 <- GPS_data[GPS_outPoly,]
 GPS_loc2 <- GPS_loc[GPS_outPoly,]
@@ -250,37 +257,37 @@ st.pred <- inla.stack(data = list(y=NA), A = list(A_pred),
 stGIA <- inla.stack(st.est, st.pred)
 
 ## Fix the GPS errors
-prec_scale <- c(1/GPS_data$std^2, 1/0.01^2, rep(1, nrow(A_pred)))
+prec_scale <- c(1/GPS_data2$std^2, 1/0.01^2, rep(1, nrow(A_pred)))
 
 ## ----inla_run2, include = TRUE, eval = FALSE-----------------------------
-## ## Run INLA
-## res_inla <- inla(formula, data = inla.stack.data(stGIA, spde = GIA_spde), family = "gaussian",
-##                  scale =prec_scale, control.family = list(hyper = hyper),
-##                  control.predictor=list(A=inla.stack.A(stGIA), compute =TRUE))
-## 
-## ## Extract and project predictions
-## INLA_pred <- res_inla$summary.linear.predictor
-## pred_idx <- inla.stack.index(stGIA, tag = "pred")$data
-## GPS_idx <- pred_idx[1:nrow(rbind(GPS_data2, GPS_data3))]
-## GIA_idx <- pred_idx[-c(1:nrow(rbind(GPS_data2, GPS_data3)))]
-## 
-## ## GPS
-## GPS_u <- INLA_pred$sd[GPS_idx]
-## GPS_pred <- data.frame(lon = GPS_all$lon, lat = GPS_all$lat, u = GPS_u)
-## 
-## ## GIA
-## GIA_diff <- INLA_pred$mean[GIA_idx]
-## GIA_m <- GIA_diff + GIA_prior
-## GIA_u <- INLA_pred$sd[GIA_idx]
-## proj <- inla.mesh.projector(Mesh_GIA, projection = "longlat", dims = c(360,180), xlim = c(0,360), ylim = c(-90, 90))
-## GIA_grid <- expand.grid(proj$x, proj$y)
-## GIA_pred <- data.frame(lon = GIA_grid[,1], lat = GIA_grid[,2],
-##                        diff = as.vector(inla.mesh.project(proj, as.vector(GIA_diff))),
-##                        mean = as.vector(inla.mesh.project(proj, as.vector(GIA_m))),
-##                        u = as.vector(inla.mesh.project(proj, as.vector(GIA_u))))
-## 
-## ress2 <- list(res_inla = res_inla, spde = GIA_spde, st = stGIA,
-##              mesh = mesh2, GPS_pred = GPS_pred, GIA_pred = GIA_pred)
+## Run INLA
+res_inla <- inla(formula, data = inla.stack.data(stGIA, spde = GIA_spde), family = "gaussian",
+                 scale =prec_scale, control.family = list(hyper = hyper),
+                 control.predictor=list(A=inla.stack.A(stGIA), compute =TRUE))
+
+## Extract and project predictions
+INLA_pred <- res_inla$summary.linear.predictor
+pred_idx <- inla.stack.index(stGIA, tag = "pred")$data
+GPS_idx <- pred_idx[1:nrow(rbind(GPS_data2, GPS_data3))]
+GIA_idx <- pred_idx[-c(1:nrow(rbind(GPS_data2, GPS_data3)))]
+
+## GPS
+GPS_u <- INLA_pred$sd[GPS_idx]
+GPS_pred <- data.frame(lon = c(GPS_data2$lon, GPS_data3$lon), lat = c(GPS_data2$lat, GPS_data3$lat), u = GPS_u)
+
+## GIA
+GIA_diff <- INLA_pred$mean[GIA_idx]
+GIA_m <- GIA_diff + GIA_prior2
+GIA_u <- INLA_pred$sd[GIA_idx]
+proj <- inla.mesh.projector(mesh, projection = "longlat", dims = c(360,180), xlim = c(0,360), ylim = c(-90, 90))
+GIA_grid <- expand.grid(proj$x, proj$y)
+GIA_pred <- data.frame(lon = GIA_grid[,1], lat = GIA_grid[,2],
+                       diff = as.vector(inla.mesh.project(proj, as.vector(GIA_diff))),
+                       mean = as.vector(inla.mesh.project(proj, as.vector(GIA_m))),
+                       u = as.vector(inla.mesh.project(proj, as.vector(GIA_u))))
+
+ress2 <- list(res_inla = res_inla, spde = GIA_spde, st = stGIA,
+             mesh = mesh2, GPS_pred = GPS_pred, GIA_pred = GIA_pred)
 
 ## ----inla_setup3, include = TRUE, cache = TRUE---------------------------
 ## Get the submesh
@@ -305,34 +312,42 @@ stGIA <- inla.stack(st.est, st.pred)
 prec_scale <- c(1/GPS_data2$std^2, 1/GPS_data3$std^2, rep(1, nrow(A_pred)))
 
 ## ----inla_run3, include = TRUE, eval = FALSE-----------------------------
-## ## Run INLA
-## res_inla <- inla(formula, data = inla.stack.data(stGIA, spde = GIA_spde), family = "gaussian",
-##                  scale =prec_scale, control.family = list(hyper = hyper),
-##                  control.predictor=list(A=inla.stack.A(stGIA), compute =TRUE))
-## 
-## ## Extract and project predictions
-## INLA_pred <- res_inla$summary.linear.predictor
-## pred_idx <- inla.stack.index(stGIA, tag = "pred")$data
-## GPS_idx <- pred_idx[1:nrow(rbind(GPS_data2, GPS_data3))]
-## GIA_idx <- pred_idx[-c(1:nrow(rbind(GPS_data2, GPS_data3)))]
-## 
-## ## GPS
-## GPS_u <- INLA_pred$sd[GPS_idx]
-## GPS_pred <- data.frame(lon = GPS_all$lon, lat = GPS_all$lat, u = GPS_u)
-## 
-## ## GIA
-## GIA_diff <- INLA_pred$mean[GIA_idx]
-## GIA_m <- GIA_diff + GIA_prior[]
-## GIA_u <- INLA_pred$sd[GIA_idx]
-## proj <- inla.mesh.projector(Mesh_GIA, projection = "longlat", dims = c(360,180), xlim = c(0,360), ylim = c(-90, 90))
-## GIA_grid <- expand.grid(proj$x, proj$y)
-## GIA_pred <- data.frame(lon = GIA_grid[,1], lat = GIA_grid[,2],
-##                        diff = as.vector(inla.mesh.project(proj, as.vector(GIA_diff))),
-##                        mean = as.vector(inla.mesh.project(proj, as.vector(GIA_m))),
-##                        u = as.vector(inla.mesh.project(proj, as.vector(GIA_u))))
-## 
-## ress3 <- list(res_inla = res_inla, spde = GIA_spde, st = stGIA,
-##             mesh = Mesh_GIA, GPS_pred = GPS_pred, GIA_pred = GIA_pred)
+## Run INLA
+res_inla <- inla(formula, data = inla.stack.data(stGIA, spde = GIA_spde), family = "gaussian",
+                 scale =prec_scale, control.family = list(hyper = hyper),
+                 control.predictor=list(A=inla.stack.A(stGIA), compute =TRUE))
+
+## Extract and project predictions
+INLA_pred <- res_inla$summary.linear.predictor
+pred_idx <- inla.stack.index(stGIA, tag = "pred")$data
+GPS_idx <- pred_idx[1:nrow(rbind(GPS_data2, GPS_data3))]
+GIA_idx <- pred_idx[-c(1:nrow(rbind(GPS_data2, GPS_data3)))]
+
+## GPS
+GPS_u <- INLA_pred$sd[GPS_idx]
+GPS_pred <- data.frame(lon = c(GPS_data2$lon, GPS_data3$lon), lat = c(GPS_data2$lat, GPS_data3$lat), u = GPS_u)
+
+## GIA
+GIA_diff <- INLA_pred$mean[GIA_idx]
+
+## For this new mesh the GIA prior mean for the mesh vertices need to re-calculate.
+meshLL <- Lxyz2ll(list(x=mesh_outPoly$loc[,1], y = mesh_outPoly$loc[,2], z = mesh_outPoly$loc[,3]))
+meshLL$lon <- ifelse(meshLL$lon >= -0.5, meshLL$lon,meshLL$lon + 360)
+mesh_sp <- SpatialPoints(data.frame(lon = meshLL$lon, lat = meshLL$lat), proj4string = CRS("+proj=longlat")) 
+mesh_idx <- over(mesh_sp, Plist)
+GIA_prior3 <- ice6g$trend[mesh_idx]
+
+GIA_m <- GIA_diff + GIA_prior3
+GIA_u <- INLA_pred$sd[GIA_idx]
+proj <- inla.mesh.projector(mesh, projection = "longlat", dims = c(360,180), xlim = c(0,360), ylim = c(-90, 90))
+GIA_grid <- expand.grid(proj$x, proj$y)
+GIA_pred <- data.frame(lon = GIA_grid[,1], lat = GIA_grid[,2],
+                       diff = as.vector(inla.mesh.project(proj, as.vector(GIA_diff))),
+                       mean = as.vector(inla.mesh.project(proj, as.vector(GIA_m))),
+                       u = as.vector(inla.mesh.project(proj, as.vector(GIA_u))))
+
+ress3 <- list(res_inla = res_inla, spde = GIA_spde, st = stGIA,
+            mesh = mesh, GPS_pred = GPS_pred, GIA_pred = GIA_pred)
 
 ## ----inla_setup4, include = TRUE, cache = TRUE---------------------------
 mesh <- mesh2
@@ -346,40 +361,41 @@ A_pred <- inla.spde.make.A(mesh = mesh, loc = rbind(GPS_loc2, GPS_loc3, mesh$loc
 
 ## Create the estimation and prediction stack
 st.est <- inla.stack(data = list(y=c(GPS_data2$trend0, GPS_data3$trend0)), A = list(A_data),
-                     effects = list(GIA = 1:GIA_spde$n.spde), tag = "est")
+                     effects = list(GIA = 1:mesh$n), tag = "est")
 st.pred <- inla.stack(data = list(y=NA), A = list(A_pred),
-                      effects = list(GIA=1:GIA_spde$n.spde), tag = "pred")
+                      effects = list(GIA = 1:mesh$n), tag = "pred")
 stGIA <- inla.stack(st.est, st.pred)
 ## Fix the GPS errors
 prec_scale <- c(1/GPS_data2$std^2, 1/GPS_data3$std^2, rep(1, nrow(A_pred)))
 
 ## ----inla_run4, include = TRUE, eval = FALSE-----------------------------
-## ## Run INLA
-## res_inla <- inla(formula, data=inla.stack.data(stGIA), family = "gaussian",
-##                    scale =prec_scale, control.family = list(hyper = hyper),
-##                    control.predictor=list(A = inla.stack.A(stGIA), compute = TRUE))
-## 
-## ## Extract and project predictions
-## INLA_pred <- res_inla$summary.linear.predictor
-## pred_idx <- inla.stack.index(stGIA, tag = "pred")$data
-## GPS_idx <- pred_idx[1:nrow(rbind(GPS_data2, GPS_data3))]
-## GIA_idx <- pred_idx[-c(1:nrow(rbind(GPS_data2, GPS_data3)))]
-## 
-## ## GPS
-## GPS_u <- INLA_pred$sd[GPS_idx]
-## GPS_pred <- data.frame(lon = GPS_all$lon, lat = GPS_all$lat, u = GPS_u)
-## 
-## ## GIA
-## GIA_diff <- INLA_pred$mean[GIA_idx]
-## GIA_m <- GIA_diff + GIA_prior[]
-## GIA_u <- INLA_pred$sd[GIA_idx]
-## proj <- inla.mesh.projector(Mesh_GIA, projection = "longlat", dims = c(360,180), xlim = c(0,360), ylim = c(-90, 90))
-## GIA_grid <- expand.grid(proj$x, proj$y)
-## GIA_pred <- data.frame(lon = GIA_grid[,1], lat = GIA_grid[,2],
-##                        diff = as.vector(inla.mesh.project(proj, as.vector(GIA_diff))),
-##                        mean = as.vector(inla.mesh.project(proj, as.vector(GIA_m))),
-##                        u = as.vector(inla.mesh.project(proj, as.vector(GIA_u))))
-## 
-## ress4 <- list(res_inla = res_inla, spde = GIA_spde, st = stGIA,
-##             mesh = Mesh_GIA, GPS_pred = GPS_pred, GIA_pred = GIA_pred)
+## Run INLA
+res_inla <- inla(formula, data=inla.stack.data(stGIA), family = "gaussian",
+                   scale =prec_scale, control.family = list(hyper = hyper),
+                   control.predictor=list(A = inla.stack.A(stGIA), compute = TRUE))
 
+## Extract and project predictions
+INLA_pred <- res_inla$summary.linear.predictor
+pred_idx <- inla.stack.index(stGIA, tag = "pred")$data
+GPS_idx <- pred_idx[1:nrow(rbind(GPS_data2, GPS_data3))]
+GIA_idx <- pred_idx[-c(1:nrow(rbind(GPS_data2, GPS_data3)))]
+
+## GPS
+GPS_u <- INLA_pred$sd[GPS_idx]
+GPS_pred <- data.frame(lon = c(GPS_data2$lon, GPS_data3$lon), lat = c(GPS_data2$lat, GPS_data3$lat), u = GPS_u)
+
+## GIA
+GIA_diff <- INLA_pred$mean[GIA_idx]
+GIA_m <- GIA_diff + GIA_prior2
+GIA_u <- INLA_pred$sd[GIA_idx]
+proj <- inla.mesh.projector(mesh, projection = "longlat", dims = c(360,180), xlim = c(0,360), ylim = c(-90, 90))
+GIA_grid <- expand.grid(proj$x, proj$y)
+GIA_pred <- data.frame(lon = GIA_grid[,1], lat = GIA_grid[,2],
+                       diff = as.vector(inla.mesh.project(proj, as.vector(GIA_diff))),
+                       mean = as.vector(inla.mesh.project(proj, as.vector(GIA_m))),
+                       u = as.vector(inla.mesh.project(proj, as.vector(GIA_u))))
+
+ress4 <- list(res_inla = res_inla, spde = GIA_spde, st = stGIA,
+            mesh = mesh, GPS_pred = GPS_pred, GIA_pred = GIA_pred)
+
+save(ress1, ress2, ress3, ress4, "/./projects/GlobalMass/WP1-BHM/Experiment1b/GIA_RGL/GIA_compare.RData")
