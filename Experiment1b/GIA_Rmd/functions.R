@@ -49,7 +49,58 @@ fiboSphere <- function(N = 1000L, LL = TRUE, L0 = FALSE) {
 }
 
 ## 4 Wrapper for esitmation and prediction using INLA  
-BayesDA_GIA <- function(GIA, GPS, trho, tsigma){
+BayesDA_GIA<- function(Mesh_GIA, GPS_data){
+  GIA_spde <- inla.spde2.matern(Mesh_GIA, B.tau = matrix(c(ltau0, -1, 1),1,3), B.kappa = matrix(c(lkappa0, 0, -1), 1,3),
+                                theta.prior.mean = c(0,0), theta.prior.prec = c(sqrt(1/theta1_s), sqrt(1/theta2_s)))
+  
+  ## Link the process to observations and predictions
+  A_data <- inla.spde.make.A(mesh = Mesh_GIA, loc = GPS_loc)
+  A_pred <- inla.spde.make.A(mesh = Mesh_GIA, loc = rbind(GPS_loc, Mesh_GIA$loc))
+  
+  ## Create the estimation and prediction stack
+  st.est <- inla.stack(data = list(y=GPS_data$trend0), A = list(A_data),
+                       effects = list(GIA = 1:GIA_spde$n.spde), tag = "est")
+  st.pred <- inla.stack(data = list(y=NA), A = list(A_pred),
+                        effects = list(GIA=1:GIA_spde$n.spde), tag = "pred")
+  stGIA <- inla.stack(st.est, st.pred)
+  
+  ## Fix the GPS errors
+  prec_scale <- c(1/GPS_data$std^2, rep(1, nrow(A_pred)))
+  
+  ## Run INLA
+  res_inla <- inla(formula, data = inla.stack.data(stGIA, spde = GIA_spde), family = "gaussian",
+                   scale =prec_scale, control.family = list(hyper = hyper),
+                   control.predictor=list(A=inla.stack.A(stGIA), compute =TRUE))
+  
+  INLA_pred <- res_inla$summary.linear.predictor
+  
+  ## Extract and project predictions
+  pred_idx <- inla.stack.index(stGIA, tag = "pred")$data
+  GPS_idx <- pred_idx[1:nrow(GPS_data)]
+  GIA_idx <- pred_idx[-c(1:nrow(GP_dataS))]
+  
+  ## GPS 
+  GPS_u <- INLA_pred$sd[GPS_idx]
+  GPS_pred <- data.frame(lon = GPSX, lat = GPS$lat, u = GPS_u)
+  
+  ## GIA
+  GIA_diff <- INLA_pred$mean[GIA_idx] 
+  GIA_m <- GIA_diff + GIA_prior
+  GIA_u <- INLA_pred$sd[GIA_idx]
+  proj <- inla.mesh.projector(Mesh_GIA, projection = "longlat", dims = c(360,180), xlim = c(0, 360), ylim = c(-90, 90))
+  GIA_grid <- expand.grid(proj$x, proj$y)
+  GIA_pred <- data.frame(lon = GIA_grid[,1], lat = GIA_grid[,2],
+                         diff = as.vector(inla.mesh.project(proj, as.vector(GIA_diff))),
+                         mean = as.vector(inla.mesh.project(proj, as.vector(GIA_m))),
+                         u = as.vector(inla.mesh.project(proj, as.vector(GIA_u))))
+  
+  return(list(res_inla = res_inla, spde = GIA_spde, st = stGIA, 
+              mesh = Mesh_GIA, GPS_pred = GPS_pred, GIA_pred = GIA_pred))
+}
+
+
+
+BayesDA<- function(GIA, GPS, trho, tsigma){
   
   fibo_points <- fiboSphere2(N = 12960)
   mesh_points_xyz <- do.call(cbind, Lll2xyz(lat = fibo_points[,2], lon = fibo_points[,1]))

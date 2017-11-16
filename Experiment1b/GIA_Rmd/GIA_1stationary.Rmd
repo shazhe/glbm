@@ -177,8 +177,6 @@ if(Sys.info()["sysname"] == "Windows"){
 }else if(grep("Ubuntu",Sys.info()["version"]) == 1){
  load("~/GMdata/GIA_RGL/res1.RData")
 }
-
-INLA_pred <- res_inla$summary.linear.predictor
 ```
 
 # Analyse results
@@ -207,8 +205,10 @@ GIA_pred <- data.frame(lon = GIA_grid[,1], lat = GIA_grid[,2],
                        mean = as.vector(inla.mesh.project(proj, as.vector(GIA_m))),
                        u = as.vector(inla.mesh.project(proj, as.vector(GIA_u))))
 
-ress <- list(res_inla = res_inla, spde = GIA_spde, st = stGIA, 
+ress1 <- list(res_inla = res_inla, spde = GIA_spde, st = stGIA, 
             mesh = Mesh_GIA, GPS_pred = GPS_pred, GIA_pred = GIA_pred)
+
+save(ress1, file = "/./projects/GlobalMass/WP1-BHM/Experiment1b/GIA_RGL/res1.RData")
 ```
 
 
