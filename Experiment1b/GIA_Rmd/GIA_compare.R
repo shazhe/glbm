@@ -398,4 +398,4 @@ GIA_pred <- data.frame(lon = GIA_grid[,1], lat = GIA_grid[,2],
 ress4 <- list(res_inla = res_inla, spde = GIA_spde, st = stGIA,
             mesh = mesh, GPS_pred = GPS_pred, GIA_pred = GIA_pred)
 
-save(ress1, ress2, ress3, ress4, "/./projects/GlobalMass/WP1-BHM/Experiment1b/GIA_RGL/GIA_compare.RData")
+save(ress1, ress2, ress3, ress4, file ="/./projects/GlobalMass/WP1-BHM/Experiment1b/GIA_RGL/GIA_compare.RData")

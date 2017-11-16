@@ -359,11 +359,13 @@ Then we run INLA and assemble results same as previously and store the resutsl i
 # Compare results
 
 ```{r load_res, include = FALSE}
-laod("/./projects/GlobalMass/WP1-BHM/Experiment1b/GIA_RGL/GIA_compare.RData")
+load("z:/WP1-BHM/Experiment1b/GIA_RGL/GIA_compare.RData")
 ```
 
 Plot the posteriors of the hyper parameters.
 ```{r hyper, eval = FALSE}
+res_inla <- ress3$res_inla
+GIA_spde <- ress3$spde
 pars_GIA <- inla.spde2.result(res_inla, "GIA", GIA_spde, do.transf=TRUE)
 theta_mean <- pars_GIA$summary.theta$mean
 theta_sd <- pars_GIA$summary.theta$sd
