@@ -183,12 +183,10 @@ BayesDA<- function(GIA, GPS, trho, tsigma){
 }
 
 
-## 5 Plot predicted mean
-## Plot predicted mean
+## 5 Plot the predicted field
 map_res <- function(data, xname, yname, fillvar, colpal = NULL, limits=NULL, title){
   plot_data <- data[c(xname, yname, fillvar)]
   names(plot_data) <- c("X", "Y", "Fill")
-  
   beauty <- 
     theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), 
           panel.background = element_rect(fill = "white", colour = 'white'), 
@@ -202,7 +200,7 @@ map_res <- function(data, xname, yname, fillvar, colpal = NULL, limits=NULL, tit
           panel.border = element_blank())
   world_map <- map_data("world2")
   baseworld <- geom_polygon(data = world_map, aes(x=long, y=lat, group=group), colour="grey", fill = NA, alpha = 0.5)  
-  
+ 
   colbar <- guide_colorbar(barwidth = 2, barheight = 10, label.position = "right", title.position = "bottom")
   
   if(is.null(colpal)){
@@ -225,6 +223,18 @@ map_res <- function(data, xname, yname, fillvar, colpal = NULL, limits=NULL, tit
 }
 
 
+## plot simulated field
+map_res2 <- function(res, colpal = NULL, limits=NULL, title, ...){
+  mesh <- res$mesh
+  proj = inla.mesh.projector(mesh,  projection = "longlat", dims = c(360,180), xlim = c(0, 360), ylim = c(-90, 90))
+  
+  field.proj = inla.mesh.project(proj, field)
+  image.plot(list(x = proj$x, y=proj$y, z = field.proj),
+             ...)
+}
+
+
+
 ## 6 Plot zoom in
 map_zoom <-function(data_field, data_obs, zoom_coords, colpal, limits=NULL){
   lon1 <- zoom_coords$lon[1]
@@ -245,6 +255,7 @@ map_zoom <-function(data_field, data_obs, zoom_coords, colpal, limits=NULL){
           panel.border = element_blank())
   world_map <- map_data("world2")
   baseworld <- geom_polygon(data = world_map, aes(x=long, y=lat, group=group), colour="grey", fill = NA, alpha = 0.5) + beauty 
+ 
   
   colbar <- guide_colorbar(barwidth = 2, barheight = 10, label.position = "right", title.position = "bottom")
   
@@ -322,13 +333,54 @@ mesh.sub <- function(mesh, Omega, i = 2){
 }
 
 
-## additional plot function
-
-local.plot.field = function(field, mesh, ...){
-  proj = inla.mesh.projector(mesh,  projection = "longlat", dims = c(360,180), xlim = c(0, 360), ylim = c(-90, 90))
-  field.proj = inla.mesh.project(proj, field)
-  image.plot(list(x = proj$x, y=proj$y, z = field.proj),
-             ...)
+#### additional plot function
+## plot posterior hyperparameters
+marginal_par <- function(res,  mixture = FALSE, plot = FALSE){
+  if(mixture){
+    theta1 <- res_inla$marginals.hyperpar$`Theta1 for GIA`
+    theta2 <- res_inla$marginals.hyperpar$`Theta2 for GIA`
+    
+    Vmar<- inla.tmarginal(exp, theta1)
+    Rmar <- inla.tmarginal(exp, theta2)
+    
+    ## Find the mode of rho and sigma^2
+    lrho_mode <- res_inla$summary.hyperpar$mode[2]
+    lrho_mean <- res_inla$summary.hyperpar$mean[2]
+    lrho_sd <- res_inla$summary.hyperpar$sd[2]
+    rho_mode <- exp(lrho_mean - lrho_sd^2)
+    
+    lsigma_mode <- res_inla$summary.hyperpar$mode[1]
+    lsigma_mean <- res_inla$summary.hyperpar$mean[1]
+    lsigma_sd <- res_inla$summary.hyperpar$sd[1]
+    sigma_mode <- exp(lsigma_mean - lsigma_sd^2)
+    
+  }else{
+    res_inla <- res$res_inla
+    GIA_spde <- res$spde
+    pars_GIA <- inla.spde2.result(res_inla, "GIA", GIA_spde, do.transf=TRUE)
+    Vmar <-pars_GIA$marginals.variance.nominal[[1]]
+    Rmar <- pars_GIA$marginals.range.nominal[[1]]
+    
+    ## Find the mode of rho and sigma^2
+    lrho_mode <- pars_GIA$summary.log.range.nominal$mode
+    lrho_mean <- pars_GIA$summary.log.range.nominal$mean
+    lrho_sd <- pars_GIA$summary.log.range.nominal$sd
+    rho_mode <- exp(lrho_mean - lrho_sd^2)
+    
+    lsigma_mode <- pars_GIA$summary.log.variance.nominal$mode
+    lsigma_mean <- pars_GIA$summary.log.variance.nominal$mean
+    lsigma_sd <- pars_GIA$summary.log.variance.nominal$sd
+    sigma_mode <- exp(lsigma_mean - lsigma_sd^2)
+  }
+  
+  if(plot){
+    plot(Vmar, type = "l", main = bquote(bold({sigma^2}("mode") == .(round(sigma_mode, 4)))))
+    plot(Rmar, type = "l", main = bquote(bold(rho("mode") == .(round(rho_mode, 4)))))
+  }
+  return(list(Vmar=Vmar, Rmar=Rmar, sigma_mode=sigma_mode, rho_mode=rho_mode))
 }
+
+
+
 
 

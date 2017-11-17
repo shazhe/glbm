@@ -364,30 +364,36 @@ load("z:/WP1-BHM/Experiment1b/GIA_RGL/GIA_compare.RData")
 
 Plot the posteriors of the hyper parameters.
 ```{r hyper, eval = FALSE}
-res_inla <- ress3$res_inla
-GIA_spde <- ress3$spde
-pars_GIA <- inla.spde2.result(res_inla, "GIA", GIA_spde, do.transf=TRUE)
-theta_mean <- pars_GIA$summary.theta$mean
-theta_sd <- pars_GIA$summary.theta$sd
+pars_pm1 <- marginal_par(res = ress1)
+pars_pm2 <- marginal_par(res = ress2)
+pars_pm3 <- marginal_par(res = ress3)
+pars_pm4 <- marginal_par(res = ress4, mixture = TRUE)
 
-## Find the mode of rho and sigma^2
-lrho_mode <- pars_GIA$summary.log.range.nominal$mode
-lrho_mean <- pars_GIA$summary.log.range.nominal$mean
-lrho_sd <- pars_GIA$summary.log.range.nominal$sd
-rho_mode <- exp(lrho_mean - lrho_sd^2)
+## The posterior modes
+print(paste("The estimated correlation lengths are:",
+            pars_pm1$rho_mode*6371, 
+            pars_pm2$rho_mode*6371, 
+            pars_pm3$rho_mode*6371,
+            pars_pm4$rho_mode*6371, sep = "  "))
 
-lsigma_mode <- pars_GIA$summary.log.variance.nominal$mode
-lsigma_mean <- pars_GIA$summary.log.variance.nominal$mean
-lsigma_sd <- pars_GIA$summary.log.variance.nominal$sd
-sigma_mode <- exp(lsigma_mean - lsigma_sd^2)
+print(paste("The estimated marginal variances are:",
+            pars_pm1$sigma_mode, 
+            pars_pm2$sigma_mode, 
+            pars_pm3$sigma_mode,
+            pars_pm4$sigma_mode, sep = "  "))
 
-plot(pars_GIA$marginals.range.nominal[[1]], type = "l",
-     main = bquote(bold(rho("mode") == .(round(rho_mode, 4))))) # The posterior from inla output
-plot(pars_GIA$marginals.variance.nominal[[1]], type = "l", 
-     main = bquote(bold({sigma^2}("mode") == .(round(sigma_mode, 4))))) # The posterior from inla output
+## The posterior distributions
+plot(pars_pm1$Vmar, type = "l", main = bquote(bold({sigma^2})), xlim = c(1, 5), ylim = c(0, 17))
+lines(pars_pm2$Vmar, col = 2)
+lines(pars_pm3$Vmar, col = 3)
+lines(pars_pm4$Vmar, col = 4)
+legend("topright", c("stationary", "polygon obs", "subset", "mixture"), lty = rep(1), col = 1:4)
 
-## The estimated correlation length
-rho_mode*6371
+plot(pars_pm1$Rmar, type = "l", main = bquote(bold({rho})), xlim = c(0.04, 0.12), ylim = c(0, 180))
+lines(pars_pm2$Rmar, col = 2)
+lines(pars_pm3$Rmar, col = 3)
+lines(pars_pm4$Rmar, col = 4)
+legend("topright", c("stationary", "polygon obs", "subset", "mixture"), lty = rep(1), col = 1:4)
 ```
 
 

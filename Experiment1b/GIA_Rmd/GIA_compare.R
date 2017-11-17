@@ -108,13 +108,14 @@ GIA_m <- GIA_diff + GIA_prior
 GIA_u <- INLA_pred$sd[GIA_idx]
 proj <- inla.mesh.projector(mesh, projection = "longlat", dims = c(360,180), xlim = c(0,360), ylim = c(-90, 90))
 GIA_grid <- expand.grid(proj$x, proj$y)
+GIA_predn <- data.frame(diff = GIA_diff, mean = GIA_m, u=GIA_u)
 GIA_pred <- data.frame(lon = GIA_grid[,1], lat = GIA_grid[,2],
                        diff = as.vector(inla.mesh.project(proj, as.vector(GIA_diff))),
                        mean = as.vector(inla.mesh.project(proj, as.vector(GIA_m))),
                        u = as.vector(inla.mesh.project(proj, as.vector(GIA_u))))
 
 ress1 <- list(res_inla = res_inla, spde = GIA_spde, st = stGIA, 
-            mesh = mesh1, GPS_pred = GPS_pred, GIA_pred = GIA_pred)
+            mesh = mesh1, GPS_pred = GPS_pred, GIA_pred = GIA_pred, GIA_predn = GIA_predn)
 
 ## ----hyper, include=TRUE-------------------------------------------------
 pars_GIA <- inla.spde2.result(res_inla, "GIA", GIA_spde, do.transf=TRUE)
@@ -285,9 +286,9 @@ GIA_pred <- data.frame(lon = GIA_grid[,1], lat = GIA_grid[,2],
                        diff = as.vector(inla.mesh.project(proj, as.vector(GIA_diff))),
                        mean = as.vector(inla.mesh.project(proj, as.vector(GIA_m))),
                        u = as.vector(inla.mesh.project(proj, as.vector(GIA_u))))
-
+GIA_predn <- data.frame(diff = GIA_diff, mean = GIA_m, u=GIA_u)
 ress2 <- list(res_inla = res_inla, spde = GIA_spde, st = stGIA,
-             mesh = mesh2, GPS_pred = GPS_pred, GIA_pred = GIA_pred)
+             mesh = mesh2, GPS_pred = GPS_pred, GIA_pred = GIA_pred, GIA_predn = GIA_predn)
 
 ## ----inla_setup3, include = TRUE, cache = TRUE---------------------------
 ## Get the submesh
@@ -345,9 +346,9 @@ GIA_pred <- data.frame(lon = GIA_grid[,1], lat = GIA_grid[,2],
                        diff = as.vector(inla.mesh.project(proj, as.vector(GIA_diff))),
                        mean = as.vector(inla.mesh.project(proj, as.vector(GIA_m))),
                        u = as.vector(inla.mesh.project(proj, as.vector(GIA_u))))
-
+GIA_predn <- data.frame(diff = GIA_diff, mean = GIA_m, u=GIA_u)
 ress3 <- list(res_inla = res_inla, spde = GIA_spde, st = stGIA,
-            mesh = mesh, GPS_pred = GPS_pred, GIA_pred = GIA_pred)
+            mesh = mesh, GPS_pred = GPS_pred, GIA_pred = GIA_pred, GIA_predn = GIA_predn)
 
 ## ----inla_setup4, include = TRUE, cache = TRUE---------------------------
 mesh <- mesh2
@@ -394,8 +395,8 @@ GIA_pred <- data.frame(lon = GIA_grid[,1], lat = GIA_grid[,2],
                        diff = as.vector(inla.mesh.project(proj, as.vector(GIA_diff))),
                        mean = as.vector(inla.mesh.project(proj, as.vector(GIA_m))),
                        u = as.vector(inla.mesh.project(proj, as.vector(GIA_u))))
-
+GIA_predn <- data.frame(diff = GIA_diff, mean = GIA_m, u=GIA_u)
 ress4 <- list(res_inla = res_inla, spde = GIA_spde, st = stGIA,
-            mesh = mesh, GPS_pred = GPS_pred, GIA_pred = GIA_pred)
+            mesh = mesh, GPS_pred = GPS_pred, GIA_pred = GIA_pred, GIA_predn = GIA_predn)
 
 save(ress1, ress2, ress3, ress4, file ="/./projects/GlobalMass/WP1-BHM/Experiment1b/GIA_RGL/GIA_compare.RData")
