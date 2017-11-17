@@ -227,10 +227,9 @@ map_res <- function(data, xname, yname, fillvar, colpal = NULL, limits=NULL, tit
 map_res2 <- function(res, colpal = NULL, limits=NULL, title, ...){
   mesh <- res$mesh
   proj = inla.mesh.projector(mesh,  projection = "longlat", dims = c(360,180), xlim = c(0, 360), ylim = c(-90, 90))
-  
-  field.proj = inla.mesh.project(proj, field)
-  image.plot(list(x = proj$x, y=proj$y, z = field.proj),
-             ...)
+  field.pred <- inla.mesh.project(proj, as.vector(res$GIA_predn[,field]))
+  image.plot(list(x = proj$x, y=proj$y, z = field.pred), ...)
+  map("world2", interior = FALSE, add = T, col = "grey")
 }
 
 
