@@ -363,7 +363,7 @@ load("z:/WP1-BHM/Experiment1b/GIA_RGL/GIA_compare.RData")
 ```
 
 Plot the posteriors of the hyper parameters.
-```{r hyper, include = FALSE}
+```{r hyper}
 pars_pm1 <- marginal_par(res = ress1)
 pars_pm2 <- marginal_par(res = ress2)
 pars_pm3 <- marginal_par(res = ress3)
@@ -398,7 +398,7 @@ legend("topright", c("stationary", "polygon obs", "subset", "mixture"), lty = re
 
 
 Plot the predictions.
-```{r predict, include=FALSE}
+```{r predict}
 ress1$GIA_pred$model <- "stationary"
 ress2$GIA_pred$model <- "polygon_Obs"
 ress3$GIA_pred$model <- "subset"
