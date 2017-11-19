@@ -336,6 +336,7 @@ mesh.sub <- function(mesh, Omega, i = 2){
 ## plot posterior hyperparameters
 marginal_par <- function(res,  mixture = FALSE, plot = FALSE){
   if(mixture){
+    res_inla <- res$res_inla
     theta1 <- res_inla$marginals.hyperpar$`Theta1 for GIA`
     theta2 <- res_inla$marginals.hyperpar$`Theta2 for GIA`
     

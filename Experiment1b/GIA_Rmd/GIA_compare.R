@@ -112,7 +112,8 @@ GIA_predn <- data.frame(diff = GIA_diff, mean = GIA_m, u=GIA_u)
 GIA_pred <- data.frame(lon = GIA_grid[,1], lat = GIA_grid[,2],
                        diff = as.vector(inla.mesh.project(proj, as.vector(GIA_diff))),
                        mean = as.vector(inla.mesh.project(proj, as.vector(GIA_m))),
-                       u = as.vector(inla.mesh.project(proj, as.vector(GIA_u))))
+                       u = as.vector(inla.mesh.project(proj, as.vector(GIA_u))),
+                       model = rep("stationary", nrow(GIA_grid)))
 
 ress1 <- list(res_inla = res_inla, spde = GIA_spde, st = stGIA, 
             mesh = mesh1, GPS_pred = GPS_pred, GIA_pred = GIA_pred, GIA_predn = GIA_predn)
@@ -285,7 +286,8 @@ GIA_grid <- expand.grid(proj$x, proj$y)
 GIA_pred <- data.frame(lon = GIA_grid[,1], lat = GIA_grid[,2],
                        diff = as.vector(inla.mesh.project(proj, as.vector(GIA_diff))),
                        mean = as.vector(inla.mesh.project(proj, as.vector(GIA_m))),
-                       u = as.vector(inla.mesh.project(proj, as.vector(GIA_u))))
+                       u = as.vector(inla.mesh.project(proj, as.vector(GIA_u))),
+                       model = rep("polygonObs", nrow(GIA_grid)))
 GIA_predn <- data.frame(diff = GIA_diff, mean = GIA_m, u=GIA_u)
 ress2 <- list(res_inla = res_inla, spde = GIA_spde, st = stGIA,
              mesh = mesh2, GPS_pred = GPS_pred, GIA_pred = GIA_pred, GIA_predn = GIA_predn)
@@ -345,7 +347,8 @@ GIA_grid <- expand.grid(proj$x, proj$y)
 GIA_pred <- data.frame(lon = GIA_grid[,1], lat = GIA_grid[,2],
                        diff = as.vector(inla.mesh.project(proj, as.vector(GIA_diff))),
                        mean = as.vector(inla.mesh.project(proj, as.vector(GIA_m))),
-                       u = as.vector(inla.mesh.project(proj, as.vector(GIA_u))))
+                       u = as.vector(inla.mesh.project(proj, as.vector(GIA_u))),
+                       model = rep("subset", nrow(GIA_grid)))
 GIA_predn <- data.frame(diff = GIA_diff, mean = GIA_m, u=GIA_u)
 ress3 <- list(res_inla = res_inla, spde = GIA_spde, st = stGIA,
             mesh = mesh, GPS_pred = GPS_pred, GIA_pred = GIA_pred, GIA_predn = GIA_predn)
@@ -394,7 +397,8 @@ GIA_grid <- expand.grid(proj$x, proj$y)
 GIA_pred <- data.frame(lon = GIA_grid[,1], lat = GIA_grid[,2],
                        diff = as.vector(inla.mesh.project(proj, as.vector(GIA_diff))),
                        mean = as.vector(inla.mesh.project(proj, as.vector(GIA_m))),
-                       u = as.vector(inla.mesh.project(proj, as.vector(GIA_u))))
+                       u = as.vector(inla.mesh.project(proj, as.vector(GIA_u))),
+                       model = rep("mixture", nrow(GIA_grid)))
 GIA_predn <- data.frame(diff = GIA_diff, mean = GIA_m, u=GIA_u)
 ress4 <- list(res_inla = res_inla, spde = GIA_spde, st = stGIA,
             mesh = mesh, GPS_pred = GPS_pred, GIA_pred = GIA_pred, GIA_predn = GIA_predn)

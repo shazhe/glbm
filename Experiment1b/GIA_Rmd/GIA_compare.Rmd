@@ -31,7 +31,7 @@ First we load the data and prior. Note that the ICE6G solution is given on a 1 d
 ```{r load, message = FALSE, warning=FALSE, cache = TRUE}
 ## Load packages
 library(sp); library(INLA); library(GEOmap)
-library(ggplot2); library(grid); library(gridExtra)
+library(ggplot2); library(grid); library(gridExtra);library(lattice);library(RColorBrewer)
 source("functions.R")
 source("functions-barriers-dt-models-march2017.R")
 
@@ -345,9 +345,9 @@ A_pred <- inla.spde.make.A(mesh = mesh, loc = rbind(GPS_loc2, GPS_loc3, mesh$loc
 
 ## Create the estimation and prediction stack
 st.est <- inla.stack(data = list(y=c(GPS_data2$trend0, GPS_data3$trend0)), A = list(A_data),
-                     effects = list(GIA = 1:GIA_spde$n.spde), tag = "est")
+                     effects = list(GIA = 1:mesh$n), tag = "est")
 st.pred <- inla.stack(data = list(y=NA), A = list(A_pred),
-                      effects = list(GIA=1:GIA_spde$n.spde), tag = "pred")
+                      effects = list(GIA=1:mesh$n), tag = "pred")
 stGIA <- inla.stack(st.est, st.pred)
 ## Fix the GPS errors
 prec_scale <- c(1/GPS_data2$std^2, 1/GPS_data3$std^2, rep(1, nrow(A_pred)))
@@ -363,7 +363,7 @@ load("z:/WP1-BHM/Experiment1b/GIA_RGL/GIA_compare.RData")
 ```
 
 Plot the posteriors of the hyper parameters.
-```{r hyper, eval = FALSE}
+```{r hyper, include = FALSE}
 pars_pm1 <- marginal_par(res = ress1)
 pars_pm2 <- marginal_par(res = ress2)
 pars_pm3 <- marginal_par(res = ress3)
@@ -398,23 +398,80 @@ legend("topright", c("stationary", "polygon obs", "subset", "mixture"), lty = re
 
 
 Plot the predictions.
-```{r predict, include=TRUE, eval = FALSE}
-GPS_pred <- ress$GPS_pred
-GIA_pred <- ress$GIA_pred
-## Plot the GIA prior mean
-map_prior <- map_res(data = ice6g, xname = "x_center", yname = "y_center", fillvar = "trend", 
-                    limits = c(-7, 22), title = "Prior GIA mean field")
-## Plot the GIA predicted mean
-map_GIA <- map_res(data = GIA_pred, xname = "lon", yname = "lat", fillvar = "mean", 
-                  limits = c(-7, 22), title = "Predicted GIA")
-## Plot the GIA difference map
-map_diff <- map_res(data = GIA_pred, xname = "lon", yname = "lat", fillvar = "diff", 
-                  limits = c(-8, 8), title = "GIA difference: Updated - Prior")
-## Plot the GIA difference map
-map_sd <- map_res(data = GIA_pred, xname = "lon", yname = "lat", fillvar = "u", 
-                    colpal = colorRamps::matlab.like(12), title = "Predicted uncertainties")
-## Display
-grid.arrange(map_prior, map_GIA, map_diff, map_sd, ncol = 2)
+```{r predict, include=FALSE}
+ress1$GIA_pred$model <- "stationary"
+ress2$GIA_pred$model <- "polygon_Obs"
+ress3$GIA_pred$model <- "subset"
+ress4$GIA_pred$model <- "mixture"
+
+## The predicted mean
+pred_all <- do.call(rbind, list(ress1$GIA_pred, ress2$GIA_pred, ress3$GIA_pred, ress4$GIA_pred))
+range_mean <- range(pred_all$mean, na.rm = TRUE)
+NAid <- which(is.na(pred_all$diff))
+pred_all[NAid,"mean"] <- range_mean[2] + 1
+
+
+brks1 <- seq(-7, -0.5, length.out=9)
+brks2 <- c(seq(0.5, 16, length.out = 8), 17)
+colreg1 <- rev(brewer.pal(9, "Blues"))
+colreg2 <- brewer.pal(8, "Reds")
+colreg<- c(colreg1, "#FFFFFF", colreg2, "#bebebe")
+brks <- c(brks1, -0.1, 0.1, brks2)
+levelplot(mean ~ lon + lat|model, data = pred_all,
+          col.regions= colreg, at=brks, 
+          colorkey = list(col = colreg, 
+                          labels = list(labels = c(-5, 0, 5, 10, 15, "NA"),
+                                        at = c(-5, 0, 5, 10, 15, 16.5))),
+          panel = function(x,y,z,...){
+            panel.levelplot(x,y,z,...)
+            map2 <- map("world2", interior = FALSE, plot = FALSE)
+            panel.xyplot(x=map2$x, y=map2$y, type = "l")
+            },
+          main = "predicted GIA mean field (mm/yr)", xlab = "longitude", ylab = "latitude")
+
+
+## The predicted uncertainties
+range_u <- range(pred_all$u, na.rm = TRUE)
+pred_all[NAid,"u"] <- range_u[2] + 1
+
+brks <- c(seq(0, 0.8, 0.1),seq(1,3, 0.5), 3.8, 4.6, 5.4)
+colreg <- c(colorRamps::matlab.like(length(brks)-2), "#bebebe")
+levelplot(u ~ lon + lat|model, data = pred_all,
+          col.regions= colreg, at=brks, 
+          colorkey = list(col = colreg, 
+                          labels = list(labels = c(0, 1, 2, 3, "NA"),
+                                        at = c(0, 1, 2, 3, 5))),
+          panel = function(x,y,z,...){
+            panel.levelplot(x,y,z,...)
+            map2 <- map("world2", interior = FALSE, plot = FALSE)
+            panel.xyplot(x=map2$x, y=map2$y, type = "l", col = "grey")
+            },
+          main = "predicted GIA uncertanties (mm/yr)", xlab = "longitude", ylab = "latitude")
+
+## The difference between the predicted mean and prior mean
+range_d <- range(pred_all$diff, na.rm = TRUE)
+pred_all[NAid,"diff"] <- range_d[2] + 1
+
+brks1 <- seq(-7, -0.5, length.out=9)
+brks2 <- c(seq(0.5, 10, length.out = 8), 11)
+colreg1 <- rev(brewer.pal(9, "Blues"))
+colreg2 <- brewer.pal(8, "Reds")
+colreg<- c(colreg1, "#FFFFFF", colreg2, "#bebebe")
+brks <- c(brks1, -0.1, 0.1, brks2)
+levelplot(diff ~ lon + lat|model, data = pred_all,
+          col.regions= colreg, at=brks, 
+          colorkey = list(col = colreg, 
+                          labels = list(labels = c(-5, 0, 5, "NA"),
+                                        at = c(-5, 0, 5, 10.5))),
+          panel = function(x,y,z,...){
+            panel.levelplot(x,y,z,...)
+            map2 <- map("world2", interior = FALSE, plot = FALSE)
+            panel.xyplot(x=map2$x, y=map2$y, type = "l", col = "grey")
+            },
+          main = "predicted GIA mean field (mm/yr)", xlab = "longitude", ylab = "latitude")
+
+
+
 ```
 
 
