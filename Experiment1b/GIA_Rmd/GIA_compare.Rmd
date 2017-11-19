@@ -425,7 +425,7 @@ levelplot(mean ~ lon + lat|model, data = pred_all,
           panel = function(x,y,z,...){
             panel.levelplot(x,y,z,...)
             map2 <- map("world2", interior = FALSE, plot = FALSE)
-            panel.xyplot(x=map2$x, y=map2$y, type = "l")
+            panel.xyplot(x=map2$x, y=map2$y, type = "l", col = "black")
             },
           main = "predicted GIA mean field (mm/yr)", xlab = "longitude", ylab = "latitude")
 
@@ -444,7 +444,7 @@ levelplot(u ~ lon + lat|model, data = pred_all,
           panel = function(x,y,z,...){
             panel.levelplot(x,y,z,...)
             map2 <- map("world2", interior = FALSE, plot = FALSE)
-            panel.xyplot(x=map2$x, y=map2$y, type = "l", col = "grey")
+            panel.xyplot(x=map2$x, y=map2$y, type = "l", col = "black")
             },
           main = "predicted GIA uncertanties (mm/yr)", xlab = "longitude", ylab = "latitude")
 
@@ -466,9 +466,9 @@ levelplot(diff ~ lon + lat|model, data = pred_all,
           panel = function(x,y,z,...){
             panel.levelplot(x,y,z,...)
             map2 <- map("world2", interior = FALSE, plot = FALSE)
-            panel.xyplot(x=map2$x, y=map2$y, type = "l", col = "grey")
+            panel.xyplot(x=map2$x, y=map2$y, type = "l", col = "black")
             },
-          main = "predicted GIA mean field (mm/yr)", xlab = "longitude", ylab = "latitude")
+          main = "predicted GIA mean field - prior mean (mm/yr)", xlab = "longitude", ylab = "latitude")
 
 
 
