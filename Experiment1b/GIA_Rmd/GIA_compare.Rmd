@@ -28,13 +28,14 @@ In the following, we demonstrate the all these four approaches and compare the r
 # Data and prior
 
 First we load the data and prior. Note that the ICE6G solution is given on a 1 degree grid. For any given location, we define the GIA prior to be the value of the grid in which the location falls; hence we set it as a spatial polygon data set.
-```{r load, message = FALSE, warning=FALSE, cache = TRUE}
+```{r load_package, message = FALSE, warning=FALSE}
 ## Load packages
 library(sp); library(INLA); library(GEOmap)
-library(ggplot2); library(grid); library(gridExtra);library(lattice);library(RColorBrewer)
 source("functions.R")
 source("functions-barriers-dt-models-march2017.R")
+```
 
+```{r load, message = FALSE, warning=FALSE, cache = TRUE}
 ## Load data
 ## 1 Load GIA prior
 ice6g <- read.table("Z:/WP2-SolidEarth/BHMinputs/GIA/GIA_Pel-6-VM5.txt", header = T)
@@ -179,7 +180,7 @@ ress1 <- list(res_inla = res_inla, spde = GIA_spde, st = stGIA,
 # Pseudo polygon observations
 
 ## Generate the Pseudo polygon
-Here we still assume the process is stationary globally but use polygon observations in the pseudo polygon regions defined by experts opinion. More details about choosing and generating the polygons can be found [here](http://rpubs.com/zs_sz/PseudoObs02). The following chunk load the pseudo polygons using the ensemble mean of 8 GIA mode solutions for a given threshold value, say $0.3$.
+Here we still assume the process is stationary globally but use polygon observations in the pseudo polygon regions defined by experts opinion. More details about choosing and generating the polygons can be found [here](http://rpubs.com/zs_sz/PseudoObs02b). The following chunk load the pseudo polygons using the ensemble mean of 8 GIA mode solutions for a given threshold value, say $0.3$.
 ```{r polygons, message = FALSE, cache = TRUE}
 ## Load the pseudo polygon
 zeroPolygon <- readOGR(dsn = "Z:/WP1-BHM/Experiment1b/shapefiles", layer = "zero03")
@@ -381,96 +382,40 @@ print(paste("The estimated marginal variances are:",
             pars_pm2$sigma_mode, 
             pars_pm3$sigma_mode,
             pars_pm4$sigma_mode, sep = "  "))
-
+par(mfrow = c(1,2))
 ## The posterior distributions
-plot(pars_pm1$Vmar, type = "l", main = bquote(bold({sigma^2})), xlim = c(1, 5), ylim = c(0, 17))
-lines(pars_pm2$Vmar, col = 2)
-lines(pars_pm3$Vmar, col = 3)
+plot(pars_pm1$Vmar, type = "l", xlim = c(1, 4.5), ylim = c(0, 17), 
+     ylab = "posterior density", xlab = bquote(bold({sigma^2})))
+lines(pars_pm3$Vmar, col = 2)
 lines(pars_pm4$Vmar, col = 4)
-legend("topright", c("stationary", "polygon obs", "subset", "mixture"), lty = rep(1), col = 1:4)
+lines(pars_pm2$Vmar, col = 3)
+legend("topright", c("stationary",  "subset", "mixture", "polygon_obs"), lty = rep(1), col = c(1,2,4, 3))
 
-plot(pars_pm1$Rmar, type = "l", main = bquote(bold({rho})), xlim = c(0.04, 0.12), ylim = c(0, 180))
-lines(pars_pm2$Rmar, col = 2)
-lines(pars_pm3$Rmar, col = 3)
+plot(pars_pm1$Rmar, type = "l", xlim = c(0.04, 0.12), ylim = c(0, 180),
+     ylab = "posterior density", xlab = bquote(bold({rho})))
+lines(pars_pm3$Rmar, col = 2)
 lines(pars_pm4$Rmar, col = 4)
-legend("topright", c("stationary", "polygon obs", "subset", "mixture"), lty = rep(1), col = 1:4)
+lines(pars_pm2$Rmar, col = 3)
+legend("topright", c("stationary",  "subset", "mixture", "polygon_obs"), lty = rep(1), col = c(1,2,4, 3))
 ```
 
 
 Plot the predictions.
-```{r predict}
+```{r predict, fig.height=8, fig.width=6}
 ress1$GIA_pred$model <- "stationary"
 ress2$GIA_pred$model <- "polygon_Obs"
 ress3$GIA_pred$model <- "subset"
 ress4$GIA_pred$model <- "mixture"
-
-## The predicted mean
 pred_all <- do.call(rbind, list(ress1$GIA_pred, ress2$GIA_pred, ress3$GIA_pred, ress4$GIA_pred))
-range_mean <- range(pred_all$mean, na.rm = TRUE)
-NAid <- which(is.na(pred_all$diff))
-pred_all[NAid,"mean"] <- range_mean[2] + 1
-
-
-brks1 <- seq(-7, -0.5, length.out=9)
-brks2 <- c(seq(0.5, 16, length.out = 8), 17)
-colreg1 <- rev(brewer.pal(9, "Blues"))
-colreg2 <- brewer.pal(8, "Reds")
-colreg<- c(colreg1, "#FFFFFF", colreg2, "#bebebe")
-brks <- c(brks1, -0.1, 0.1, brks2)
-levelplot(mean ~ lon + lat|model, data = pred_all,
-          col.regions= colreg, at=brks, 
-          colorkey = list(col = colreg, 
-                          labels = list(labels = c(-5, 0, 5, 10, 15, "NA"),
-                                        at = c(-5, 0, 5, 10, 15, 16.5))),
-          panel = function(x,y,z,...){
-            panel.levelplot(x,y,z,...)
-            map2 <- map("world2", interior = FALSE, plot = FALSE)
-            panel.xyplot(x=map2$x, y=map2$y, type = "l", col = "black")
-            },
-          main = "predicted GIA mean field (mm/yr)", xlab = "longitude", ylab = "latitude")
-
+pred_all$model <- factor(pred_all$model, levels = c("stationary", "polygon_Obs", "subset", "mixture"))
+## The predicted mean
+level_GIA(pred_data = pred_all, var = "mean", style ="zero", layout = c(1, 4), title = "predicted GIA mean field (mm/yr)")
 
 ## The predicted uncertainties
-range_u <- range(pred_all$u, na.rm = TRUE)
-pred_all[NAid,"u"] <- range_u[2] + 1
-
-brks <- c(seq(0, 0.8, 0.1),seq(1,3, 0.5), 3.8, 4.6, 5.4)
-colreg <- c(colorRamps::matlab.like(length(brks)-2), "#bebebe")
-levelplot(u ~ lon + lat|model, data = pred_all,
-          col.regions= colreg, at=brks, 
-          colorkey = list(col = colreg, 
-                          labels = list(labels = c(0, 1, 2, 3, "NA"),
-                                        at = c(0, 1, 2, 3, 5))),
-          panel = function(x,y,z,...){
-            panel.levelplot(x,y,z,...)
-            map2 <- map("world2", interior = FALSE, plot = FALSE)
-            panel.xyplot(x=map2$x, y=map2$y, type = "l", col = "black")
-            },
-          main = "predicted GIA uncertanties (mm/yr)", xlab = "longitude", ylab = "latitude")
+level_GIA(pred_data = pred_all, var = "u", style ="positive",layout = c(1, 4), title = "predicted GIA uncertanties (mm/yr)")
 
 ## The difference between the predicted mean and prior mean
-range_d <- range(pred_all$diff, na.rm = TRUE)
-pred_all[NAid,"diff"] <- range_d[2] + 1
-
-brks1 <- seq(-7, -0.5, length.out=9)
-brks2 <- c(seq(0.5, 10, length.out = 8), 11)
-colreg1 <- rev(brewer.pal(9, "Blues"))
-colreg2 <- brewer.pal(8, "Reds")
-colreg<- c(colreg1, "#FFFFFF", colreg2, "#bebebe")
-brks <- c(brks1, -0.1, 0.1, brks2)
-levelplot(diff ~ lon + lat|model, data = pred_all,
-          col.regions= colreg, at=brks, 
-          colorkey = list(col = colreg, 
-                          labels = list(labels = c(-5, 0, 5, "NA"),
-                                        at = c(-5, 0, 5, 10.5))),
-          panel = function(x,y,z,...){
-            panel.levelplot(x,y,z,...)
-            map2 <- map("world2", interior = FALSE, plot = FALSE)
-            panel.xyplot(x=map2$x, y=map2$y, type = "l", col = "black")
-            },
-          main = "predicted GIA mean field - prior mean (mm/yr)", xlab = "longitude", ylab = "latitude")
-
-
+level_GIA(pred_data = pred_all, var = "diff", style ="zero", layout = c(1, 4), title = "predicted GIA mean field - prior mean (mm/yr)")
 
 ```
 

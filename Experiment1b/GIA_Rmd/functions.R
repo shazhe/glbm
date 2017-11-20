@@ -222,6 +222,42 @@ map_res <- function(data, xname, yname, fillvar, colpal = NULL, limits=NULL, tit
   return(Map)
 }
 
+## lattice plot
+level_GIA <- function(pred_data, var, style = c("zero", "positive"), layout, title){
+  range_var <- range(pred_data[,var], na.rm = TRUE)
+  NAid <- which(is.na(pred_all[, var]))
+  pred_data[NAid,var] <- range_var[2] + 1
+  plotdata <- data.frame(lon = pred_data$lon, lat = pred_data$lat, var = pred_data[, var], model = pred_data$model)
+  
+  if(style == "zero"){
+    brks1 <- seq(floor(range_var[1]), -0.5, length.out=9)
+    brks2 <- c(seq(0.5, floor(range_var[2]), length.out = 7), range_var[2]+ 0.9, ceiling(range_var[2] + 1))
+    colreg1 <- rev(RColorBrewer::brewer.pal(9, "Blues"))
+    colreg2 <- RColorBrewer::brewer.pal(8, "Reds")
+    colreg<- c(colreg1, "#FFFFFF", colreg2, "#bebebe")
+    brks <- c(brks1, -0.1, 0.1, brks2)
+    lab_tik <- seq(-5*(abs(brks[1])%/%5), 5*(brks[length(brks)-1] %/%5), 5)
+    labs <- list(labels = c(lab_tik, "NA"), at = c(lab_tik, (brks[length(brks)-1] + brks[length(brks)])*0.5))
+  }else if(style == "positive"){
+    brks <- c(seq(0, 0.8, 0.1), seq(1,floor(range_var[2])-1, 0.5), floor(range_var[2]), ceiling(range_var[2]), range_var[2]+1)
+    colreg <- c(colorRamps::matlab.like(length(brks)-2), "#bebebe")
+    lab_tik <- c(0, 1, seq(2, brks[length(brks)-1], 2))
+    labs <- list(labels = c(lab_tik, "NA"), at = c(lab_tik, (brks[length(brks)-1] + brks[length(brks)])*0.5))
+  }
+  
+  lattice::levelplot(var ~ lon + lat|model, data = plotdata, aspect = "iso",
+            col.regions= colreg, at=brks, 
+            colorkey = list(col = colreg, labels = labs),
+            panel = function(x,y,z,...){
+              lattice::panel.levelplot(x,y,z,...)
+              map2 <- map("world2", interior = FALSE, plot = FALSE)
+              lattice::panel.xyplot(x=map2$x, y=map2$y, type = "l", col = "black")
+            },
+            layout = layout,
+            main = title, xlab = "longitude", ylab = "latitude")
+}
+
+
 
 ## plot simulated field
 map_res2 <- function(res, colpal = NULL, limits=NULL, title, ...){

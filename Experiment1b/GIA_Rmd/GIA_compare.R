@@ -1,7 +1,6 @@
 ## ----load, message = FALSE, warning=FALSE, cache = TRUE------------------
 ## Load packages
 library(sp); library(INLA); library(GEOmap)
-library(ggplot2); library(grid); library(gridExtra)
 source("functions.R")
 source("functions-barriers-dt-models-march2017.R")
 
@@ -118,47 +117,6 @@ GIA_pred <- data.frame(lon = GIA_grid[,1], lat = GIA_grid[,2],
 ress1 <- list(res_inla = res_inla, spde = GIA_spde, st = stGIA, 
             mesh = mesh1, GPS_pred = GPS_pred, GIA_pred = GIA_pred, GIA_predn = GIA_predn)
 
-## ----hyper, include=TRUE-------------------------------------------------
-pars_GIA <- inla.spde2.result(res_inla, "GIA", GIA_spde, do.transf=TRUE)
-theta_mean <- pars_GIA$summary.theta$mean
-theta_sd <- pars_GIA$summary.theta$sd
-
-## Find the mode of rho and sigma^2
-lrho_mode <- pars_GIA$summary.log.range.nominal$mode
-lrho_mean <- pars_GIA$summary.log.range.nominal$mean
-lrho_sd <- pars_GIA$summary.log.range.nominal$sd
-rho_mode <- exp(lrho_mean - lrho_sd^2)
-
-lsigma_mode <- pars_GIA$summary.log.variance.nominal$mode
-lsigma_mean <- pars_GIA$summary.log.variance.nominal$mean
-lsigma_sd <- pars_GIA$summary.log.variance.nominal$sd
-sigma_mode <- exp(lsigma_mean - lsigma_sd^2)
-
-# plot(pars_GIA$marginals.range.nominal[[1]], type = "l",
-#      main = bquote(bold(rho("mode") == .(round(rho_mode, 4))))) # The posterior from inla output
-# plot(pars_GIA$marginals.variance.nominal[[1]], type = "l", 
-#      main = bquote(bold({sigma^2}("mode") == .(round(sigma_mode, 4))))) # The posterior from inla output
-
-## The estimated correlation length
-rho_mode*6371
-
-## ----predict, include=TRUE-----------------------------------------------
-GPS_pred <- ress$GPS_pred
-GIA_pred <- ress$GIA_pred
-## Plot the GIA prior mean
-map_prior <- map_res(data = ice6g, xname = "x_center", yname = "y_center", fillvar = "trend", 
-                    limits = c(-7, 22), title = "Prior GIA mean field")
-## Plot the GIA predicted mean
-map_GIA <- map_res(data = GIA_pred, xname = "lon", yname = "lat", fillvar = "mean", 
-                  limits = c(-7, 22), title = "Predicted GIA")
-## Plot the GIA difference map
-map_diff <- map_res(data = GIA_pred, xname = "lon", yname = "lat", fillvar = "diff", 
-                  limits = c(-8, 8), title = "GIA difference: Updated - Prior")
-## Plot the GIA difference map
-map_sd <- map_res(data = GIA_pred, xname = "lon", yname = "lat", fillvar = "u", 
-                    colpal = colorRamps::matlab.like(12), title = "Predicted uncertainties")
-## Display
-grid.arrange(map_prior, map_GIA, map_diff, map_sd, ncol = 2)
 
 ## ----polygons, include = FALSE, message = FALSE, cache = TRUE------------
 ## Load the pseudo polygon
@@ -209,15 +167,12 @@ TinPoly <- unlist(over(zeroPoly, SpatialPoints(coords=mesh2$Trill), returnList=T
 TAll <- 1:mesh2$t
 ToutPoly <- TAll[-TinPoly]
 Omega = dt.Omega(list(TinPoly, 1:mesh2$t), mesh2)
-#plot(mesh2, t.sub = Omega[[2]])
-#plot(mesh2, t.sub = Omega[[1]])
 
 ## ----data2, include = TRUE, cache=TRUE-----------------------------------
 ## Remove GPS data inside the polygon
 GPS_inPoly <- unlist(over(zeroPoly, SpatialPoints(coords = cbind(GPSV4b$lon, GPSV4b$lat)), returnList=T))
 GPS_All <- 1:nrow(GPS_data)
 GPS_outPoly <- GPS_All[-GPS_inPoly]
-#plot(GPS_data[GPS_outPoly,c("lon", "lat")], pch = "+")
 
 GPS_data2 <- GPS_data[GPS_outPoly,]
 GPS_loc2 <- GPS_loc[GPS_outPoly,]
@@ -289,6 +244,7 @@ GIA_pred <- data.frame(lon = GIA_grid[,1], lat = GIA_grid[,2],
                        u = as.vector(inla.mesh.project(proj, as.vector(GIA_u))),
                        model = rep("polygonObs", nrow(GIA_grid)))
 GIA_predn <- data.frame(diff = GIA_diff, mean = GIA_m, u=GIA_u)
+
 ress2 <- list(res_inla = res_inla, spde = GIA_spde, st = stGIA,
              mesh = mesh2, GPS_pred = GPS_pred, GIA_pred = GIA_pred, GIA_predn = GIA_predn)
 
