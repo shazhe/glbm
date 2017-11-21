@@ -475,6 +475,7 @@ dt.create.prior.log.exp = function (prior.param) {
     }
     return(val)
   }
+}
 
   dt.create.prior.log.norm = function(prior.param) {
     # Create the log normal prior for sigma and range in theta
