@@ -476,6 +476,35 @@ dt.create.prior.log.exp = function (prior.param) {
     return(val)
   }
 
+  dt.create.prior.log.norm = function(prior.param) {
+    # Create the log normal prior for sigma and range in theta
+    # range and sigma follows log normal distribution 
+    # i.e theta[1] = log(sigma), theta[2] = log(range1), theta[3] = log(range2), ...
+    # prior.param are the mean and variance of theta
+    # prior.param$sigma[1] = E(theta[1]), prior.param$sigma[2] = V(theta[1])
+    # prior.param$range[1,1] = E(theta[2), prior.param$sigma[1,2] = V(theta[2]),...
+    
+    ## Move to current scope (environment)
+    prior.param = prior.param
+    
+    log.prior = function(theta) {
+      theta1_m <- prior.param$sigma[1]
+      theta1_s <- prior.param$sigma[2]
+      thetar_m <- prior.param$range[,1]
+      thetar_s <- prior.param$range[,2]
+      
+      ntheta = length(theta)
+      
+      ## Prior for standard deviation
+      val = 0 + dnorm(theta[1], mean = theta1_m, sd = theta1_s)
+      
+      ## Prior for range(s)
+      for (i in 2:ntheta) {
+        val = val + dnorm(theta[i], mean=thetar_m[i-1], sd = thetar_s[i-1])
+      }
+      return(val)
+    }
+    
   return(log.prior)
   # - this environment includes the prior parameters
 }

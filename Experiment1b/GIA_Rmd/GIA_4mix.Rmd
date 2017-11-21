@@ -231,7 +231,21 @@ Q.mixture = dt.create.Q(mesh, Omega, fixed.ranges = c(0.01, NA))
 # - - This shows that you do not need to know the 
 #     true 'barrier range'!
 
-log.prior = dt.create.prior.log.exp(prior.param = c(1,1))
+## set the prior 
+#sigma and rho from previous settings
+# trho <- Tlognorm(mu_r, v_r)
+# tsigma <- Tlognorm(mu_s, v_s)
+# also need prior for zero polygon region rho -- assume it is very small
+mu_r0 <-50/6371
+v_r0 <- (100/6371)
+trho0 <- Tlognorm(mu_r0, v_r0)
+
+prior0 <- list(sigma = tsigma, range = rbind(trho0, trho) )
+# prior.param$sigma[1] = E(theta[1]), prior.param$sigma[2] = V(theta[1])
+# prior.param$range[1,1] = E(theta[2), prior.param$sigma[1,2] = V(theta[2]),...
+
+prior1 <- list(sigma = tsigma, range = trho)
+log.prior <- dt.create.prior.log.norm(prior.param = prior1) 
 # - The prior parameters are the lambdas in the exponential 
 #   priors for standard deviation and inverse-range
 
