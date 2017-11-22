@@ -1,8 +1,8 @@
 ## ----load, message = FALSE, warning=FALSE, cache = TRUE------------------
 ## Load packages
 library(sp); library(INLA); library(GEOmap)
-source("functions.R")
-source("functions-barriers-dt-models-march2017.R")
+source("glbm/BHM_sphere/functions.R")
+source("glbm/BHM_sphere/functions-barriers-dt-models-march2017.R")
 
 ## Load data
 ## 1 Load GIA prior
