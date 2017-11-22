@@ -137,6 +137,14 @@ GPS_data3 <- data.frame(ID = rep("pseudo", nobsb), lon = obs_pseudo@coords[,1], 
 GPS_loc3 <- mesh2$loc[VinPoly,]
 
 
+## Create a sparse and regular GPS observation in side the zero polygon
+proj4string(zeroPoly) <- "+proj=longlat"
+GPS_ll <- spsample(zeroPoly, n = 25, type = "Fibonacci")
+GIA_pobs <-  ice6g$trend[over(GPS_ll, Plist)]
+nobsb <-nrow(GPS_ll@coords)
+GPS_data4 <- data.frame(ID = rep("pseudo", nobsb), lon = GPS_ll@coords[,1], lat = GPS_ll@coords[,2],
+                        trend = rep(0, nobsb), std = rep(0.1, nobsb), trend0 = -GIA_pobs)
+GPS_loc4 <- do.call(cbind, Lll2xyz(lat = GPS_data4$lat, lon = GPS_data4$lon))
 
 ## ----inla_setup, cache = TRUE--------------------------------------------
 ## Build the SPDE model
@@ -309,15 +317,10 @@ ress3 <- list(res_inla = res_inla, spde = GIA_spde, st = stGIA,
 
 ## ----inla_setup4, include = TRUE, cache = TRUE---------------------------
 mesh <- mesh2
-Q.mixture = dt.create.Q(mesh, Omega, fixed.ranges = c(5, NA))
+Q.mixture = dt.create.Q(mesh, Omega, fixed.ranges = c(2, NA))
 prior0 <- list(sigma = tsigma, range = matrix(trho, ncol = 2))
 log.prior <- dt.create.prior.log.norm(prior.param = prior0) 
 GIA_spde = dt.inla.model(Q = Q.mixture, log.prior=log.prior)
-
-## Only need a few points in GPS_loc3, say 20% ~200 points
-idx2 <- sample(1:nrow(GPS_data3), 400)
-GPS_data4 <- GPS_data3[idx2,]
-GPS_loc4 <- GPS_loc3[idx2,]
 
 ## Link the process to observations and predictions
 A_data <- inla.spde.make.A(mesh = mesh, loc =  rbind(GPS_loc2, GPS_loc4))

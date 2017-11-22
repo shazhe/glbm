@@ -368,7 +368,7 @@ Plot the posteriors of the hyper parameters.
 pars_pm1 <- marginal_par(res = ress1)
 pars_pm2 <- marginal_par(res = ress2)
 pars_pm3 <- marginal_par(res = ress3)
-pars_pm4 <- marginal_par(res = ress4, mixture = TRUE)
+pars_pm4 <- marginal_par(res = ress5, mixture = TRUE)
 
 ## The posterior modes
 print(paste("The estimated correlation lengths are:",
@@ -404,16 +404,16 @@ ress1$GIA_pred$model <- "stationary"
 ress2$GIA_pred$model <- "polygon_Obs"
 ress3$GIA_pred$model <- "subset"
 ress4$GIA_pred$model <- "mixture"
-pred_all <- do.call(rbind, list(ress1$GIA_pred, ress2$GIA_pred, ress3$GIA_pred, ress4$GIA_pred))
-pred_all$model <- factor(pred_all$model, levels = c("stationary", "polygon_Obs", "subset", "mixture"))
+pred_all <- do.call(rbind, list(ress1$GIA_pred,  ress3$GIA_pred, ress4$GIA_pred))
+pred_all$model <- factor(pred_all$model, levels = c("stationary", "subset", "mixture"))
 ## The predicted mean
-level_GIA(pred_data = pred_all, var = "mean", style ="zero", layout = c(1, 4), title = "predicted GIA mean field (mm/yr)")
+level_GIA(pred_data = pred_all, var = "mean", style ="zero", layout = c(1, 3), title = "predicted GIA mean field (mm/yr)")
 
 ## The predicted uncertainties
-level_GIA(pred_data = pred_all, var = "u", style ="positive",layout = c(1, 4), title = "predicted GIA uncertanties (mm/yr)")
+level_GIA(pred_data = pred_all, var = "u", style ="positive",layout = c(1, 3), title = "predicted GIA uncertanties (mm/yr)")
 
 ## The difference between the predicted mean and prior mean
-level_GIA(pred_data = pred_all, var = "diff", style ="zero", layout = c(1, 4), title = "predicted GIA mean field - prior mean (mm/yr)")
+level_GIA(pred_data = pred_all, var = "diff", style ="zero", layout = c(1, 3), title = "predicted GIA mean field - prior mean (mm/yr)")
 
 ```
 
