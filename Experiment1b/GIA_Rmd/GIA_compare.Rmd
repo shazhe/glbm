@@ -384,19 +384,17 @@ print(paste("The estimated marginal variances are:",
             pars_pm4$sigma_mode, sep = "  "))
 par(mfrow = c(1,2))
 ## The posterior distributions
-plot(pars_pm1$Vmar, type = "l", xlim = c(1, 4.5), ylim = c(0, 17), 
+plot(pars_pm1$Vmar, type = "l", xlim = c(2, 5), ylim = c(0, 5), 
      ylab = "posterior density", xlab = bquote(bold({sigma^2})))
 lines(pars_pm3$Vmar, col = 2)
 lines(pars_pm4$Vmar, col = 4)
-lines(pars_pm2$Vmar, col = 3)
-legend("topright", c("stationary",  "subset", "mixture", "polygon_obs"), lty = rep(1), col = c(1,2,4, 3))
+legend("topright", c("stationary",  "subset", "mixture"), lty = rep(1), col = c(1,2,4))
 
-plot(pars_pm1$Rmar, type = "l", xlim = c(0.04, 0.12), ylim = c(0, 180),
+plot(pars_pm1$Rmar, type = "l", xlim = c(0.06, 0.12), ylim = c(0, 80),
      ylab = "posterior density", xlab = bquote(bold({rho})))
 lines(pars_pm3$Rmar, col = 2)
 lines(pars_pm4$Rmar, col = 4)
-lines(pars_pm2$Rmar, col = 3)
-legend("topright", c("stationary",  "subset", "mixture", "polygon_obs"), lty = rep(1), col = c(1,2,4, 3))
+legend("topright", c("stationary",  "subset", "mixture"), lty = rep(1), col = c(1,2,4))
 ```
 
 

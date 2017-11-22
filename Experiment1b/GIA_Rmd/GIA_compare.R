@@ -65,59 +65,6 @@ ltau0 <- 0.5*log(1/(4*pi)) - lsigma0 - lkappa0
 hyper <- list(prec = list(fixed = TRUE, initial = 0))
 formula = y ~ -1 +  f(GIA, model = GIA_spde)
 
-## ----inla_setup, cache = TRUE--------------------------------------------
-## Build the SPDE model
-mesh <- mesh1
-GIA_spde <- inla.spde2.matern(mesh, B.tau = matrix(c(ltau0, -1, 1),1,3), B.kappa = matrix(c(lkappa0, 0, -1), 1,3),
-                              theta.prior.mean = c(0,0), theta.prior.prec = c(sqrt(1/theta1_s), sqrt(1/theta2_s)))
-
-## Link the process to observations and predictions
-A_data <- inla.spde.make.A(mesh = mesh, loc = GPS_loc)
-A_pred <- inla.spde.make.A(mesh = mesh, loc = rbind(GPS_loc, mesh$loc))
-
-## Create the estimation and prediction stack
-st.est <- inla.stack(data = list(y=GPS_data$trend0), A = list(A_data),
-                     effects = list(GIA = 1:GIA_spde$n.spde), tag = "est")
-st.pred <- inla.stack(data = list(y=NA), A = list(A_pred),
-                      effects = list(GIA=1:GIA_spde$n.spde), tag = "pred")
-stGIA <- inla.stack(st.est, st.pred)
-
-## ----inla_run, message = FALSE, warning = FALSE--------------------------
-## Fix the GPS errors
-prec_scale <- c(1/GPS_data$std^2, rep(1, nrow(A_pred)))
-
-res_inla <- inla(formula, data = inla.stack.data(stGIA, spde = GIA_spde), family = "gaussian",
-                 scale =prec_scale, control.family = list(hyper = hyper),
-                 control.predictor=list(A=inla.stack.A(stGIA), compute =TRUE))
-
-## ----inla_res, include = TRUE, cache=TRUE--------------------------------
-INLA_pred <- res_inla$summary.linear.predictor
-## Extract and project predictions
-pred_idx <- inla.stack.index(stGIA, tag = "pred")$data
-GPS_idx <- pred_idx[1:nrow(GPS_data)]
-GIA_idx <- pred_idx[-(1:nrow(GPS_data))]
-
-## GPS 
-GPS_u <- INLA_pred$sd[GPS_idx]
-GPS_pred <- data.frame(lon = GPS_data$lon, lat = GPS_data$lat, u = GPS_u)
-
-## GIA
-GIA_diff <- INLA_pred$mean[GIA_idx] 
-GIA_m <- GIA_diff + GIA_prior
-GIA_u <- INLA_pred$sd[GIA_idx]
-proj <- inla.mesh.projector(mesh, projection = "longlat", dims = c(360,180), xlim = c(0,360), ylim = c(-90, 90))
-GIA_grid <- expand.grid(proj$x, proj$y)
-GIA_predn <- data.frame(diff = GIA_diff, mean = GIA_m, u=GIA_u)
-GIA_pred <- data.frame(lon = GIA_grid[,1], lat = GIA_grid[,2],
-                       diff = as.vector(inla.mesh.project(proj, as.vector(GIA_diff))),
-                       mean = as.vector(inla.mesh.project(proj, as.vector(GIA_m))),
-                       u = as.vector(inla.mesh.project(proj, as.vector(GIA_u))),
-                       model = rep("stationary", nrow(GIA_grid)))
-
-ress1 <- list(res_inla = res_inla, spde = GIA_spde, st = stGIA, 
-            mesh = mesh1, GPS_pred = GPS_pred, GIA_pred = GIA_pred, GIA_predn = GIA_predn)
-
-
 ## ----polygons, include = FALSE, message = FALSE, cache = TRUE------------
 ## Load the pseudo polygon
 zeroPolygon <- readOGR(dsn = "/./projects/GlobalMass/WP1-BHM/Experiment1b/shapefiles", layer = "zero03")
@@ -134,16 +81,11 @@ zeroPoly@polygons[[1]]@Polygons <- zeropolys2
 #### Dense points outside the polygons
 pinPoly <- unlist(over(zeroPoly, SpatialPoints(coords = fibo_points), returnList=T))
 fibo_inSub<- fibo_points[-pinPoly,]
-#plot(zeroPoly)
-points(fibo_inSub, pch = ".")
 
 #### Sparse points in the polygons
 fibo_points2 <- fiboSphere(N = 500, L0=TRUE)
 pinPoly <- unlist(over(zeroPoly, SpatialPoints(coords = fibo_points2), returnList=T))
 fibo_inPoly<- fibo_points2[pinPoly,]
-#plot(zeroPoly)
-points(fibo_inPoly, pch = ".")
-points(fibo_inSub, pch = ".")
 
 fibo_points_all <- rbind(fibo_inPoly, fibo_inSub)
 mesh_points_xyz <- do.call(cbind, Lll2xyz(lat = fibo_points_all[,2], lon = fibo_points_all[,1]))
@@ -191,8 +133,64 @@ pobs_idx <- over(obs_pseudo, Plist)
 GIA_pobs <- ice6g$trend[pobs_idx]
 nobsb <-nrow(obs_pseudo@coords)
 GPS_data3 <- data.frame(ID = rep("pseudo", nobsb), lon = obs_pseudo@coords[,1], lat = obs_pseudo@coords[,2],
-                     trend = rep(0, nobsb), std = rep(0.1, nobsb), trend0 = -GIA_pobs)
+                        trend = rep(0, nobsb), std = rep(0.1, nobsb), trend0 = -GIA_pobs)
 GPS_loc3 <- mesh2$loc[VinPoly,]
+
+
+
+## ----inla_setup, cache = TRUE--------------------------------------------
+## Build the SPDE model
+mesh <- mesh1
+GIA_spde <- inla.spde2.matern(mesh, B.tau = matrix(c(ltau0, -1, 1),1,3), B.kappa = matrix(c(lkappa0, 0, -1), 1,3),
+                              theta.prior.mean = c(0,0), theta.prior.prec = c(sqrt(1/theta1_s), sqrt(1/theta2_s)))
+
+## Link the process to observations and predictions
+A_data <- inla.spde.make.A(mesh = mesh, loc = GPS_loc2)
+A_pred <- inla.spde.make.A(mesh = mesh, loc = rbind(GPS_loc2, mesh$loc))
+
+## Create the estimation and prediction stack
+st.est <- inla.stack(data = list(y=GPS_data2$trend0), A = list(A_data),
+                     effects = list(GIA = 1:GIA_spde$n.spde), tag = "est")
+st.pred <- inla.stack(data = list(y=NA), A = list(A_pred),
+                      effects = list(GIA=1:GIA_spde$n.spde), tag = "pred")
+stGIA <- inla.stack(st.est, st.pred)
+
+## ----inla_run, message = FALSE, warning = FALSE--------------------------
+## Fix the GPS errors
+prec_scale <- c(1/GPS_data2$std^2, rep(1, nrow(A_pred)))
+
+res_inla <- inla(formula, data = inla.stack.data(stGIA, spde = GIA_spde), family = "gaussian",
+                 scale =prec_scale, control.family = list(hyper = hyper),
+                 control.predictor=list(A=inla.stack.A(stGIA), compute =TRUE))
+
+## ----inla_res, include = TRUE, cache=TRUE--------------------------------
+INLA_pred <- res_inla$summary.linear.predictor
+## Extract and project predictions
+pred_idx <- inla.stack.index(stGIA, tag = "pred")$data
+GPS_idx <- pred_idx[1:nrow(GPS_data2)]
+GIA_idx <- pred_idx[-(1:nrow(GPS_data2))]
+
+## GPS 
+GPS_u <- INLA_pred$sd[GPS_idx]
+GPS_pred <- data.frame(lon = GPS_data2$lon, lat = GPS_data2$lat, u = GPS_u)
+
+## GIA
+GIA_diff <- INLA_pred$mean[GIA_idx] 
+GIA_m <- GIA_diff + GIA_prior
+GIA_u <- INLA_pred$sd[GIA_idx]
+proj <- inla.mesh.projector(mesh, projection = "longlat", dims = c(360,180), xlim = c(0,360), ylim = c(-90, 90))
+GIA_grid <- expand.grid(proj$x, proj$y)
+GIA_predn <- data.frame(diff = GIA_diff, mean = GIA_m, u=GIA_u)
+GIA_pred <- data.frame(lon = GIA_grid[,1], lat = GIA_grid[,2],
+                       diff = as.vector(inla.mesh.project(proj, as.vector(GIA_diff))),
+                       mean = as.vector(inla.mesh.project(proj, as.vector(GIA_m))),
+                       u = as.vector(inla.mesh.project(proj, as.vector(GIA_u))),
+                       model = rep("stationary", nrow(GIA_grid)))
+
+ress1 <- list(res_inla = res_inla, spde = GIA_spde, st = stGIA, 
+            mesh = mesh1, GPS_pred = GPS_pred, GIA_pred = GIA_pred, GIA_predn = GIA_predn)
+
+
 
 ## ----inla_setup2, include = TRUE, cache = TRUE---------------------------
 ## Link the process to observations and predictions
@@ -257,18 +255,18 @@ GIA_spde <- inla.spde2.matern(mesh, B.tau = matrix(c(ltau0, -1, 1),1,3), B.kappa
                               theta.prior.mean = c(0,0), theta.prior.prec = c(sqrt(1/theta1_s), sqrt(1/theta2_s)))
 
 ## Link the process to observations and predictions
-A_data <- inla.spde.make.A(mesh = mesh, loc =  rbind(GPS_loc2, GPS_loc3))
-A_pred <- inla.spde.make.A(mesh = mesh, loc = rbind(GPS_loc2, GPS_loc3, mesh$loc))
+A_data <- inla.spde.make.A(mesh = mesh, loc =  rbind(GPS_loc2))
+A_pred <- inla.spde.make.A(mesh = mesh, loc = rbind(GPS_loc2, mesh$loc))
 
 ## Create the estimation and prediction stack
-st.est <- inla.stack(data = list(y=c(GPS_data2$trend0, GPS_data3$trend0)), A = list(A_data),
+st.est <- inla.stack(data = list(y=c(GPS_data2$trend0)), A = list(A_data),
                      effects = list(GIA = 1:GIA_spde$n.spde), tag = "est")
 st.pred <- inla.stack(data = list(y=NA), A = list(A_pred),
                       effects = list(GIA=1:GIA_spde$n.spde), tag = "pred")
 stGIA <- inla.stack(st.est, st.pred)
 
 ## Fix the GPS errors
-prec_scale <- c(1/GPS_data2$std^2, 1/GPS_data3$std^2, rep(1, nrow(A_pred)))
+prec_scale <- c(1/GPS_data2$std^2, rep(1, nrow(A_pred)))
 
 ## ----inla_run3, include = TRUE, eval = FALSE-----------------------------
 ## Run INLA
@@ -279,12 +277,12 @@ res_inla <- inla(formula, data = inla.stack.data(stGIA, spde = GIA_spde), family
 ## Extract and project predictions
 INLA_pred <- res_inla$summary.linear.predictor
 pred_idx <- inla.stack.index(stGIA, tag = "pred")$data
-GPS_idx <- pred_idx[1:nrow(rbind(GPS_data2, GPS_data3))]
-GIA_idx <- pred_idx[-c(1:nrow(rbind(GPS_data2, GPS_data3)))]
+GPS_idx <- pred_idx[1:nrow(GPS_data2)]
+GIA_idx <- pred_idx[-c(1:nrow(GPS_data2))]
 
 ## GPS
 GPS_u <- INLA_pred$sd[GPS_idx]
-GPS_pred <- data.frame(lon = c(GPS_data2$lon, GPS_data3$lon), lat = c(GPS_data2$lat, GPS_data3$lat), u = GPS_u)
+GPS_pred <- data.frame(lon = GPS_data2$lon, lat = GPS_data2$lat, u = GPS_u)
 
 ## GIA
 GIA_diff <- INLA_pred$mean[GIA_idx]
@@ -311,22 +309,28 @@ ress3 <- list(res_inla = res_inla, spde = GIA_spde, st = stGIA,
 
 ## ----inla_setup4, include = TRUE, cache = TRUE---------------------------
 mesh <- mesh2
-Q.mixture = dt.create.Q(mesh, Omega, fixed.ranges = c(0.01, NA))
-log.prior = dt.create.prior.log.exp(prior.param = c(1,1))
+Q.mixture = dt.create.Q(mesh, Omega, fixed.ranges = c(5, NA))
+prior0 <- list(sigma = tsigma, range = matrix(trho, ncol = 2))
+log.prior <- dt.create.prior.log.norm(prior.param = prior0) 
 GIA_spde = dt.inla.model(Q = Q.mixture, log.prior=log.prior)
 
+## Only need a few points in GPS_loc3, say 20% ~200 points
+idx2 <- sample(1:nrow(GPS_data3), 400)
+GPS_data4 <- GPS_data3[idx2,]
+GPS_loc4 <- GPS_loc3[idx2,]
+
 ## Link the process to observations and predictions
-A_data <- inla.spde.make.A(mesh = mesh, loc =  rbind(GPS_loc2, GPS_loc3))
-A_pred <- inla.spde.make.A(mesh = mesh, loc = rbind(GPS_loc2, GPS_loc3, mesh$loc))
+A_data <- inla.spde.make.A(mesh = mesh, loc =  rbind(GPS_loc2, GPS_loc4))
+A_pred <- inla.spde.make.A(mesh = mesh, loc = rbind(GPS_loc2, GPS_loc4, mesh$loc))
 
 ## Create the estimation and prediction stack
-st.est <- inla.stack(data = list(y=c(GPS_data2$trend0, GPS_data3$trend0)), A = list(A_data),
+st.est <- inla.stack(data = list(y=c(GPS_data2$trend0, GPS_data4$trend0)), A = list(A_data),
                      effects = list(GIA = 1:mesh$n), tag = "est")
 st.pred <- inla.stack(data = list(y=NA), A = list(A_pred),
                       effects = list(GIA = 1:mesh$n), tag = "pred")
 stGIA <- inla.stack(st.est, st.pred)
 ## Fix the GPS errors
-prec_scale <- c(1/GPS_data2$std^2, 1/GPS_data3$std^2, rep(1, nrow(A_pred)))
+prec_scale <- c(1/GPS_data2$std^2, 1/GPS_data4$std^2, rep(1, nrow(A_pred)))
 
 ## ----inla_run4, include = TRUE, eval = FALSE-----------------------------
 ## Run INLA
@@ -337,12 +341,12 @@ res_inla <- inla(formula, data=inla.stack.data(stGIA), family = "gaussian",
 ## Extract and project predictions
 INLA_pred <- res_inla$summary.linear.predictor
 pred_idx <- inla.stack.index(stGIA, tag = "pred")$data
-GPS_idx <- pred_idx[1:nrow(rbind(GPS_data2, GPS_data3))]
-GIA_idx <- pred_idx[-c(1:nrow(rbind(GPS_data2, GPS_data3)))]
+GPS_idx <- pred_idx[1:nrow(rbind(GPS_data2, GPS_data4))]
+GIA_idx <- pred_idx[-c(1:nrow(rbind(GPS_data2, GPS_data4)))]
 
 ## GPS
 GPS_u <- INLA_pred$sd[GPS_idx]
-GPS_pred <- data.frame(lon = c(GPS_data2$lon, GPS_data3$lon), lat = c(GPS_data2$lat, GPS_data3$lat), u = GPS_u)
+GPS_pred <- data.frame(lon = c(GPS_data2$lon, GPS_data4$lon), lat = c(GPS_data2$lat, GPS_data4$lat), u = GPS_u)
 
 ## GIA
 GIA_diff <- INLA_pred$mean[GIA_idx]
@@ -356,6 +360,7 @@ GIA_pred <- data.frame(lon = GIA_grid[,1], lat = GIA_grid[,2],
                        u = as.vector(inla.mesh.project(proj, as.vector(GIA_u))),
                        model = rep("mixture", nrow(GIA_grid)))
 GIA_predn <- data.frame(diff = GIA_diff, mean = GIA_m, u=GIA_u)
+
 ress4 <- list(res_inla = res_inla, spde = GIA_spde, st = stGIA,
             mesh = mesh, GPS_pred = GPS_pred, GIA_pred = GIA_pred, GIA_predn = GIA_predn)
 

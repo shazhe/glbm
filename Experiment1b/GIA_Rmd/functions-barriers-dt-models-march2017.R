@@ -497,11 +497,11 @@ dt.create.prior.log.exp = function (prior.param) {
       ntheta = length(theta)
       
       ## Prior for standard deviation
-      val = 0 + dnorm(theta[1], mean = theta1_m, sd = theta1_s)
+      val = 0 + dnorm(theta[1], mean = theta1_m, sd = theta1_s, log = TRUE)
       
       ## Prior for range(s)
       for (i in 2:ntheta) {
-        val = val + dnorm(theta[i], mean=thetar_m[i-1], sd = thetar_s[i-1])
+        val = val + dnorm(theta[i], mean=thetar_m[i-1], sd = thetar_s[i-1], log = TRUE)
       }
       return(val)
     }

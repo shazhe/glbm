@@ -90,31 +90,6 @@ plot(mesh, t.sub = Omega[[1]])
 ```
 
 
-## Set up prior
-
-We set up the SPDE priors for the mixture model and simulate some data using the prior. The correlation length in the zero polygon regions is not sensitive and we set it to be much smaller than the modelling regions. 
-```{r mesh4, include=TRUE, cache=TRUE}
-mu_r <- 500/6371
-v_r <- (1000/6371)^2
-mu_s <- 20
-v_s <- 40^2
-
-## Transform the parameters for the SPDE_GMRF approximation
-Tlognorm <- function(mu, v){
-  logv <- log(1 + v/mu^2)
-  logmu <- log(mu^2) - 0.5*log(mu^2 + v)
-  return(c(logmu, logv))
-}
-trho <- Tlognorm(mu_r, v_r)
-tsigma <- Tlognorm(mu_s, v_s)
-
-lsigma0 <- tsigma[1]
-theta1_s <- tsigma[2]
-lrho0 <- trho[1]
-theta2_s <- trho[2]
-lkappa0 <- log(8)/2 - lrho0
-ltau0 <- 0.5*log(1/(4*pi)) - lsigma0 - lkappa0
-```
 
 ## 2 Data preparation
 
@@ -205,6 +180,7 @@ GPS_all_loc <- rbind(GPS_loc, obs_xyz)
 
 ## 3 Inference on the subset
 
+First set up the data, prediction stacks and the GPS prior as before.
 ```{r inla, include = TRUE, cache = TRUE}
 Mesh_GIA <- mesh
 A_data <- inla.spde.make.A(mesh = Mesh_GIA, loc = GPS_all_loc)
@@ -220,38 +196,91 @@ stGIA <- inla.stack(st.est, st.pred)
 ## Fix the GPS errors
 hyper <- list(prec = list(fixed = TRUE, initial = 0))
 prec_scale <- c(1/GPS_all$std^2, rep(1, nrow(A_pred)))
+```
 
+### Set up prior and build Q
 
+This part is ***different***. We set up the priors for the hyper-parameters and there are a few options we can compare. We have chosen to use the log-normal distribution for $\sigma$ and $\rho$ for the other models and in this model we keep them the same. 
+```{r prior1, include=TRUE, cache=TRUE}
+mu_r <- 500/6371
+v_r <- (1000/6371)^2
+mu_s <- 20
+v_s <- 40^2
+
+## Transform the parameters for the SPDE_GMRF approximation
+Tlognorm <- function(mu, v){
+  logv <- log(1 + v/mu^2)
+  logmu <- log(mu^2) - 0.5*log(mu^2 + v)
+  return(c(logmu, logv))
+}
+trho <- Tlognorm(mu_r, v_r)
+tsigma <- Tlognorm(mu_s, v_s)
+```
+
+For the zero region, we also need to set up the priors. We can either fix the hyper-parameters to be some value or also set priors on them. We consider the following senarios for the zero region
+
+(1) fix $\rho_0$ and $\sigma_0$ and $\sigma_0 = \sigma$
+
+(2) fix $\rho_0$ and $\sigma_0$ and $\sigma_0 \neq \sigma$.
+
+(3) vary $\rho_0$ and $\sigma_0 = \sigma$.
+
+(4) vary $\rho_0$ and fix $\sigma_0 \neq \sigma$.
+
+(5) vary both $\rho_0$ and $\sigma_0$.
+
+```{r prior2, include=TRUE, cache=TRUE}
+## Senario 1
+Q.mixture = dt.create.Q(mesh, Omega, fixed.ranges = c(5, NA))
+prior <- list(sigma = tsigma, range = matrix(trho, ncol = 2))
+log.prior <- dt.create.prior.log.norm(prior.param = prior0) 
+GIA_spde1 = dt.inla.model(Q = Q.mixture, log.prior=log.prior)
+
+## Senario 2
+Q.mixture = dt.create.Q(mesh, Omega, fixed.ranges = c(0.01, NA), same_sigma = FALSE, fixed.sigmas = c(0.1, NA))
+prior <- list(sigma = tsigma, range = matrix(trho, ncol = 2))
+log.prior <- dt.create.prior.log.norm(prior.param = prior0) 
+GIA_spde1 = dt.inla.model(Q = Q.mixture, log.prior=log.prior)
+
+## Senario 3
+Q.mixture = dt.create.Q(mesh, Omega, sam_sigma = TRUE)
+trho0 <- Tlognorm(50/6371, (100/6371)^2)
+prior <- list(sigma = tsigma, range = rbind(trho0, trho) )
+log.prior <- dt.create.prior.log.norm(prior.param = prior) 
+GIA_spde3 = dt.inla.model(Q = Q.mixture, log.prior=log.prior)
+
+## Senario 4
 Q.mixture = dt.create.Q(mesh, Omega, fixed.ranges = c(0.01, NA))
-# - We fix the barrier range to a different value than we 
-#   used for simulations
-# - - Why? It does not matter, as long as it is 'small' 
-#     the models are very
-#     similar
-# - - This shows that you do not need to know the 
-#     true 'barrier range'!
+prior <- list(sigma = tsigma, range = matrix(trho, ncol = 2))
+log.prior <- dt.create.prior.log.norm(prior.param = prior0) 
+GIA_spde1 = dt.inla.model(Q = Q.mixture, log.prior=log.prior)
 
-## set the prior 
-#sigma and rho from previous settings
-# trho <- Tlognorm(mu_r, v_r)
-# tsigma <- Tlognorm(mu_s, v_s)
-# also need prior for zero polygon region rho -- assume it is very small
+## senario 5
+Q.mixture = dt.create.Q(mesh, Omega, fixed.ranges = c(0.01, NA))
+prior <- list(sigma = tsigma, range = matrix(trho, ncol = 2))
+log.prior <- dt.create.prior.log.norm(prior.param = prior0) 
+GIA_spde1 = dt.inla.model(Q = Q.mixture, log.prior=log.prior)
+
+tsigma0 <- Tlognorm(0.2, 0.4^2)
+Q.mixture = dt.create.Q(mesh, Omega)
 mu_r0 <-50/6371
 v_r0 <- (100/6371)
 trho0 <- Tlognorm(mu_r0, v_r0)
 
-prior0 <- list(sigma = tsigma, range = rbind(trho0, trho) )
+
 # prior.param$sigma[1] = E(theta[1]), prior.param$sigma[2] = V(theta[1])
 # prior.param$range[1,1] = E(theta[2), prior.param$sigma[1,2] = V(theta[2]),...
 
-prior1 <- list(sigma = tsigma, range = trho)
-log.prior <- dt.create.prior.log.norm(prior.param = prior1) 
+
+log.prior <- dt.create.prior.log.norm(prior.param = prior0) 
 # - The prior parameters are the lambdas in the exponential 
 #   priors for standard deviation and inverse-range
+```
 
-GIA_spde = dt.inla.model(Q = Q.mixture, log.prior=log.prior)
+```{r spde_mod}
 
-formula <- y ~ -1 + f(GIA, model=GIA_spde)
+
+formula <- y ~ -1 + f(GIA, model=GIA_spde1)
 # - The spatial model component is different from before
 # - The rest of the model setup is the same! 
 #   (as in the stationary case)
@@ -264,7 +293,7 @@ Then we run the INLA model. Note that this will take more than 10min and require
 res_inla <- inla(formula, data=inla.stack.data(stGIA), family = "gaussian",
                    scale =prec_scale, control.family = list(hyper = hyper),
                    control.predictor=list(A = inla.stack.A(stGIA), compute = TRUE))
-INLA_pred <- res_inla$summary.linear.predictor
+
 ```
 
 ```{r inla_load, include = FALSE, eval = TRUE}
@@ -284,6 +313,7 @@ Now assemble the inla inference and prediction results.
 
 ```{r inla_res, include = TRUE, cache=TRUE}
 ## Extract and project predictions
+INLA_pred <- res_inla$summary.linear.predictor
 pred_idx <- inla.stack.index(stGIA, tag = "pred")$data
 GPS_idx <- pred_idx[1:nrow(GPS_all)]
 GIA_idx <- pred_idx[-c(1:nrow(GPS_all))]
@@ -303,7 +333,7 @@ GIA_pred <- data.frame(lon = GIA_grid[,1], lat = GIA_grid[,2],
                        mean = as.vector(inla.mesh.project(proj, as.vector(GIA_m))),
                        u = as.vector(inla.mesh.project(proj, as.vector(GIA_u))))
 
-ress <- list(res_inla = res_inla, spde = GIA_spde, st = stGIA, 
+ress <- list(res_inla = res_inla, spde = GIA_spde1, st = stGIA, 
              mesh = Mesh_GIA, GPS_pred = GPS_pred, GIA_pred = GIA_pred)
 ```
 
@@ -313,9 +343,11 @@ ress <- list(res_inla = res_inla, spde = GIA_spde, st = stGIA,
 ```{r hyper, include=TRUE}
 theta1 <- res_inla$marginals.hyperpar$`Theta1 for GIA`
 theta2 <- res_inla$marginals.hyperpar$`Theta2 for GIA`
+theta3 <- res_inla$marginals.hyperpar$`Theta3 for GIA`
 
 Vmar<- inla.tmarginal(exp, theta1)
-Rmar <- inla.tmarginal(exp, theta2)
+Rmar1 <- inla.tmarginal(exp, theta2)
+Rmar2 <- inla.tmarginal(exp, theta3)
 
 ## Find the mode of rho and sigma^2
 lrho_mode <- res_inla$summary.hyperpar$mode[2]
@@ -323,13 +355,19 @@ lrho_mean <- res_inla$summary.hyperpar$mean[2]
 lrho_sd <- res_inla$summary.hyperpar$sd[2]
 rho_mode <- exp(lrho_mean - lrho_sd^2)
 
+lrho_mode2 <- res_inla$summary.hyperpar$mode[3]
+lrho_mean2 <- res_inla$summary.hyperpar$mean[3]
+lrho_sd2 <- res_inla$summary.hyperpar$sd[3]
+rho_mode2 <- exp(lrho_mean2 - lrho_sd2^2)
+
 lsigma_mode <- res_inla$summary.hyperpar$mode[1]
 lsigma_mean <- res_inla$summary.hyperpar$mean[1]
 lsigma_sd <- res_inla$summary.hyperpar$sd[1]
 sigma_mode <- exp(lsigma_mean - lsigma_sd^2)
-plot(Vmar, type = "l", main = bquote(bold({sigma^2}("mode") == .(round(sigma_mode, 4)))))
-plot(Rmar, type = "l", main = bquote(bold(rho("mode") == .(round(rho_mode, 4)))))
 
+plot(Vmar, type = "l", main = bquote(bold({sigma^2}("mode") == .(round(sigma_mode, 4)))))
+plot(Rmar1, type = "l", main = bquote(bold(rho("mode") == .(round(rho_mode, 4)))))
+plot(Rmar2, type = "l", main = bquote(bold(rho("mode") == .(round(rho_mode2, 4)))))
 ## The estimated correlation length is about 568km
 rho_mode*6371
 ```
