@@ -31,8 +31,8 @@ First we load the data and prior. Note that the ICE6G solution is given on a 1 d
 ```{r load_package, message = FALSE, warning=FALSE}
 ## Load packages
 library(sp); library(INLA); library(GEOmap)
-source("functions.R")
-source("functions-barriers-dt-models-march2017.R")
+source("glbm/BHM_sphere/functions.R")
+source("glbm/BHM_sphere/functions-barriers-dt-models-march2017.R")
 ```
 
 ```{r load, message = FALSE, warning=FALSE, cache = TRUE}
@@ -368,7 +368,7 @@ Plot the posteriors of the hyper parameters.
 pars_pm1 <- marginal_par(res = ress1)
 pars_pm2 <- marginal_par(res = ress2)
 pars_pm3 <- marginal_par(res = ress3)
-pars_pm4 <- marginal_par(res = ress5, mixture = TRUE)
+pars_pm4 <- marginal_par(res = ress4, mixture = TRUE, mix_theta = 3)
 
 ## The posterior modes
 print(paste("The estimated correlation lengths are:",

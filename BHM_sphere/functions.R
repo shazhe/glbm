@@ -370,11 +370,11 @@ mesh.sub <- function(mesh, Omega, i = 2){
 
 #### additional plot function
 ## plot posterior hyperparameters
-marginal_par <- function(res,  mixture = FALSE, plot = FALSE){
+marginal_par <- function(res,  mixture = FALSE, mix_theta=2, plot = FALSE){
   if(mixture){
     res_inla <- res$res_inla
-    theta1 <- res_inla$marginals.hyperpar$`Theta1 for GIA`
-    theta2 <- res_inla$marginals.hyperpar$`Theta2 for GIA`
+    theta1 <- res_inla$marginals.hyperpar[[1]]
+    theta2 <- res_inla$marginals.hyperpar[[mix_theta]]
     
     Vmar<- inla.tmarginal(exp, theta1)
     Rmar <- inla.tmarginal(exp, theta2)

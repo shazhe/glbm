@@ -1,0 +1,78 @@
+---
+title: "Experiment 2a"
+author: "Z Sha"
+date: "22 November 2017"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction
+
+In this experiment, we assume the GIA is knonw so there will be only two independent latent process $X_{ssh}$ and $X_{mass}$ and the thrid one $X_{steric}$ is given by $X_{steric} = X_{ssh} - x_{GIA} - X_{mass}$. Given the altimetry and GRACE data, the $X_{steric}$ can be predicted as an linear combination of posterior ssh and mass change:
+$$X_{steric} |  Y_{alt}, Y_{GRACE} = X_{ssh} | Y_{alt} - X_{mass}|Y_{GRACE} - x_{GIA}$$
+
+Therefore, in the following we use the same approach as in Experiment 1 to obtain the updated $X_ssh$ and $X_{mass}$. In this first experiment we assume these two process can be updated indepenently. 
+
+# Update $X_{ssh}$
+
+The sea surface height is only defined on oceans so we will model this process only on the ocean. The following chunk load the low resolution global ocean polygons from NatureEarth and generate mesh with equal area triangles of approximately one degree resolution.
+
+## Generate mesh 
+
+```{r ssh_mesh}
+library(rgdal)
+library(GEOmap)
+
+lands <- readOGR(dsn = "C:/ZSwork/glbm/Experiment2/ne_110m_land", layer = "ne_110m_land")
+#landpoly <- lands@polygons[[1]]@Polygons
+#landpolyL <- lapply(1:length(landpoly), function(x) Polygons(landpoly[x], x)) 
+#spLand <- SpatialPolygons(landpolyL)
+spLand <- SpatialPolygons(lands@polygons)
+plot(spLand, col = "grey")
+summary(spLand)
+```
+
+## Load data 
+
+## prior set up
+
+## Link data to process
+
+## INLA inference
+
+## Results
+
+
+
+
+
+
+# Update $X_{mass}$
+
+## Generate mesh 
+
+## Load data 
+
+## prior set up
+
+## Link data to process
+
+## INLA inference
+
+## Results
+
+
+
+
+# Update $X_{steric}$
+
+## Load GIA data
+
+## Results
