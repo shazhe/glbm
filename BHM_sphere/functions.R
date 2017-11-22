@@ -222,6 +222,7 @@ map_res <- function(data, xname, yname, fillvar, colpal = NULL, limits=NULL, tit
   return(Map)
 }
 
+
 ## lattice plot
 level_GIA <- function(pred_data, var, style = c("zero", "positive"), layout, title){
   range_var <- range(pred_data[,var], na.rm = TRUE)
