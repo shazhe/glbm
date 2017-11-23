@@ -20,7 +20,7 @@ We generate dense mesh in the subset and sparse mesh insise the pseudo polygons.
 (2) we want a sparse mesh for these regions and to have a good approximation requires longer correlation length.
 
 ## 1 Generate the polygons and mesh
-First we generate the mesh for a discreate reparesentation of the GIA process. The mesh is restricted on a subset of the sphere defined by the pseudo-polygons. More details about choosing and generating the polygons can be found [here](http://rpubs.com/zs_sz/PseudoObs02). The following chunk generate the pseudo polygons using the ensemble mean of 13 GIA mode solutions for a given threshold value, say $0.3$.
+First we generate the mesh for a discreate reparesentation of the GIA process. The mesh is restricted on a subset of the sphere defined by the pseudo-polygons. More details about choosing and generating the polygons can be found [here](http://rpubs.com/zs_sz/pseudo_poly). The following chunk generate the pseudo polygons using the ensemble mean of 13 GIA mode solutions for a given threshold value, say $0.3$.
 
 ```{r load, message = FALSE}
 ## load library and functions
@@ -223,26 +223,14 @@ prec_scale <- c(1/GPS_all$std^2, rep(1, nrow(A_pred)))
 
 
 Q.mixture = dt.create.Q(mesh, Omega, fixed.ranges = c(0.01, NA))
-# - We fix the barrier range to a different value than we 
-#   used for simulations
-# - - Why? It does not matter, as long as it is 'small' 
-#     the models are very
-#     similar
-# - - This shows that you do not need to know the 
-#     true 'barrier range'!
+
 
 log.prior = dt.create.prior.log.exp(prior.param = c(1,1))
-# - The prior parameters are the lambdas in the exponential 
-#   priors for standard deviation and inverse-range
 
 GIA_spde = dt.inla.model(Q = Q.mixture, log.prior=log.prior)
 
 formula <- y ~ -1 + f(GIA, model=GIA_spde)
-# - The spatial model component is different from before
-# - The rest of the model setup is the same! 
-#   (as in the stationary case)
-# - - e.g. the inla(...) call below is the same, 
-#     only this formula is different
+
 ```
 
 Then we run the INLA model. Note that this will take more than 10min and require memory larger than 32GB. We ran this on a server with 56 cores and 256GB memory.
