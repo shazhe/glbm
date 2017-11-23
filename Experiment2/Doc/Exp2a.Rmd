@@ -288,6 +288,31 @@ Now we do the same thing for the mass change process.
 
 ## Load data 
 
+Load the Grace mascon data.
+```{r grace_data}
+grace_data <- read.table("Z:/WP2-SolidEarth/BHMinputs/GRACE/GRACE_v02.3b_trends_v03.txt", header = T)
+grace_loc <-  read.table("Z:/WP2-SolidEarth/BHMinputs/GRACE/GRACE_v02.3b_loc_v03.txt", skip = 1)
+n_grace <- ncol(grace_loc)
+n_ll <- (n_grace-4)/2
+names(grace_loc) <- c("id", "area", "lon_c", "lat_C", paste0(c("lon", "lat"), rep(1:n_ll, each = 2)))
+
+## Create spatial polygons data frame
+Polygon_list <- list()
+for(i in 1:nrow(grace_loc)){
+  lons <- na.omit(as.numeric(c(grace_loc[i, seq(5,ncol(grace_loc), 2)], grace_loc[i, 5])))
+  lats <- na.omit(as.numeric(c(grace_loc[i, seq(6,ncol(grace_loc), 2)], grace_loc[i, 6])))
+  Polygon_list[[i]] <- Polygon(cbind(lons, lats))
+}
+
+Polygons_list <- lapply(1:length(Polygon_list), function(x) Polygons(list(Polygon_list[[x]]), x))
+SpPolygon <- SpatialPolygons(Polygons_list, proj4string = CRS("+proj=longlat"))
+
+grace_sp <- SpatialPolygonsDataFrame(SpPolygon,grace_data)
+spplot(grace_sp, "mmweq")
+
+## note the area calcuated by R is different from those given in the dataset -- ask Maike
+```
+
 ## prior set up
 
 ## Generate mesh 
