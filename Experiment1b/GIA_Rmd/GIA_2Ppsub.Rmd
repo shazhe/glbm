@@ -56,7 +56,7 @@ zeroPoly@polygons[[1]]@Polygons <- zeropolys2
 plot(zeroPoly, col = "blue", main = "zero regions -- threshold = 0.3 (refined)")
 ```
 
-Next we generate the mesh and separate the triangles in/out-side of the polygons. We spread fibonacci points on the sphere as initial locations of the triangle vertices. The number of the points controls the resolution. The goal is to produce a map with approximately one degree resolution, hence we also need a similar resolution for the triangulation. Not that the triangle edge be no larger than the process correlation length. A one degree grid is about $110 \times 110 km$ which corresponds to a correlation length about $110/6371 = 0.017$. The number of triangles should be $f = 180 * 360 = 64800$ corresponding to number of vertices of $v \approx = (f+2)*2/5= 25921$.
+Next we generate the mesh and separate the triangles in/out-side of the polygons. We spread fibonacci points on the sphere as initial locations of the triangle vertices. The number of the points controls the resolution. The goal is to produce a map with approximately one degree resolution, hence we also need a similar resolution for the triangulation. Not that the triangle edge be no larger than the process correlation length. A one degree grid is about $110 \times 110 km$ which corresponds to a correlation length about $110/6371 = 0.017$. The number of triangles should be $f = 180 * 360 = 64800$ corresponding to number of vertices of $v \approx (f+2)*2/5= 25921$.
 
 ```{r mesh, include=TRUE, cache=TRUE}
 fibo_points <- fiboSphere(N = 3e4, LL = FALSE)

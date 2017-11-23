@@ -371,7 +371,7 @@ mesh.sub <- function(mesh, Omega, i = 2){
 
 #### additional plot function
 ## plot posterior hyperparameters
-marginal_par <- function(res,  mixture = FALSE, mix_theta=2, plot = FALSE){
+marginal_par <- function(res, process, mixture = FALSE, mix_theta=2, plot = FALSE){
   if(mixture){
     res_inla <- res$res_inla
     theta1 <- res_inla$marginals.hyperpar[[1]]
@@ -393,20 +393,20 @@ marginal_par <- function(res,  mixture = FALSE, mix_theta=2, plot = FALSE){
     
   }else{
     res_inla <- res$res_inla
-    GIA_spde <- res$spde
-    pars_GIA <- inla.spde2.result(res_inla, "GIA", GIA_spde, do.transf=TRUE)
-    Vmar <-pars_GIA$marginals.variance.nominal[[1]]
-    Rmar <- pars_GIA$marginals.range.nominal[[1]]
+    spde <- res$spde
+    pars <- inla.spde2.result(res_inla, process, spde, do.transf=TRUE)
+    Vmar <-pars$marginals.variance.nominal[[1]]
+    Rmar <- pars$marginals.range.nominal[[1]]
     
     ## Find the mode of rho and sigma^2
-    lrho_mode <- pars_GIA$summary.log.range.nominal$mode
-    lrho_mean <- pars_GIA$summary.log.range.nominal$mean
-    lrho_sd <- pars_GIA$summary.log.range.nominal$sd
+    lrho_mode <- pars$summary.log.range.nominal$mode
+    lrho_mean <- pars$summary.log.range.nominal$mean
+    lrho_sd <- pars$summary.log.range.nominal$sd
     rho_mode <- exp(lrho_mean - lrho_sd^2)
     
-    lsigma_mode <- pars_GIA$summary.log.variance.nominal$mode
-    lsigma_mean <- pars_GIA$summary.log.variance.nominal$mean
-    lsigma_sd <- pars_GIA$summary.log.variance.nominal$sd
+    lsigma_mode <- pars$summary.log.variance.nominal$mode
+    lsigma_mean <- pars$summary.log.variance.nominal$mean
+    lsigma_sd <- pars$summary.log.variance.nominal$sd
     sigma_mode <- exp(lsigma_mean - lsigma_sd^2)
   }
   
