@@ -31,8 +31,8 @@ First we load the data and prior. Note that the ICE6G solution is given on a 1 d
 ```{r load_package, message = FALSE, warning=FALSE}
 ## Load packages
 library(sp); library(INLA); library(GEOmap)
-source("functions.R")
-source("functions-barriers-dt-models-march2017.R")
+source("glbm/BHM_sphere/functions.R")
+source("glbm/BHM_sphere/functions-barriers-dt-models-march2017.R")
 ```
 
 ```{r load, message = FALSE, warning=FALSE, cache = TRUE}
@@ -368,7 +368,7 @@ Plot the posteriors of the hyper parameters.
 pars_pm1 <- marginal_par(res = ress1)
 pars_pm2 <- marginal_par(res = ress2)
 pars_pm3 <- marginal_par(res = ress3)
-pars_pm4 <- marginal_par(res = ress4, mixture = TRUE)
+pars_pm4 <- marginal_par(res = ress4, mixture = TRUE, mix_theta = 3)
 
 ## The posterior modes
 print(paste("The estimated correlation lengths are:",
@@ -384,19 +384,17 @@ print(paste("The estimated marginal variances are:",
             pars_pm4$sigma_mode, sep = "  "))
 par(mfrow = c(1,2))
 ## The posterior distributions
-plot(pars_pm1$Vmar, type = "l", xlim = c(1, 4.5), ylim = c(0, 17), 
+plot(pars_pm1$Vmar, type = "l", xlim = c(1.8, 5), ylim = c(0, 3.5), 
      ylab = "posterior density", xlab = bquote(bold({sigma^2})))
 lines(pars_pm3$Vmar, col = 2)
 lines(pars_pm4$Vmar, col = 4)
-lines(pars_pm2$Vmar, col = 3)
-legend("topright", c("stationary",  "subset", "mixture", "polygon_obs"), lty = rep(1), col = c(1,2,4, 3))
+legend("topright", c("stationary",  "subset", "mixture"), lty = rep(1), col = c(1,2,4))
 
-plot(pars_pm1$Rmar, type = "l", xlim = c(0.04, 0.12), ylim = c(0, 180),
+plot(pars_pm1$Rmar, type = "l", xlim = c(0.06, 0.13), ylim = c(0, 60),
      ylab = "posterior density", xlab = bquote(bold({rho})))
 lines(pars_pm3$Rmar, col = 2)
 lines(pars_pm4$Rmar, col = 4)
-lines(pars_pm2$Rmar, col = 3)
-legend("topright", c("stationary",  "subset", "mixture", "polygon_obs"), lty = rep(1), col = c(1,2,4, 3))
+legend("topright", c("stationary",  "subset", "mixture"), lty = rep(1), col = c(1,2,4))
 ```
 
 
@@ -406,16 +404,16 @@ ress1$GIA_pred$model <- "stationary"
 ress2$GIA_pred$model <- "polygon_Obs"
 ress3$GIA_pred$model <- "subset"
 ress4$GIA_pred$model <- "mixture"
-pred_all <- do.call(rbind, list(ress1$GIA_pred, ress2$GIA_pred, ress3$GIA_pred, ress4$GIA_pred))
-pred_all$model <- factor(pred_all$model, levels = c("stationary", "polygon_Obs", "subset", "mixture"))
+pred_all <- do.call(rbind, list(ress1$GIA_pred,  ress3$GIA_pred, ress4$GIA_pred))
+pred_all$model <- factor(pred_all$model, levels = c("stationary", "subset", "mixture"))
 ## The predicted mean
-level_GIA(pred_data = pred_all, var = "mean", style ="zero", layout = c(1, 4), title = "predicted GIA mean field (mm/yr)")
+level_GIA(pred_data = pred_all, var = "mean", style ="zero", layout = c(1, 3), title = "predicted GIA mean field (mm/yr)")
 
 ## The predicted uncertainties
-level_GIA(pred_data = pred_all, var = "u", style ="positive",layout = c(1, 4), title = "predicted GIA uncertanties (mm/yr)")
+level_GIA(pred_data = pred_all, var = "u", style ="positive",layout = c(1, 3), title = "predicted GIA uncertanties (mm/yr)")
 
 ## The difference between the predicted mean and prior mean
-level_GIA(pred_data = pred_all, var = "diff", style ="zero", layout = c(1, 4), title = "predicted GIA mean field - prior mean (mm/yr)")
+level_GIA(pred_data = pred_all, var = "diff", style ="zero", layout = c(1, 3), title = "predicted GIA mean field - prior mean (mm/yr)")
 
 ```
 
