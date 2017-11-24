@@ -36,7 +36,7 @@ First we load the altimetry data and do some exploratory analysis on the spatial
 Load the pre-processed altimetry data. The data are the yearly trend estimates over 10 years (2005-2015) and their estimated errors at one degree resolution.
 ```{r alt_data}
 library(ncdf4)
-alt_nc <- nc_open("C:/ZSwork/glbm/Experiment2/trend_SSH_CCI_200501_201512.nc")
+alt_nc <- nc_open("Z:/WP3-Ocean/BHMinputs/trend_SSH_CCI_200501_201512.nc")
 print(alt_nc)
 lon <- ncvar_get(alt_nc, "lon")
 lat <- ncvar_get(alt_nc, "lat")
@@ -73,7 +73,7 @@ Now we do some exploratory analysis which will be helpful in setting up the prio
 
 The following chunch plot the smoothed variogram of the altimerty trend. It takes a long time to run due to the size of the data.
 
-```{r variogram, message = FALSE, eval = FALSE}
+```{r variogram, message = FALSE}
 library(gstat)
 coordinates(alt_data2) <- c("lon", "lat")
 proj4string(alt_data2) <- CRS("+proj=longlat")
@@ -97,15 +97,17 @@ The sea surface height is only defined on oceans so we will model this process o
 
 To build the spde model used for approximating the process, we need to generate a triagluar mesh for the process. In general, the triangles in the mesh should have similar size and shape and the size of the triangles should be no larger than the spatial correlation length. 
 
-In our exploratory analysis, the correlation length is quite long, therefore we can choose a sparse mesh. Here we choose the triangle size to have approximately 5 degree resolution so that the edge length of the triangles are smaller than 500km on average which is much smaller than 3000km. 
+In our exploratory analysis, the correlation length is quite long, therefore if the purpose is estimating the hyper-parameters, then we can choose to have a sparse mesh with resolutiong no large than the correlation length. Here we could use say a triangle size to have approximately 5 degree resolution so that the edge length of the triangles are smaller than 500km on average which is much smaller than 3000km. 
 
-The equal area triangles can be genrnated using fibonacci points. We will need about $360 \times 180/(5^2) = 2592 $ triangles and this corresponds to about 1037 vertices. In the following code, we tune the number of point so that the mesh have about 2600 triangles.
+However, Since our purpose is to produce a map of the process at high resolution, we must have a mesh with at least the desired prediction resolution. For a 1 degree resolution map, we will need about $360 \times 180 = 64800$ triangles corresponding to number of vertices of $v \approx  (f+2)*2/5= 25921$. When using the Fibonacci grid points in long lat coordinates as the starting points for generating the mesh, the number of points is about half of the triangle vertices.
 
 ```{r ssh_mesh}
 ## Genereate Fibonacci points on the sphere
-fibo_points <- fiboSphere(N = 650, L0 = TRUE)
+fibo_points <- fiboSphere(N = 12960, L0 = TRUE)
 fibo_points_xyz <- do.call(cbind, Lll2xyz(lat = fibo_points[,2], lon = fibo_points[,1]))
 mesh0 <- inla.mesh.2d(loc = fibo_points_xyz, cutoff = 0.01, max.edge = 1)
+## Make this "smoother"
+mesh0 <- inla.mesh.2d(loc = mesh0$loc, cutoff = 0.01, max.edge = 1)
 ```
 
 Since the process is only defined on the ocean, we remove the mesh that are not in the modelling region. And to make sure the triangles capture the shape of the coastlines, we add extra points near the coastlines.
@@ -114,27 +116,16 @@ Since the process is only defined on the ocean, we remove the mesh that are not 
 Ocean <- readOGR(dsn = "Z:/WP1-BHM/maps/ne_110m_ocean", layer = "ne_110m_ocean")
 plot(Ocean)
 
-## Load coastline
-Coastline <- readOGR(dsn = "Z:/WP1-BHM/maps/ne_110m_coastline", layer = "ne_110m_coastline")
-## sample points along the coastlines for building up the mesh
-CLpts <- spsample(Coastline, n =5000, type = "regular")
-plot(CLpts)
-coast_xyz <- do.call(cbind, Lll2xyz(lat = CLpts@coords[,2], lon = CLpts@coords[,1]))
-## Now generate mesh with coast line added in
-mesh1 <- inla.mesh.2d(loc = rbind(fibo_points_xyz, coast_xyz), cutoff = 0.01, max.edge = 1)
-## Make this smoother
-mesh1 <- inla.mesh.2d(loc = mesh1$loc, cutoff = 0.01, max.edge = 1)
-
 ## Remove mesh not in the ocean
-mesh1 <- dt.mesh.addon.posTri(mesh = mesh1, globe = TRUE) 
-Tlonlat <- Lxyz2ll(list(x = mesh1$posTri[,1], y = mesh1$posTri[,2], z = mesh1$posTri[,3]))
-mesh1$Trill <- cbind(lon = Tlonlat$lon, lat =Tlonlat$lat)
-TinOcean <- unlist(over(Ocean, SpatialPoints(coords=mesh1$Trill, proj4string = CRS(proj4string(Ocean))), returnList=T))
-TAll <- 1:mesh1$t
+mesh0 <- dt.mesh.addon.posTri(mesh = mesh0, globe = TRUE) 
+Tlonlat <- Lxyz2ll(list(x = mesh0$posTri[,1], y = mesh0$posTri[,2], z = mesh0$posTri[,3]))
+mesh0$Trill <- cbind(lon = Tlonlat$lon, lat =Tlonlat$lat)
+TinOcean <- unlist(over(Ocean, SpatialPoints(coords=mesh0$Trill, proj4string = CRS(proj4string(Ocean))), returnList=T))
+TAll <- 1:mesh0$t
 ToutOcean <- TAll[-TinOcean]
-Omega = dt.Omega(list(TinOcean, 1:mesh1$t), mesh1)
+Omega = dt.Omega(list(TinOcean, 1:mesh0$t), mesh0)
 
-mesh_ssh <- mesh.sub(mesh1, Omega, 1)
+mesh_ssh <- mesh.sub(mesh0, Omega, 1)
 summary(mesh_ssh)
 ```
 
@@ -182,7 +173,7 @@ stSSH <- inla.stack(st.est, st.pred)
 
 ## INLA inference
 
-Now we can run INLA for the Bayesian inference. Do not run on a desktop the process may use up to 25GB memory at peak. We ran this on a server with enough memory.
+Now we can run INLA for the Bayesian inference. Do not run on a desktop the process may use up to 64GB memory at peak. We ran this on a server with enough memory.
 
 ```{r inla_run, include = TRUE, eval = FALSE}
 ## Fix altimetry errors as they are known
@@ -203,7 +194,7 @@ res_inla <- inla(formula, data = inla.stack.data(stSSH, spde = SSH_spde), family
 ### Assemble and save results
 
 Now assemble the inla inference and prediction results.
-```{r inla_res, include = TRUE, cache=TRUE}
+```{r inla_res, include = TRUE, eval = FALSE}
 INLA_pred <- res_inla$summary.linear.predictor
 ## Extract and project predictions
 pred_idx <- inla.stack.index(stSSH, tag = "pred")$data
@@ -220,13 +211,14 @@ SSH_pred <- data.frame(lon = SSH_grid[,1], lat = SSH_grid[,2],
 ress <- list(res_inla = res_inla, spde = SSH_spde, st = stSSH, 
             mesh = mesh_ssh,  SSH_pred = SSH_pred)
 
-save(ress, file ="/./projects/GlobalMass/WP1-BHM/Experiment2a/exp2a_ssh.RData")
+save(ress, file ="Z:/WP1-BHM/Experiment2a/exp2a_ssh.RData")
 ```
 
 
 ### Plot the posteriors of the hyper parameters
 
 ```{r hyper, include=TRUE}
+load("Z:/WP1-BHM/Experiment2a/exp2a_ssh.RData")
 pars_SSH <- marginal_par(res = ress, process = "SSH", plot = TRUE)
 ## The posterior modes
 print(paste("The estimated correlation lengths are:", pars_SSH$rho_mode*6371,  sep = "  "))
@@ -294,7 +286,7 @@ grace_data <- read.table("Z:/WP2-SolidEarth/BHMinputs/GRACE/GRACE_v02.3b_trends_
 grace_loc <-  read.table("Z:/WP2-SolidEarth/BHMinputs/GRACE/GRACE_v02.3b_loc_v03.txt", skip = 1)
 n_grace <- ncol(grace_loc)
 n_ll <- (n_grace-4)/2
-names(grace_loc) <- c("id", "area", "lon_c", "lat_C", paste0(c("lon", "lat"), rep(1:n_ll, each = 2)))
+names(grace_loc) <- c("id", "area", "lon_c", "lat_c", paste0(c("lon", "lat"), rep(1:n_ll, each = 2)))
 
 ## Create spatial polygons data frame
 Polygon_list <- list()
@@ -308,7 +300,7 @@ Polygons_list <- lapply(1:length(Polygon_list), function(x) Polygons(list(Polygo
 SpPolygon <- SpatialPolygons(Polygons_list, proj4string = CRS("+proj=longlat"))
 
 grace_sp <- SpatialPolygonsDataFrame(SpPolygon,grace_data)
-spplot(grace_sp, "mmweq")
+spplot(grace_sp, "mmweq", at = seq(-50, 50, 5))
 
 ## note the area calcuated by R is different from those given in the dataset -- ask Maike
 ```
@@ -317,12 +309,12 @@ spplot(grace_sp, "mmweq")
 
 ## Generate mesh 
 
-We also need a mesh to represent the mass process. We could use the same as SSH but 
-
-
-
+We also need a mesh to represent the mass process. For the same reason as discussed in previous section for SSH, we need a mesh with 1 degree resolution. The GRACE data is all over the globe, so we can use the \code{mesh0}.
 
 ## Link data to process
+
+The GRACE masc
+
 
 ## INLA inference
 
