@@ -22,22 +22,6 @@ alt_data$lat <- rep(lat, each = 360)
 alt_data2 <- na.omit(alt_data)
 ## Find the xyz coords of the altimetry data
 alt_loc <- do.call(cbind, Lll2xyz(lon = alt_data2$lon, lat = alt_data2$lat))
-## plot the data
-lattice::levelplot(trend_ssh ~ lon + lat, data = alt_data2, aspect = "iso",  at =seq(-20, 20, 4),
-                     panel = function(x,y,z,...){
-                       lattice::panel.levelplot(x,y,z,...)
-                       map2 <- map("world2", interior = FALSE, plot = FALSE)
-                       lattice::panel.xyplot(x=map2$x, y=map2$y, type = "l", col = "black")
-                     },
-                     main = title, xlab = "longitude", ylab = "latitude")
-
-lattice::levelplot(err_ssh ~ lon + lat, data = alt_data2, aspect = "iso",  at = seq(0, 4, 0.5),
-                     panel = function(x,y,z,...){
-                       lattice::panel.levelplot(x,y,z,...)
-                       map2 <- map("world2", interior = FALSE, plot = FALSE)
-                       lattice::panel.xyplot(x=map2$x, y=map2$y, type = "l", col = "black")
-                     },
-                     main = title, xlab = "longitude", ylab = "latitude")
 
 
 ## ----prior---------------------------------------------------------------
@@ -58,7 +42,6 @@ mesh0 <- inla.mesh.2d(loc = mesh0$loc, cutoff = 0.01, max.edge = 1)
 ## ----ssh_mesh2-----------------------------------------------------------
 ## Load the Ocean polygon
 Ocean <- readOGR(dsn = "/./projects/GlobalMass/WP1-BHM/maps/ne_110m_ocean", layer = "ne_110m_ocean")
-plot(Ocean)
 
 ## Remove mesh not in the ocean
 mesh0 <- dt.mesh.addon.posTri(mesh = mesh0, globe = TRUE) 
