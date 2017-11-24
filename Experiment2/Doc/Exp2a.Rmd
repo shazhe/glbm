@@ -308,7 +308,7 @@ spplot(grace_sp, "mmweq", at = seq(-50, 50, 5))
 ## prior set up
 ```{r prior}
 ## Priors mean and variance for the parameters: rho and sigma
-mu_r <- 3000/6371
+mu_r <- 500/6371
 v_r <- 1
 mu_s <- 5
 v_s <- 10^2
