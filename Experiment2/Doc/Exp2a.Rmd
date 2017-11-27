@@ -450,7 +450,7 @@ grace_sp$pred_mean <- grace_m
 grace_sp$pred_u <- grace_u
 
 
-save(res_mass, grace_sp , file ="Z:/WP1-BHM/Experiment2a/exp2a_mass.RData")
+save(res_mass, grace_sp, file ="Z:/WP1-BHM/Experiment2a/exp2a_mass.RData")
 ```
 
 
@@ -471,7 +471,7 @@ print(paste("The estimated marginal variances are:", pars_mass$sigma_mode,sep = 
 In this experiment, it is more convenient to produce the prediction at the altmetry data directly, since they are grid points.
 We plot the predicted SSH at these locations and compare them to the altimetry data
 ```{r predict_grace, include=TRUE}
-mass_pred <- ress_mass$mass_pred
+mass_pred <- res_mass$mass_pred
 mass_pred$source1 <- "mass predicted mean"
 mass_pred$source2 <- "mass predicted uncertainty"
 
@@ -522,6 +522,7 @@ Now assemble the predicted mean of and uncertainty of steric at 1 degree resolut
 steric_m <- res_SSH$SSH_pred$mean - res_mass$mass_pred$mean - ice6g2$trend
 steric_u <- res_SSH$SSH_pred$u - res_mass$mass_pred$u
 steric_data <- data.frame(lon = ice6g2$x_center, lat = ice6g2$y_center, mean = steric_m, u = steric_u)
+
 ```
 
 Plot the steric map.

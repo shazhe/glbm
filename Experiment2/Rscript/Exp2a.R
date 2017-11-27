@@ -252,5 +252,5 @@ ice6g2 <- ice6g2[order(ice6g$x_center),]
 steric_m <- res_SSH$SSH_pred$mean - res_mass$mass_pred$mean - ice6g2$trend
 steric_u <- res_SSH$SSH_pred$u - res_mass$mass_pred$u
 steric_data <- data.frame(lon = ice6g2$x_center, lat = ice6g2$y_center, mean = steric_m, u = steric_u)
-save(res_SSH, res_mass, grace_sp, steric_data, "/./projects/WP1-BHM/Experiment2a/exp2a_all.RData")
+save(res_SSH, res_mass, grace_sp, steric_data, file ="/./projects/GlobalMass/WP1-BHM/Experiment2a/exp2a_all.RData")
 
