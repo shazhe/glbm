@@ -202,16 +202,16 @@ pred_idx <- inla.stack.index(stSSH, tag = "pred")$data
 ## SSH
 SSH_m <- INLA_pred$mean[pred_idx] 
 SSH_u <- INLA_pred$sd[pred_idx]
-proj <- inla.mesh.projector(mesh_ssh, projection = "longlat", dims = c(360,180), xlim = c(0.5,359.5), ylim = c(-89.5, 89.5))
+proj <- inla.mesh.projector(mesh_ssh, projection = "longlat", dims = c(360,180), xlim = c(0,359), ylim = c(-89.5, 89.5))
 SSH_grid <- expand.grid(proj$x, proj$y)
 SSH_pred <- data.frame(lon = SSH_grid[,1], lat = SSH_grid[,2],
                        mean = as.vector(inla.mesh.project(proj, as.vector(SSH_m))),
                        u = as.vector(inla.mesh.project(proj, as.vector(SSH_u))))
 
-ress <- list(res_inla = res_inla, spde = SSH_spde, st = stSSH, 
+res_SSH <- list(res_inla = res_inla, spde = SSH_spde, st = stSSH, 
             mesh = mesh_ssh,  SSH_pred = SSH_pred)
 
-save(ress, file ="Z:/WP1-BHM/Experiment2a/exp2a_ssh.RData")
+save(res_SSH, file ="Z:/WP1-BHM/Experiment2a/exp2a_ssh.RData")
 ```
 
 
@@ -219,7 +219,7 @@ save(ress, file ="Z:/WP1-BHM/Experiment2a/exp2a_ssh.RData")
 
 ```{r hyper, include=TRUE}
 load("Z:/WP1-BHM/Experiment2a/exp2a_ssh.RData")
-pars_SSH <- marginal_par(res = ress, process = "SSH", plot = TRUE)
+pars_SSH <- marginal_par(res = res_SSH, process = "SSH", plot = TRUE)
 ## The posterior modes
 print(paste("The estimated correlation lengths are:", pars_SSH$rho_mode*6371,  sep = "  "))
 
@@ -232,7 +232,7 @@ print(paste("The estimated marginal variances are:", pars_SSH$sigma_mode,sep = "
 In this experiment, it is more convenient to produce the prediction at the altmetry data directly, since they are grid points.
 We plot the predicted SSH at these locations and compare them to the altimetry data
 ```{r predict, include=TRUE}
-alt_pred <- ress$SSH_pred
+alt_pred <- res_SSH$SSH_pred
 alt_pred$source1 <- "SSH predicted mean"
 alt_pred$source2 <- "SSH predicted uncertainty"
 alt_data$source1 <- "Altimetry trend"
@@ -306,12 +306,20 @@ spplot(grace_sp, "mmweq", at = seq(-50, 50, 5))
 ```
 
 ## prior set up
+
+Use the polygon data to have rought estimate of the correlation length and variance.
 ```{r prior}
+grace_v <- data.frame(mean = grace_data$mmweq, lon = grace_loc$lon_c, lat = grace_loc$lat_c)
+coordinates(grace_v) <- c("lon", "lat")
+proj4string(grace_v) <- CRS("+proj=longlat")
+v2 <- variogram(mean~1, grace_v) 
+plot(v2)
+
 ## Priors mean and variance for the parameters: rho and sigma
-mu_r <- 500/6371
+mu_r <- 2000/6371
 v_r <- 1
-mu_s <- 5
-v_s <- 10^2
+mu_s <- 250
+v_s <- 200^2
 
 ## Transform the parameters for the SPDE_GMRF approximation
 trho <- Tlognorm(mu_r, v_r)
@@ -345,7 +353,7 @@ grace_area <- geosphere::areaPolygon(grace_sp)/(1000^2)
 plot(grace_loc$area, grace_area)
 abline(a = 0, b =1)
 grace_sp$area <-grace_area
-spplot(grace_sp, "area")
+#spplot(grace_sp, "area")
 
 ## Generate the integration grid for each polygons
 poly_block <- function(i, dis = 10){
@@ -384,13 +392,9 @@ A_mass_pred <- inla.spde.make.A(mesh = mesh0, loc = grid_pred, weights = areas)
 ## Create the estimation and prediction stack
 st.est <- inla.stack(data = list(y=grace_sp$mmweq), A = list(A_GRACE_data),
                      effects = list(mass = 1:mass_spde$n.spde), tag = "est")
-st.pred <- inla.stack(data = list(y=NA), A = list(A_mass_pred),
-                      effects = list(mass=1:mass_spde$n.spde), tag = "pred")
-
-st.pred2 <- inla.stack(data = list(y=NA), A = list(A_GRACE_data),
+st.pred <- inla.stack(data = list(y=NA), A = list(rbind(A_GRACE_data, A_mass_pred)),
                       effects = list(mass=1:mass_spde$n.spde), tag = "pred")
 stmass <- inla.stack(st.est, st.pred)
-stmass2 <- inla.stack(st.est, st.pred2)
 ```
 
 
@@ -401,8 +405,7 @@ Now we can run INLA for the Bayesian inference. Do not run on a desktop the proc
 ```{r inla_run, include = TRUE, eval = FALSE}
 ## Fix altimetry errors as they are known
 hyper <- list(prec = list(fixed = TRUE, initial = 0))
-prec_scale <- c(1/grace_sp$std^2, rep(1, nrow(A_mass_pred)))
-prec_scale2 <- c(1/grace_sp$std^2, rep(1, nrow(A_GRACE_data)))
+prec_scale <- c(1/grace_sp$std^2, rep(1, nrow(A_mass_pred) + nrow(A_GRACE_data)))
 
 ## The formular for modelling the SSH mean
 formula = y ~ -1 +  f(mass, model = mass_spde)
@@ -411,10 +414,6 @@ formula = y ~ -1 +  f(mass, model = mass_spde)
 res_inla <- inla(formula, data = inla.stack.data(stmass, spde = mass_spde), family = "gaussian",
                  scale =prec_scale, control.family = list(hyper = hyper),
                  control.predictor=list(A=inla.stack.A(stmass), compute =TRUE))
-
-res_inla2 <- inla(formula, data = inla.stack.data(stmass2, spde = mass_spde), family = "gaussian",
-                 scale =prec_scale2, control.family = list(hyper = hyper),
-                 control.predictor=list(A=inla.stack.A(stmass2), compute =TRUE))
 ```
 
 
@@ -426,20 +425,28 @@ Now assemble the inla inference and prediction results.
 INLA_pred <- res_inla$summary.linear.predictor
 ## Extract and project predictions
 pred_idx <- inla.stack.index(stmass, tag = "pred")$data
+idx_grace <- pred_idx[1:nrow(A_GRACE_data)]
+idx_grid <- pred_idx[-(1:nrow(A_GRACE_data))]
 
 ## SSH
-mass_m <- INLA_pred$mean[pred_idx] 
-mass_u <- INLA_pred$sd[pred_idx]
-proj <- inla.mesh.projector(mesh0, projection = "longlat", dims = c(360,180), xlim = c(0.5,359.5), ylim = c(-89.5, 89.5))
+mass_m <- INLA_pred$mean[idx_grace] 
+mass_u <- INLA_pred$sd[idx_grace]
+proj <- inla.mesh.projector(mesh0, projection = "longlat", dims = c(360,180), xlim = c(0,359), ylim = c(-89.5, 89.5))
 mass_grid <- expand.grid(proj$x, proj$y)
 mass_pred <- data.frame(lon = mass_grid[,1], lat = mass_grid[,2],
                        mean = mass_m,
                        u = mass_u)
 
-ress_mass <- list(res_inla = res_inla, spde = mass_spde, st = stmass, 
+res_mass <- list(res_inla = res_inla, spde = mass_spde, st = stmass, 
             mesh = mesh0,  mass_pred = mass_pred)
 
-save(ress_mass, file ="Z:/WP1-BHM/Experiment2a/exp2a_mass.RData")
+grace_m <- INLA_pred2$mean[idx_grace] 
+grace_u <- INLA_pred2$sd[idx_grace]
+grace_sp$pred_mean <- grace_m
+grace_sp$pred_u <- grace_u
+
+
+save(res_mass, grace_sp , file ="Z:/WP1-BHM/Experiment2a/exp2a_mass.RData")
 ```
 
 
@@ -466,7 +473,7 @@ mass_pred$source2 <- "mass predicted uncertainty"
 
 
 ## plot the mean 
-lattice::levelplot(mean ~ lon + lat, data = alt_pred, aspect = "iso", at = seq(-20, 20, 2),
+lattice::levelplot(mean ~ lon + lat, data = mass_pred, aspect = "iso", 
                      panel = function(x,y,z,...){
                        lattice::panel.levelplot(x,y,z,...)
                        map2 <- map("world2", interior = FALSE, plot = FALSE)
@@ -475,7 +482,7 @@ lattice::levelplot(mean ~ lon + lat, data = alt_pred, aspect = "iso", at = seq(-
                      main = title, xlab = "longitude", ylab = "latitude")
 
 ## plot the uncertainty
-lattice::levelplot(u ~ lon + lat, data = alt_pred, aspect = "iso", at = seq(0, 3, 0.5),
+lattice::levelplot(u ~ lon + lat, data = mass_pred, aspect = "iso", 
                      panel = function(x,y,z,...){
                        lattice::panel.levelplot(x,y,z,...)
                        map2 <- map("world2", interior = FALSE, plot = FALSE)
@@ -487,10 +494,49 @@ lattice::levelplot(u ~ lon + lat, data = alt_pred, aspect = "iso", at = seq(0, 3
 ```
 
 
-
-
 # Update $X_{steric}$
+
+In this experiment, steric can be represented by SSH, MASS and GIA. 
+$$X_{steric} = X_{SSH} - X_{MASS} - x_{GIA}$$
+Since these processes are all Gaussian, the are additive. We have 
+$$E(X_{steric} | altimetry, GRACE, GIA) = E(X_{SSH}| altimetry) - E(X_{mass}|GRACE) - x_{GIA} \\
+V(X_{steric}| altimetry, GRACE, GIA) = V(X_{SSH}| altimetry) + V(X_{mass}|GRACE)$$
 
 ## Load GIA data
 
+Here we use the ICE-6G data to fix the GIA.
+```{r gia_data}
+ ice6g <- read.table("Z:/WP2-SolidEarth/BHMinputs/GIA/GIA_Pel-6-VM5.txt", header = T)
+aa <- order(cbind(ice6g$y_center, ice6g$x_center))
+ice6g2 <- ice6g[aa,]
+```
+
 ## Results
+
+Now assemble the predicted mean of and uncertainty of steric at 1 degree resolution.
+```{r setric}
+steric_m <- res_SSH$SSH_pred$mean - res_mass$mass_pred$mean - ice6g2$trend
+steric_u <- res_SSH$SSH_pred$u - res_mass$mass_pred$u
+steric_data <- data.frame(lon = ice6g2$x_center, lat = ice6g2$y_center, mean = steric_m, u = steric_u)
+save(res_SSH, ress_mass, grace_sp, steric_data, "Z:/WP1-BHM/Experiment2a/exp2a_all.RData")
+```
+
+Plot the steric map.
+```{r plot_steric}
+lattice::levelplot(mean ~ lon + lat, data = steric_data, aspect = "iso",  at =seq(-20, 20, 4),
+                     panel = function(x,y,z,...){
+                       lattice::panel.levelplot(x,y,z,...)
+                       map2 <- map("world2", interior = FALSE, plot = FALSE)
+                       lattice::panel.xyplot(x=map2$x, y=map2$y, type = "l", col = "black")
+                     },
+                     main = title, xlab = "longitude", ylab = "latitude")
+
+lattice::levelplot(u ~ lon + lat, data = steric_data, aspect = "iso",  at =seq(0, 10, 2),
+                     panel = function(x,y,z,...){
+                       lattice::panel.levelplot(x,y,z,...)
+                       map2 <- map("world2", interior = FALSE, plot = FALSE)
+                       lattice::panel.xyplot(x=map2$x, y=map2$y, type = "l", col = "black")
+                     },
+                     main = title, xlab = "longitude", ylab = "latitude")
+```
+
