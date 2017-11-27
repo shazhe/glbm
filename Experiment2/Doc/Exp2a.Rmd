@@ -318,8 +318,8 @@ plot(v2)
 ## Priors mean and variance for the parameters: rho and sigma
 mu_r <- 2000/6371
 v_r <- 1
-mu_s <- 16
-v_s <- 30^2
+mu_s <- 2
+v_s <- 5^2
 
 ## Transform the parameters for the SPDE_GMRF approximation
 trho <- Tlognorm(mu_r, v_r)
@@ -350,7 +350,7 @@ The GRACE data we have are mass anomalies aggregated into large polygon grid and
 A most tricky setting is the scaling factor! Since the projection matrix A approximate can map inputs to outputs on different scales, this can make the computation unstable when the difference in the scales are huge. The scale also determines the scale of the marginal variacen and predicted uncertainties. 
 
 We choose to scale the prediction by $1e4$ for a $100km \times 100km$ area resolution. This approximately correpond to a 1 degree resolution and also at the similar scale of the GRACE data polygon size.
-```{r grace_link}
+```{r grace_link, eval = FALSE}
 ## For each polygon observation we generate the regular spaced grid and the number of grid cell is proportional to the area of the polygon
 grace_area <- geosphere::areaPolygon(grace_sp)/(1000^2)
 plot(grace_loc$area, grace_area)
@@ -509,7 +509,7 @@ V(X_{steric}| altimetry, GRACE, GIA) = V(X_{SSH}| altimetry) + V(X_{mass}|GRACE)
 ## Load GIA data
 
 Here we use the ICE-6G data to fix the GIA.
-```{r gia_data}
+```{r gia_data, eval = FALSE}
 ice6g <- read.table("Z:/WP2-SolidEarth/BHMinputs/GIA/GIA_Pel-6-VM5.txt", header = T)
 ice6g2<- ice6g[order(ice6g$y_center),]
 ice6g2 <- ice6g2[order(ice6g$x_center),]
@@ -518,16 +518,15 @@ ice6g2 <- ice6g2[order(ice6g$x_center),]
 ## Results
 
 Now assemble the predicted mean of and uncertainty of steric at 1 degree resolution.
-```{r setric}
+```{r setric, eval = FALSE}
 steric_m <- res_SSH$SSH_pred$mean - res_mass$mass_pred$mean - ice6g2$trend
 steric_u <- res_SSH$SSH_pred$u - res_mass$mass_pred$u
 steric_data <- data.frame(lon = ice6g2$x_center, lat = ice6g2$y_center, mean = steric_m, u = steric_u)
-steric_data <- na.omit(steric_data)
-save(res_SSH, ress_mass, grace_sp, steric_data, "Z:/WP1-BHM/Experiment2a/exp2a_all.RData")
 ```
 
 Plot the steric map.
 ```{r plot_steric}
+load("Z:/WP1-BHM/Experiment2a/exp2a_all.RData")
 lattice::levelplot(mean ~ lon + lat, data = steric_data, aspect = "iso",  
                      panel = function(x,y,z,...){
                        lattice::panel.levelplot(x,y,z,...)

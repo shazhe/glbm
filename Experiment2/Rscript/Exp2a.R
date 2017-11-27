@@ -137,8 +137,8 @@ grace_sp <- SpatialPolygonsDataFrame(SpPolygon,grace_data)
 ## Priors mean and variance for the parameters: rho and sigma
 mu_r <- 2000/6371
 v_r <- 1
-mu_s <- 16
-v_s <- 30^2
+mu_s <- 2
+v_s <- 5^2
 
 ## Transform the parameters for the SPDE_GMRF approximation
 trho <- Tlognorm(mu_r, v_r)
@@ -159,8 +159,6 @@ mass_spde <- inla.spde2.matern(mesh0, B.tau = matrix(c(ltau0, -1, 1),1,3), B.kap
 ## ----grace_link----------------------------------------------------------
 ## For each polygon observation we generate the regular spaced grid and the number of grid cell is proportional to the area of the polygon
 grace_area <- geosphere::areaPolygon(grace_sp)/(1000^2)
-plot(grace_loc$area, grace_area)
-abline(a = 0, b =1)
 grace_sp$area <-grace_area
 area_mean <- mean(grace_area)
 
