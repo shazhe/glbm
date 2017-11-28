@@ -244,7 +244,7 @@ grace_sp$pred_u <- grace_u
 save(res_mass, grace_sp , file ="/./projects/GlobalMass/WP1-BHM/Experiment2a/exp2a_mass.RData")
 
 ## ----gia_data------------------------------------------------------------
-ice6g <- read.table("/./projects/WP2-SolidEarth/BHMinputs/GIA/GIA_Pel-6-VM5.txt", header = T)
+ice6g <- read.table("/./projects/GlobalMass/WP2-SolidEarth/BHMinputs/GIA/GIA_Pel-6-VM5.txt", header = T)
 ice6g2<- ice6g[order(ice6g$y_center),]
 ice6g2 <- ice6g2[order(ice6g$x_center),]
 
