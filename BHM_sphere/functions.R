@@ -326,26 +326,31 @@ map_zoom <-function(data_field, data_obs, zoom_coords, colpal, limits=NULL){
 ## 7 get the subset of the mesh for buiding the Q
 mesh.sub <- function(mesh, Omega, i = 2, sphere=TRUE){
   mesh_sub <- mesh
-  id_tri <- Omega[[i]] # triangel id in the subset
-  id_vet <- unique(as.vector(mesh$graph$tv[Omega[[i]], ])) # vertex id in the subset
+  id_tri <- sort(Omega[[i]]) # triangle id in the subset
+  id_vet <- sort(unique(as.vector(mesh$graph$tv[Omega[[i]], ]))) # vertex id in the subset
   
   if(!sphere){
     ## get the subset of the graph
-    sub_tv <- mesh$graph$tv[id_tri, ]
-    sub_vt <- mesh$graph$vt[id_vet,]
-    sub_tt <- mesh$graph$tt[id_tri,]
+    sub_tv <- apply(mesh$graph$tv[id_tri,], 2, match, table = id_vet)
+    sub_vt <- match(mesh$graph$vt[id_vet,], id_tri)
+    sub_tt <- apply(mesh$graph$tt[id_tri,], 2, match, table = id_tri)
     sub_tti <- mesh$graph$tti[id_tri,]
     sub_vv <- mesh$graph$vv[id_vet,id_vet]
     
     ## Now assemble 
     mesh_sub$t <- length(id_tri) 
     mesh_sub$n <- length(id_vet)
+    mesh_sub$loc <- mesh$loc[id_vet,]
     mesh_sub$graph$tv <- sub_tv
     mesh_sub$graph$vt <- sub_vt
     mesh_sub$graph$tt <- sub_tt
     mesh_sub$graph$tti <- sub_tti
     mesh_sub$graph$vv <- sub_vv
     
+    mesh_sub$idx$loc <- na.omit(match(mesh$idx$loc, id_vet))
+    mesh_sub$idx$segm <- na.omit(match(mesh$idx$segm, id_vet))
+    mesh_sub$segm$bnd$idx <- na.omit(apply(mesh$segm$bnd$idx, 2, match, table = id_vet))
+   
     mesh_sub$posTri <- mesh_sub$posTri[Omega[[i]],]
     mesh_sub$Trill <- mesh_sub$Trill[Omega[[i]],]
   }

@@ -1,17 +1,15 @@
 ### GIA paper
 
-
-
 #### Illstration of subset model
 
 library(INLA); library(rgdal); library(maptools); library(GEOmap); library(rgl)
-source("~/glbm/BHM_sphere/functions-barriers-dt-models-march2017.R")
-source("~/glbm/BHM_sphere/functions.R")
+source("C:/ZSwork/glbm/BHM_sphere/functions-barriers-dt-models-march2017.R")
+source("C:/ZSwork/glbm/BHM_sphere/functions.R")
 set.seed(18)
 
 # boundaries and interiors
-loc.bnd = matrix(c(0,0, 1,0, 1,1, 0,1), 4, 2, byrow=TRUE)
-loc.int = matrix(c(0.3,0.3, 0.8,0.3, 0.8,0.5, 0.3,0.5, 0.3,0.3), 5, 2, byrow=TRUE)
+loc.bnd = matrix(c(0,0, 5,0, 5,5, 0,5), 4, 2, byrow=TRUE)
+loc.int = matrix(c(1.5,2.3, 3.5,2.3, 3.5, 2.7, 1.5,2.7, 1.5,2.3), 5, 2, byrow=TRUE)
 segm.bnd = inla.mesh.segment(loc.bnd)
 segm.int = inla.mesh.segment(loc.int, is.bnd=FALSE)
 int.Poly <- SpatialPolygons(list(Polygons(list(Polygon(loc.int)), ID = "in")))
@@ -35,10 +33,25 @@ plot(mesh, add=T)
 mesh_sub <- mesh.sub(mesh, Omega, 2, sphere = FALSE)
 plot(mesh_sub)
 
-spde1 <- inla.spde2.matern(mesh_sub, B.tau = matrix(c(-5, -1, 1),1,3), B.kappa = matrix(c(2, 0, -1), 1,3),
-                  theta.prior.mean = c(0,0), theta.prior.prec = c(1,1))
-Q <- inla.spde.precision(spde1, c(0,0))
+## Transform the parameters for the SPDE_GMRF approximation
+lsigma0 <- log(2)
+lrho0 <- log(1)
+lkappa0 <- log(8)/2 - lrho0
+ltau0 <- 0.5*log(1/(4*pi)) - lsigma0 - lkappa0
 
-data_loc <- matrix(c(0.5, 0.55,  0.5, 0.25, 0.8, 0.55), byrow = TRUE, ncol = 2)
-Amat <- inla.spde.make.A(mesh = mesh_sub, loc = data_loc)
-Sigma_data <- solve(Q)
+spde1 <- inla.spde2.matern(mesh_sub, B.tau = matrix(c(ltau0, -1, 1),1,3), B.kappa = matrix(c(lkappa0, 0, -1), 1,3),
+                  theta.prior.mean = c(0,0), theta.prior.prec = c(1,1))
+
+spde2 <- inla.spde2.matern(mesh, B.tau = matrix(c(ltau0, -1, 1),1,3), B.kappa = matrix(c(lkappa0, 0, -1), 1,3),
+                           theta.prior.mean = c(0,0), theta.prior.prec = c(1,1))
+
+Q1 <- inla.spde.precision(spde1, c(0,0))
+Q2 <- inla.spde.precision(spde2, c(0,0))
+
+data_loc <- matrix(c(2,3,  2, 2,  3,3), byrow = TRUE, ncol = 2)
+plot(mesh_sub, asp = 1)
+points(data_loc, col = 2)
+Amat1 <- inla.spde.make.A(mesh = mesh_sub, loc = data_loc)
+Amat2 <- inla.spde.make.A(mesh = mesh, loc = data_loc)
+Sigma_data1 <- cov2cor(Amat1%*%solve(Q1, t(Amat1)))
+Sigma_data2 <- cov2cor(Amat2%*%solve(Q2, t(Amat2)))
