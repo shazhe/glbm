@@ -15,10 +15,10 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # Introduction
 
-In this experiment, we assume the GIA is knonw so there will be only two independent latent process $X_{ssh}$ and $X_{mass}$ and the thrid one $X_{steric}$ is given by $X_{steric} = X_{ssh} - x_{GIA} - X_{mass}$. Given the altimetry and GRACE data, the $X_{steric}$ can be predicted as an linear combination of posterior ssh and mass change:
+In this experiment, we assume the GIA is known so there will be only two independent latent process $X_{ssh}$ and $X_{mass}$ and the third one $X_{steric}$ is given by $X_{steric} = X_{ssh} - x_{GIA} - X_{mass}$. Given the altimetry and GRACE data, the $X_{steric}$ can be predicted as an linear combination of posterior ssh and mass change:
 $$X_{steric} |  Y_{alt}, Y_{GRACE} = X_{ssh} | Y_{alt} - X_{mass}|Y_{GRACE} - x_{GIA}$$
 
-Therefore, in the following we use the same approach as in Experiment 1 to obtain the updated $X_ssh$ and $X_{mass}$. In this first experiment we assume these two process can be updated indepenently. 
+Therefore, in the following we use the same approach as in Experiment 1 to obtain the updated $X_ssh$ and $X_{mass}$. In this first experiment we assume these two process can be updated independently. 
 
 ```{r loadlibs, message = FALSE, warning = FALSE}
 library(rgdal); library(sp);library(GEOmap)
@@ -69,9 +69,9 @@ lattice::levelplot(err_ssh ~ lon + lat, data = alt_data2, aspect = "iso",  at = 
 
 ## prior set up
 
-Now we do some exploratory analysis which will be helpful in setting up the prior for hyper parameters $\rho$ and $\sigma^2$ for the SSH process. We can set up a vague prior in this preliminary study and later on set the prior to be concertrated if more information of ssh is given. We learn a sensible value for a initial mean by plotting the variogram of the the altimetry data.
+Now we do some exploratory analysis which will be helpful in setting up the prior for hyper parameters $\rho$ and $\sigma^2$ for the SSH process. We can set up a vague prior in this preliminary study and later on set the prior to be concentrated if more information of ssh is given. We learn a sensible value for a initial mean by plotting the variogram of the the altimetry data.
 
-The following chunch plot the smoothed variogram of the altimerty trend. It takes a long time to run due to the size of the data.
+The following chunk plot the smoothed variogram of the altimerty trend. It takes a long time to run due to the size of the data.
 
 ```{r variogram, message = FALSE}
 library(gstat)
@@ -95,9 +95,9 @@ The sea surface height is only defined on oceans so we will model this process o
 
 ## Generate mesh 
 
-To build the spde model used for approximating the process, we need to generate a triagluar mesh for the process. In general, the triangles in the mesh should have similar size and shape and the size of the triangles should be no larger than the spatial correlation length. 
+To build the spde model used for approximating the process, we need to generate a triangular mesh for the process. In general, the triangles in the mesh should have similar size and shape and the size of the triangles should be no larger than the spatial correlation length. 
 
-In our exploratory analysis, the correlation length is quite long, therefore if the purpose is estimating the hyper-parameters, then we can choose to have a sparse mesh with resolutiong no large than the correlation length. Here we could use say a triangle size to have approximately 5 degree resolution so that the edge length of the triangles are smaller than 500km on average which is much smaller than 3000km. 
+In our exploratory analysis, the correlation length is quite long, therefore if the purpose is estimating the hyper-parameters, then we can choose to have a sparse mesh with resolution no large than the correlation length. Here we could use say a triangle size to have approximately 5 degree resolution so that the edge length of the triangles are smaller than 500km on average which is much smaller than 3000km. 
 
 However, Since our purpose is to produce a map of the process at high resolution, we must have a mesh with at least the desired prediction resolution. For a 1 degree resolution map, we will need about $360 \times 180 = 64800$ triangles corresponding to number of vertices of $v \approx  (f+2)*2/5= 25921$. When using the Fibonacci grid points in long lat coordinates as the starting points for generating the mesh, the number of points is about half of the triangle vertices.
 
@@ -229,7 +229,7 @@ print(paste("The estimated marginal variances are:", pars_SSH$sigma_mode,sep = "
 
 ## Plot the predictions
 
-In this experiment, it is more convenient to produce the prediction at the altmetry data directly, since they are grid points.
+In this experiment, it is more convenient to produce the prediction at the altimetry data directly, since they are grid points.
 We plot the predicted SSH at these locations and compare them to the altimetry data
 ```{r predict, include=TRUE}
 alt_pred <- res_SSH$SSH_pred
@@ -307,7 +307,7 @@ spplot(grace_sp, "mmweq", at = seq(-50, 50, 5))
 
 ## prior set up
 
-Use the polygon data to have rought estimate of the correlation length and variance.
+Use the polygon data to have rough estimate of the correlation length and variance.
 ```{r Grace_prior}
 grace_v <- data.frame(mean = grace_data$mmweq, lon = grace_loc$lon_c, lat = grace_loc$lat_c)
 coordinates(grace_v) <- c("lon", "lat")
@@ -345,11 +345,11 @@ We also need a mesh to represent the mass process. For the same reason as discus
 
 ## Link data to process
 
-The GRACE data we have are mass anomalies aggregated into large polygon grid and we call them "super mascons" as they are on larger grid than the original data provdided by the GRACE project. To link the data to the process, we need to integrate the process value over the coressponding polygon. The integration can be done numerically as weighted sum of the grid values within the polygons. The grid values are represented by the GMRF.
+The GRACE data we have are mass anomalies aggregated into large polygon grid and we call them "super mascons" as they are on larger grid than the original data provided by the GRACE project. To link the data to the process, we need to integrate the process value over the corresponding polygon. The integration can be done numerically as weighted sum of the grid values within the polygons. The grid values are represented by the GMRF.
 
-A most tricky setting is the scaling factor! Since the projection matrix A approximate can map inputs to outputs on different scales, this can make the computation unstable when the difference in the scales are huge. The scale also determines the scale of the marginal variacen and predicted uncertainties. 
+A most tricky setting is the scaling factor! Since the projection matrix A approximate can map inputs to outputs on different scales, this can make the computation unstable when the difference in the scales are huge. The scale also determines the scale of the marginal variance and predicted uncertainties. 
 
-We choose to scale the prediction by $1e4$ for a $100km \times 100km$ area resolution. This approximately correpond to a 1 degree resolution and also at the similar scale of the GRACE data polygon size.
+We choose to scale the prediction by $1e4$ for a $100km \times 100km$ area resolution. This approximately correspond to a 1 degree resolution and also at the similar scale of the GRACE data polygon size.
 ```{r grace_link, eval = FALSE}
 ## For each polygon observation we generate the regular spaced grid and the number of grid cell is proportional to the area of the polygon
 grace_area <- geosphere::areaPolygon(grace_sp)/(1000^2)
@@ -378,7 +378,38 @@ grid_block <- do.call(c, lapply(grace_block, "[[", "block"))
 weights <- do.call(c, lapply(grace_block, "[[", "weights"))
 
 A_GRACE_data <- inla.spde.make.A(mesh = mesh0, loc = grid_xyz, block = grid_block,  weights = weights)
+```
 
+The GRACE data also see the contribution of GIA. In this experiment, we assume GIA is known so we can remove the GIA contribution to GRACE.
+
+First load the GIA data. We use the ICE-6G data and use the same mesh grid as $mass$ to reprensent GIA.
+```{r gia_data, eval = FALSE}
+ice6g <- read.table("Z:/WP2-SolidEarth/BHMinputs/GIA/GIA_Pel-6-VM5_ewh.txt", header = T)
+ice6g$x_center <- ifelse(ice6g$x_center < 0, ice6g$x_center+360, ice6g$x_center)
+ice6g2<- ice6g[order(ice6g$y_center,ice6g$x_center ),]
+gia_loc <- do.call(cbind, Lll2xyz(lat = ice6g2$y_center, lon = ice6g2$x_center))
+
+polycoords <- ice6g[,c(6:13, 6,7)] 
+plist <- lapply(ice6g$ID, 
+                function(x) Polygons(list(Polygon(cbind(lon = as.numeric(polycoords[x, c(1,3,5,7,9)]), 
+                                                        lat = as.numeric(polycoords[x, c(2,4,6,8,10)])))), ID = x))
+Plist <- SpatialPolygons(plist, proj4string = CRS("+proj=longlat"))
+meshLL <- Lxyz2ll(list(x=mesh0$loc[,1], y = mesh0$loc[,2], z = mesh0$loc[,3]))
+mesh_sp <- SpatialPoints(data.frame(lon = meshLL$lon, lat = meshLL$lat), proj4string = CRS("+proj=longlat")) 
+
+mesh_idx <- over(mesh_sp, Plist)
+GIA_v <- ice6g$trend[mesh_idx]
+```
+
+
+```{r grace_gia_remove}
+GIA_grace <- A_GRACE_data %*% GIA_v
+grace_data <- grace_sp$mmweq - GIA_grace
+grace_sp@data$gia <- c(GIA_grace)
+grace_sp@data$mass <- as.numeric(grace_data)
+```
+
+```{r grace_pred_link}
 ## Same for prediction on a 1 degree resolution grid, we need to know the area of the grid for integration
 ## generate the prediction grid
 gx <- seq(0, 359, 1)
@@ -394,7 +425,7 @@ grid_pred <- do.call(cbind,Lll2xyz(lat = grid_ll[,2], lon = grid_ll[,1]))
 A_mass_pred <- inla.spde.make.A(mesh = mesh0, loc = grid_pred, weights = areas/1e4)
 
 ## Create the estimation and prediction stack
-st.est <- inla.stack(data = list(y=grace_sp$mmweq), A = list(A_GRACE_data),
+st.est <- inla.stack(data = list(y=grace_sp$mass), A = list(A_GRACE_data),
                      effects = list(mass = 1:mass_spde$n.spde), tag = "est")
 st.pred <- inla.stack(data = list(y=NA), A = list(rbind(A_GRACE_data, A_mass_pred)),
                       effects = list(mass=1:mass_spde$n.spde), tag = "pred")
@@ -468,7 +499,7 @@ print(paste("The estimated marginal variances are:", pars_mass$sigma_mode,sep = 
 
 ## Plot the predictions
 
-In this experiment, it is more convenient to produce the prediction at the altmetry data directly, since they are grid points.
+In this experiment, it is more convenient to produce the prediction at the altimetry data directly, since they are grid points.
 We plot the predicted SSH at these locations and compare them to the altimetry data
 ```{r predict_grace, include=TRUE}
 mass_pred <- res_mass$mass_pred
