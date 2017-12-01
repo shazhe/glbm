@@ -477,8 +477,8 @@ res_mass <- list(res_inla = res_inla, spde = mass_spde, st = stmass,
 
 grace_m <- INLA_pred$mean[idx_grace] 
 grace_u <- INLA_pred$sd[idx_grace]
-grace_sp$pred_mean <- grace_m
-grace_sp$pred_u <- grace_u
+grace_sp@data$pred_mean <- grace_m
+grace_sp@data$pred_u <- grace_u
 
 
 save(res_mass, grace_sp, file ="Z:/WP1-BHM/Experiment2a/exp2a_mass.RData")
@@ -546,7 +546,19 @@ Here we use the ICE-6G data to fix the GIA.
 ```{r gia_data, eval = FALSE}
 ice6g <- read.table("Z:/WP2-SolidEarth/BHMinputs/GIA/GIA_Pel-6-VM5_ewh.txt", header = T)
 ice6g$x_center <- ifelse(ice6g$x_center < 0, ice6g$x_center+360, ice6g$x_center)
-ice6g2<- ice6g[order(ice6g$y_center,ice6g$x_center ),]
+ice6g<- ice6g[order(ice6g$y_center,ice6g$x_center ),]
+ice6g2 <- read.table("Z:/WP2-SolidEarth/BHMinputs/GIA/GIA_Pel-6-VM5.txt", header = T)
+ice6g2<- ice6g2[order(ice6g2$y_center,ice6g2$x_center ),]
+
+ice<-data.frame(x = ice6g$x_center, y = ice6g$y_center, rt = ice6g$trend/ice6g2$trend, rs = ice6g$std/ice6g2$std)
+
+lattice::levelplot(rs ~ x + y, data = ice, aspect = "iso",  at= seq(0, 2, 0.2),
+                     panel = function(x,y,z,...){
+                       lattice::panel.levelplot(x,y,z,...)
+                       map2 <- map("world2", interior = FALSE, plot = FALSE)
+                       lattice::panel.xyplot(x=map2$x, y=map2$y, type = "l", col = "black")
+                     },
+                     main = title, xlab = "longitude", ylab = "latitude")
 ```
 
 ## Results
@@ -554,7 +566,7 @@ ice6g2<- ice6g[order(ice6g$y_center,ice6g$x_center ),]
 Now assemble the predicted mean of and uncertainty of steric at 1 degree resolution.
 ```{r setric, eval = FALSE}
 steric_m <- res_SSH$SSH_pred$mean - res_mass$mass_pred$mean - ice6g2$trend
-steric_u <- res_SSH$SSH_pred$u - res_mass$mass_pred$u
+steric_u <- res_SSH$SSH_pred$u + res_mass$mass_pred$u
 steric_data <- data.frame(lon = ice6g2$x_center, lat = ice6g2$y_center, mean = steric_m, u = steric_u)
 
 ```
@@ -562,7 +574,7 @@ steric_data <- data.frame(lon = ice6g2$x_center, lat = ice6g2$y_center, mean = s
 Plot the steric map.
 ```{r plot_steric}
 load("Z:/WP1-BHM/Experiment2a/exp2a_all.RData")
-lattice::levelplot(mean ~ lon + lat, data = steric_data, aspect = "iso",  at = c(-50, seq(-5, 5, 1), 50),
+lattice::levelplot(mean ~ lon + lat, data = steric_data, aspect = "iso",  at = seq(-5, 5, 1),
                      panel = function(x,y,z,...){
                        lattice::panel.levelplot(x,y,z,...)
                        map2 <- map("world2", interior = FALSE, plot = FALSE)
