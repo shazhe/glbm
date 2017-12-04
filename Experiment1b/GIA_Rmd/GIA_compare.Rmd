@@ -31,8 +31,8 @@ First we load the data and prior. Note that the ICE6G solution is given on a 1 d
 ```{r load_package, message = FALSE, warning=FALSE}
 ## Load packages
 library(sp); library(INLA); library(GEOmap)
-source("glbm/BHM_sphere/functions.R")
-source("glbm/BHM_sphere/functions-barriers-dt-models-march2017.R")
+source("c:/ZSwork/glbm/BHM_sphere/functions.R")
+source("c:/ZSwork/glbm/BHM_sphere/functions-barriers-dt-models-march2017.R")
 ```
 
 ```{r load, message = FALSE, warning=FALSE, cache = TRUE}
@@ -192,6 +192,10 @@ polyholes <- sapply(zeroPolys, function(x) x@hole)
 zeropolys2 <- zeroPolys[polyareas > 200 ] 
 zeroPoly <- zeroPolygon
 zeroPoly@polygons[[1]]@Polygons <- zeropolys2
+
+plot(map2, type = "l", asp = 1, xlab = "longitude", ylab = "latitude", xlim = c(0, 360), ylim = c(-90, 90))
+plot(zeroPoly, add = T, col = "blue")
+lines(map2)
 ```
 
 ## Separate the mesh triangles
