@@ -107,7 +107,8 @@ Omega = dt.Omega(list(TinPoly, 1:mesh2$t), mesh2)
 
 ## 12 Prepare GPS data for non-stationary models 
 ## 12.1 Remove GPS data inside the polygon -- GPS data 2
-GPS_inPoly <- unlist(over(zeroPoly, SpatialPoints(coords = cbind(GPSV4b$lon, GPSV4b$lat)), returnList=T))
+GPS_inPoly <- unlist(over(zeroPoly, SpatialPoints(coords = cbind(GPSV4b$lon, GPSV4b$lat), 
+                                                                 proj4string = CRS(proj4string(zeroPoly))), returnList=T))
 GPS_All <- 1:nrow(GPS_data)
 GPS_outPoly <- GPS_All[-GPS_inPoly]
 GPS_data2 <- GPS_data[GPS_outPoly,]
@@ -131,7 +132,7 @@ GPS_ll <- spsample(zeroPoly, n = 30, type = "Fibonacci")
 GIA_pobs <-  ice6g$trend[over(GPS_ll, Plist)]
 nobsb <-nrow(GPS_ll@coords)
 GPS_data4 <- data.frame(ID = rep("pseudo", nobsb), lon = GPS_ll@coords[,1], lat = GPS_ll@coords[,2],
-                        trend = rep(0, nobsb), std = rep(0.1, nobsb), trend0 = -GIA_pobs)
+                        trend = rep(0, nobsb), std = rep(0.05, nobsb), trend0 = -GIA_pobs)
 GPS_loc4 <- do.call(cbind, Lll2xyz(lat = GPS_data4$lat, lon = GPS_data4$lon))
 
 
@@ -140,7 +141,7 @@ GPS_loc4 <- do.call(cbind, Lll2xyz(lat = GPS_data4$lat, lon = GPS_data4$lon))
 Vll <- Lxyz2ll(list(x = mesh2$loc[,1], y = mesh2$loc[,2], z = mesh2$loc[,3]))
 Vll$lon <- ifelse(Vll$lon < 0, Vll$lon + 360, Vll$lon)
 Vll <- cbind(Vll$lon, Vll$lat)
-VinPoly <- unlist(over(zeroPoly, SpatialPoints(coords=Vll), returnList=T))
+VinPoly <- unlist(over(zeroPoly, SpatialPoints(coords=Vll,proj4string = CRS(proj4string(zeroPoly))), returnList=T))
 obs_inpoly <- Vll[VinPoly,]
 obs_pseudo <-  SpatialPoints(coords = obs_inpoly)
 proj4string(obs_pseudo) <- proj4string(Plist)
@@ -149,7 +150,7 @@ pobs_idx <- over(obs_pseudo, Plist)
 GIA_pobs <- ice6g$trend[pobs_idx]
 nobsb <-nrow(obs_pseudo@coords)
 GPS_data5 <- data.frame(ID = rep("pseudo", nobsb), lon = obs_pseudo@coords[,1], lat = obs_pseudo@coords[,2],
-                        trend = rep(0, nobsb), std = rep(0.1, nobsb), trend0 = -GIA_pobs)
+                        trend = rep(0, nobsb), std = rep(0.05, nobsb), trend0 = -GIA_pobs)
 GPS_loc5 <- mesh2$loc[VinPoly,]
 
 
@@ -283,7 +284,6 @@ gps_data <- rbind(GPS_data2, GPS_data4)
 gps_loc <- rbind(GPS_loc2, GPS_loc4)
 
 Q.mixture = dt.create.Q(mesh, Omega, fixed.ranges = c(4, NA))
-trho0 <- Tlognorm(0.5, 1)
 prior0 <- list(sigma = tsigma, range = matrix(trho, ncol = 2))
 log.prior <- dt.create.prior.log.norm(prior.param = prior0) 
 GIA_spde = dt.inla.model(Q = Q.mixture, log.prior=log.prior)
@@ -336,15 +336,15 @@ ress3 <- list(res_inla = res_inla, spde = GIA_spde, st = stGIA,
 ## 4 partition model
 ##########################################################################
 mesh <- mesh2
-gps_data <- rbind(GPS_data2, GPS_data4)
-gps_loc <- rbind(GPS_loc2, GPS_loc4)
+gps_data <- rbind(GPS_data2, GPS_data5)
+gps_loc <- rbind(GPS_loc2, GPS_loc5)
 
-Q.mixture = dt.create.Q(mesh, Omega)
-trho0 <- Tlognorm(0.5, 1)
-
-prior0 <- list(sigma = tsigma, range = matrix(trho, ncol = 2))
-log.prior <- dt.create.prior.log.norm(prior.param = prior0) 
-GIA_spde = dt.inla.model(Q = Q.mixture, log.prior=log.prior)
+Q.mixture = dt.create.Q(mesh, Omega, same.sigma = FALSE)
+trho0 <- Tlognorm(4, 1)
+prior0 <- list(sigma = matrix(rep(tsigma,2), ncol = 2, byrow = TRUE),
+               range = matrix(c(trho0, trho), ncol = 2, byrow = TRUE))
+log.prior <- dt.create.prior.log.norm(prior.param = prior0, same.sigma = FALSE) 
+GIA_spde = dt.inla.model(Q = Q.mixture, log.prior=log.prior, same.sigma=FALSE)
 
 ## Link the process to observations and predictions
 A_data <- inla.spde.make.A(mesh = mesh, loc =  gps_loc)
