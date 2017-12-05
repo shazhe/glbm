@@ -347,7 +347,7 @@ We also need a mesh to represent the mass process. For the same reason as discus
 
 The GRACE data we have are mass anomalies aggregated into large polygon grid and we call them "super mascons" as they are on larger grid than the original data provided by the GRACE project. To link the data to the process, we need to integrate the process value over the corresponding polygon. The integration can be done numerically as weighted sum of the grid values within the polygons. The grid values are represented by the GMRF.
 
-A most tricky setting is the scaling factor! Since the projection matrix A approximate can map inputs to outputs on different scales, this can make the computation unstable when the difference in the scales are huge. The scale also determines the scale of the marginal variance and predicted uncertainties. 
+A most tricky setting is the scaling factor! Since the projection matrix A approximate map inputs to outputs on different scales, this can make the computation unstable when the difference in the scales are huge. The scale also determines the scale of the marginal variance and predicted uncertainties. 
 
 We choose to scale the prediction by $1e4$ for a $100km \times 100km$ area resolution. This approximately correspond to a 1 degree resolution and also at the similar scale of the GRACE data polygon size.
 ```{r grace_link, eval = FALSE}
@@ -367,7 +367,7 @@ poly_block <- function(i, dis = 10){
   ngrid_i <- length(grid_i)
   grid_xyz <- do.call(cbind, Lll2xyz(lat = grid_i@coords[,2], lon = grid_i@coords[,1]))
   block_i <- rep(i, ngrid_i) 
-  weights <- rep(area_i/1e4/ngrid_i, ngrid_i)
+  weights <- rep(area_i/ngrid_i, ngrid_i)
   return(list(grid_xyz = grid_xyz, block = block_i, weights = weights, ngrid = ngrid_i))
 }
 
@@ -389,24 +389,28 @@ ice6g$x_center <- ifelse(ice6g$x_center < 0, ice6g$x_center+360, ice6g$x_center)
 ice6g2<- ice6g[order(ice6g$y_center,ice6g$x_center ),]
 gia_loc <- do.call(cbind, Lll2xyz(lat = ice6g2$y_center, lon = ice6g2$x_center))
 
-polycoords <- ice6g[,c(6:13, 6,7)] 
-plist <- lapply(ice6g$ID, 
+polycoords <- ice6g2[,c(6:13, 6,7)] 
+plist <- lapply(ice6g2$ID, 
                 function(x) Polygons(list(Polygon(cbind(lon = as.numeric(polycoords[x, c(1,3,5,7,9)]), 
                                                         lat = as.numeric(polycoords[x, c(2,4,6,8,10)])))), ID = x))
 Plist <- SpatialPolygons(plist, proj4string = CRS("+proj=longlat"))
+gia_area <- geosphere::areaPolygon(Plist)/(1000^2)
 meshLL <- Lxyz2ll(list(x=mesh0$loc[,1], y = mesh0$loc[,2], z = mesh0$loc[,3]))
 mesh_sp <- SpatialPoints(data.frame(lon = meshLL$lon, lat = meshLL$lat), proj4string = CRS("+proj=longlat")) 
 
 mesh_idx <- over(mesh_sp, Plist)
-GIA_v <- ice6g$trend[mesh_idx]
+ice6g2$trend2 <- ice6g2$trend/(gia_area)
+GIA_v <- ice6g2$trend2[mesh_idx]
 ```
 
 
 ```{r grace_gia_remove}
 GIA_grace <- A_GRACE_data %*% GIA_v
 grace_data <- grace_sp$mmweq - GIA_grace
-grace_sp@data$gia <- c(GIA_grace)
+grace_sp@data$gia <- as.numeric(GIA_grace)
 grace_sp@data$mass <- as.numeric(grace_data)
+spplot(grace_sp, "gia")
+spplot(grace_sp, "mass")
 ```
 
 ```{r grace_pred_link}

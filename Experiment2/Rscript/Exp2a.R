@@ -7,7 +7,7 @@ source("~/glbm/BHM_sphere/functions-barriers-dt-models-march2017.R")
 
 ## ----alt_data------------------------------------------------------------
 library(ncdf4)
-alt_nc <- nc_open("/./projects/GlobalMass/WP3-Ocean/BHMinputs/trend_SSH_CCI_200501_201512.nc")
+alt_nc <- nc_open("/./projects/GlobalMass/WP3-Ocean/BHMinputs/SSH/trend_SSH_CCI_200501_201512.nc")
 print(alt_nc)
 lon <- ncvar_get(alt_nc, "lon")
 lat <- ncvar_get(alt_nc, "lat")
