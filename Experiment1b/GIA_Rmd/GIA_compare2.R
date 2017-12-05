@@ -107,7 +107,7 @@ Omega = dt.Omega(list(TinPoly, 1:mesh2$t), mesh2)
 ## 12 Prepare GPS data for non-stationary models 
 ## 12.1 Remove GPS data inside the polygon -- GPS data 2
 GPS_inPoly <- unlist(over(zeroPoly, SpatialPoints(coords = cbind(GPSV4b$lon, GPSV4b$lat), 
-                                                                 proj4string = CRS(proj4string(zeroPoly))), returnList=T))
+                                                  proj4string = CRS(proj4string(zeroPoly))), returnList=T))
 GPS_All <- 1:nrow(GPS_data)
 GPS_outPoly <- GPS_All[-GPS_inPoly]
 GPS_data2 <- GPS_data[GPS_outPoly,]
@@ -207,7 +207,7 @@ GIA_pred <- data.frame(lon = GIA_grid[,1], lat = GIA_grid[,2],
                        model = rep("stationary", nrow(GIA_grid)))
 
 ress1 <- list(res_inla = res_inla, spde = GIA_spde, st = stGIA, 
-            mesh = mesh1, GPS_pred = GPS_pred, GIA_pred = GIA_pred, GIA_predn = GIA_predn)
+              mesh = mesh1, GPS_pred = GPS_pred, GIA_pred = GIA_pred, GIA_predn = GIA_predn)
 
 
 
@@ -272,7 +272,7 @@ GIA_pred <- data.frame(lon = GIA_grid[,1], lat = GIA_grid[,2],
                        model = rep("subset", nrow(GIA_grid)))
 GIA_predn <- data.frame(diff = GIA_diff, mean = GIA_m, u=GIA_u)
 ress2 <- list(res_inla = res_inla, spde = GIA_spde, st = stGIA,
-            mesh = mesh, GPS_pred = GPS_pred, GIA_pred = GIA_pred, GIA_predn = GIA_predn)
+              mesh = mesh, GPS_pred = GPS_pred, GIA_pred = GIA_pred, GIA_predn = GIA_predn)
 
 
 ##########################################################################
@@ -286,64 +286,6 @@ Q.mixture = dt.create.Q(mesh, Omega, fixed.ranges = c(4, NA))
 prior0 <- list(sigma = tsigma, range = matrix(trho, ncol = 2))
 log.prior <- dt.create.prior.log.norm(prior.param = prior0) 
 GIA_spde = dt.inla.model(Q = Q.mixture, log.prior=log.prior)
-
-## Link the process to observations and predictions
-A_data <- inla.spde.make.A(mesh = mesh, loc =  gps_loc)
-A_pred <- inla.spde.make.A(mesh = mesh, loc = rbind(gps_loc, mesh$loc))
-
-## Create the estimation and prediction stack
-st.est <- inla.stack(data = list(y=gps_data$trend0), A = list(A_data),
-                     effects = list(GIA = 1:mesh$n), tag = "est")
-st.pred <- inla.stack(data = list(y=NA), A = list(A_pred),
-                      effects = list(GIA = 1:mesh$n), tag = "pred")
-stGIA <- inla.stack(st.est, st.pred)
-## Fix the GPS errors
-prec_scale <- c(1/gps_data$std^2,  rep(1, nrow(A_pred)))
-
-## Run INLA
-res_inla <- inla(formula, data=inla.stack.data(stGIA), family = "gaussian",
-                   scale =prec_scale, control.family = list(hyper = hyper),
-                   control.predictor=list(A = inla.stack.A(stGIA), compute = TRUE))
-
-## Extract and project predictions
-INLA_pred <- res_inla$summary.linear.predictor
-pred_idx <- inla.stack.index(stGIA, tag = "pred")$data
-GPS_idx <- pred_idx[1:nrow(gps_data)]
-GIA_idx <- pred_idx[-c(1:nrow(gps_data))]
-
-## GPS
-GPS_u <- INLA_pred$sd[GPS_idx]
-GPS_pred <- data.frame(lon = gps_data$lon, lat = gps_data$lat, u = GPS_u)
-
-## GIA
-GIA_diff <- INLA_pred$mean[GIA_idx]
-GIA_m <- GIA_diff + GIA_prior2
-GIA_u <- INLA_pred$sd[GIA_idx]
-proj <- inla.mesh.projector(mesh, projection = "longlat", dims = c(360,180), xlim = c(0,359), ylim = c(-90, 90))
-GIA_grid <- expand.grid(proj$x, proj$y)
-GIA_pred <- data.frame(lon = GIA_grid[,1], lat = GIA_grid[,2],
-                       diff = as.vector(inla.mesh.project(proj, as.vector(GIA_diff))),
-                       mean = as.vector(inla.mesh.project(proj, as.vector(GIA_m))),
-                       u = as.vector(inla.mesh.project(proj, as.vector(GIA_u))),
-                       model = rep("mixture", nrow(GIA_grid)))
-GIA_predn <- data.frame(diff = GIA_diff, mean = GIA_m, u=GIA_u)
-
-ress3 <- list(res_inla = res_inla, spde = GIA_spde, st = stGIA,
-            mesh = mesh, GPS_pred = GPS_pred, GIA_pred = GIA_pred, GIA_predn = GIA_predn)
-
-##########################################################################
-## 4 partition model
-##########################################################################
-mesh <- mesh2
-gps_data <- rbind(GPS_data2, GPS_data5)
-gps_loc <- rbind(GPS_loc2, GPS_loc5)
-
-Q.mixture = dt.create.Q(mesh, Omega, same.sigma = FALSE)
-trho0 <- Tlognorm(4, 1)
-prior0 <- list(sigma = matrix(rep(tsigma,2), ncol = 2, byrow = TRUE),
-               range = matrix(c(trho0, trho), ncol = 2, byrow = TRUE))
-log.prior <- dt.create.prior.log.norm(prior.param = prior0, same.sigma = FALSE) 
-GIA_spde = dt.inla.model(Q = Q.mixture, log.prior=log.prior, same.sigma=FALSE)
 
 ## Link the process to observations and predictions
 A_data <- inla.spde.make.A(mesh = mesh, loc =  gps_loc)
@@ -386,8 +328,8 @@ GIA_pred <- data.frame(lon = GIA_grid[,1], lat = GIA_grid[,2],
                        model = rep("mixture", nrow(GIA_grid)))
 GIA_predn <- data.frame(diff = GIA_diff, mean = GIA_m, u=GIA_u)
 
-ress4 <- list(res_inla = res_inla, spde = GIA_spde, st = stGIA,
+ress3 <- list(res_inla = res_inla, spde = GIA_spde, st = stGIA,
               mesh = mesh, GPS_pred = GPS_pred, GIA_pred = GIA_pred, GIA_predn = GIA_predn)
 
 
-save(ress1, ress2, ress3, ress4, file ="/./projects/GlobalMass/WP1-BHM/Experiment1b/GIA_RGL/GIA_compare2.RData")
+save(ress1, ress2, ress3,  file ="/./projects/GlobalMass/WP1-BHM/Experiment1b/GIA_RGL/GIA_compare2.RData")
