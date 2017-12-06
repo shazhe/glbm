@@ -385,6 +385,9 @@ dt.create.Q = function(mesh, Omega, initial.theta = NULL, same.sigma=TRUE,
           return(dt.precision.new(spde=spde, ranges=exp(ranges), sigma=exp(sigmas)))
         }
         ntheta = 2*length(spde$D)
+        if(is.null(initial.theta)) {
+          initial.theta = rep(0, ntheta)
+        }
     }else{
         if (is.null(fixed.ranges)){        
             if (is.null(copy.ranges)) {
@@ -566,7 +569,7 @@ dt.inla.model = function(Q, log.prior, same.sigma = TRUE) {
   if(identical(environment(Q),.GlobalEnv)) stop("Cannot use global environments")
   if(identical(environment(log.prior),.GlobalEnv)) stop("Cannot use global environments")
   if(anyDuplicated(ls(environment(Q)), ls(environment(log.prior)))) stop("Duplicate variables")
-}
+  }
   model.rgeneric = inla.rgeneric.define(model = general.rgeneric.model, Q=Q, log.prior=log.prior)
   return(model.rgeneric)
 }
@@ -609,20 +612,6 @@ general.rgeneric.model = function(
 
   initial = function(theta)
   {
-    ## Switch:
-    #print.v = print
-    print.v = function(x) { }
-
-    print.v("Test hi - this should work!")
-    print.v(ls())
-    print.v("next one up 1")
-    print.v(ls(envir = (parent.env(environment()))))
-    print.v("next one up 2")
-    print.v(parent.env(parent.env(environment())))
-    print.v(ls(envir = parent.env(parent.env(environment()))))
-    print.v("Q environment")
-    print.v(ls(environment(Q)))
-
     return (environment(Q)$initial.theta)
   }
 
@@ -633,8 +622,6 @@ general.rgeneric.model = function(
   val = do.call(match.arg(cmd), args = list(theta))
   return (val)
 } # end function definition
-
-
 
 
 
