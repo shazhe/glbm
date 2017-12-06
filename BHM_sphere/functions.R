@@ -397,26 +397,27 @@ mesh.sub <- function(mesh, Omega, i = 2, sphere=TRUE){
 
 #### additional plot function
 ## plot posterior hyperparameters
-marginal_par <- function(res, process, mixture = FALSE, mix_theta=2, plot = FALSE){
-  if(mixture){
+marginal_par <- function(res, process, partition = FALSE, theta.names=NULL, plot = FALSE){
+  if(partition){
+    if(is.null(theta.names)) stop("theta.names cannot be NULL")
+    theta.list <- list()
+    ntheta <- length(theta.names)
+    theta.modes <- rep(0, ntheta)
     res_inla <- res$res_inla
-    theta1 <- res_inla$marginals.hyperpar[[1]]
-    theta2 <- res_inla$marginals.hyperpar[[mix_theta]]
-    
-    Vmar<- inla.tmarginal(exp, theta1)
-    Rmar <- inla.tmarginal(exp, theta2)
-    
-    ## Find the mode of rho and sigma^2
-    lrho_mode <- res_inla$summary.hyperpar$mode[2]
-    lrho_mean <- res_inla$summary.hyperpar$mean[2]
-    lrho_sd <- res_inla$summary.hyperpar$sd[2]
-    rho_mode <- exp(lrho_mean - lrho_sd^2)
-    
-    lsigma_mode <- res_inla$summary.hyperpar$mode[1]
-    lsigma_mean <- res_inla$summary.hyperpar$mean[1]
-    lsigma_sd <- res_inla$summary.hyperpar$sd[1]
-    sigma_mode <- exp(lsigma_mean - lsigma_sd^2)
-    
+    for (i in 1:ntheta){
+      thetai <- res_inla$marginals.hyperpar[[i]]
+      theta.list[[i]]<- inla.tmarginal(exp, thetai)
+      ltheta_mode <- res_inla$summary.hyperpar$mode[i]
+      ltheta_mean <- res_inla$summary.hyperpar$mean[i]
+      ltheta_sd <- res_inla$summary.hyperpar$sd[i]
+      theta.modes[i] <- exp(ltheta_mean - ltheta_sd^2)
+    }
+    names(theta.list) <- theta.names
+    if(plot){
+      for(i in 1:ntheta)
+      plot(theta.list[[i]], type = "l", main = bquote(bold(theta("mode") == .(round(theta.modes[i], 4)))))
+    }
+    return(list(thetamars = theta.list, thetam = theta.modes))
   }else{
     res_inla <- res$res_inla
     spde <- res$spde
@@ -434,13 +435,12 @@ marginal_par <- function(res, process, mixture = FALSE, mix_theta=2, plot = FALS
     lsigma_mean <- pars$summary.log.variance.nominal$mean
     lsigma_sd <- pars$summary.log.variance.nominal$sd
     sigma_mode <- exp(lsigma_mean - lsigma_sd^2)
+    if(plot){
+      plot(Vmar, type = "l", main = bquote(bold({sigma^2}("mode") == .(round(sigma_mode, 4)))))
+      plot(Rmar, type = "l", main = bquote(bold(rho("mode") == .(round(rho_mode, 4)))))
+    }
+    return(list(Vmar=Vmar, Rmar=Rmar, sigma_mode=sigma_mode, rho_mode=rho_mode))
   }
-  
-  if(plot){
-    plot(Vmar, type = "l", main = bquote(bold({sigma^2}("mode") == .(round(sigma_mode, 4)))))
-    plot(Rmar, type = "l", main = bquote(bold(rho("mode") == .(round(rho_mode, 4)))))
-  }
-  return(list(Vmar=Vmar, Rmar=Rmar, sigma_mode=sigma_mode, rho_mode=rho_mode))
 }
 
 

@@ -514,15 +514,15 @@ dt.create.prior.log.norm = function(prior.param, same.sigma = TRUE) {
   
   if(same.sigma){
     log.prior = function(theta) {
-      theta1_m <- prior.param$sigma[1]
-      theta1_s <- prior.param$sigma[2]
+      thetas_m <- prior.param$sigma[1]
+      thetas_s <- prior.param$sigma[2]
       thetar_m <- prior.param$range[,1]
       thetar_s <- prior.param$range[,2]
       
       ntheta = length(theta)
       
       ## Prior for standard deviation
-      val = 0 + dnorm(theta[1], mean = theta1_m, sd = theta1_s, log = TRUE)
+      val = 0 + dnorm(theta[1], mean = thetas_m, sd = thetas_s, log = TRUE)
       ## Prior for range(s)
       for (i in 2:ntheta) {
         val = val + dnorm(theta[2], mean=thetar_m[i-1], sd = thetar_s[i-1], log = TRUE)
@@ -531,8 +531,8 @@ dt.create.prior.log.norm = function(prior.param, same.sigma = TRUE) {
     }
   }else{
   log.prior = function(theta) {
-    theta1_m <- prior.param$sigma[,1]
-    theta1_s <- prior.param$sigma[,2]
+    thetas_m <- prior.param$sigma[,1]
+    thetas_s <- prior.param$sigma[,2]
     thetar_m <- prior.param$range[,1]
     thetar_s <- prior.param$range[,2]
     
@@ -541,7 +541,7 @@ dt.create.prior.log.norm = function(prior.param, same.sigma = TRUE) {
     ## Prior for standard deviation
     val <- 0
     for (i in 1:nn){
-    val = val + dnorm(theta[i], mean = theta1_m[i], sd = theta1_s[i], log = TRUE)
+    val = val + dnorm(theta[i], mean = thetas_m[i], sd = thetas_s[i], log = TRUE)
     }
     ## Prior for range(s)
     for (i in 1:nn) {

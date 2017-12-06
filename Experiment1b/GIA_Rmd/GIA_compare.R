@@ -339,7 +339,7 @@ gps_data <- rbind(GPS_data2, GPS_data5)
 gps_loc <- rbind(GPS_loc2, GPS_loc5)
 
 Q.mixture = dt.create.Q(mesh, Omega, same.sigma = FALSE)
-trho0 <- Tlognorm(4, 1)
+trho0 <- Tlognorm(4, 16)
 prior0 <- list(sigma = matrix(rep(tsigma,2), ncol = 2, byrow = TRUE),
                range = matrix(c(trho0, trho), ncol = 2, byrow = TRUE))
 log.prior <- dt.create.prior.log.norm(prior.param = prior0, same.sigma = FALSE) 
@@ -390,4 +390,4 @@ ress4 <- list(res_inla = res_inla, spde = GIA_spde, st = stGIA,
               mesh = mesh, GPS_pred = GPS_pred, GIA_pred = GIA_pred, GIA_predn = GIA_predn)
 
 
-save(ress1, ress2, ress3, ress4, file ="/./projects/GlobalMass/WP1-BHM/Experiment1b/GIA_RGL/GIA_compare2.RData")
+save(ress1, ress2, ress3, ress4, file ="/./projects/GlobalMass/WP1-BHM/Experiment1b/GIA_RGL/GIA_compare.RData")
