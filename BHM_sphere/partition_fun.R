@@ -533,16 +533,16 @@ dt.create.prior.log.norm = function(prior.param, same.sigma = TRUE) {
     thetar_m <- prior.param$range[,1]
     thetar_s <- prior.param$range[,2]
     
-    ntheta = nrow(theta)
+    nn = length(theta)/2
     
     ## Prior for standard deviation
     val <- 0
-    for (i in 1:ntheta){
-    val = val + dnorm(theta[i,1], mean = theta1_m[i], sd = theta1_s[i], log = TRUE)
+    for (i in 1:nn){
+    val = val + dnorm(theta[i], mean = theta1_m[i], sd = theta1_s[i], log = TRUE)
     }
     ## Prior for range(s)
-    for (i in 1:ntheta) {
-      val = val + dnorm(theta[i,2], mean=thetar_m[i], sd = thetar_s[i], log = TRUE)
+    for (i in 1:nn) {
+      val = val + dnorm(theta[nn+i], mean=thetar_m[i], sd = thetar_s[i], log = TRUE)
     }
     return(val)
   }
