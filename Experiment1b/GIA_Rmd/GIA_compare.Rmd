@@ -371,34 +371,43 @@ Plot the posteriors of the hyper parameters.
 ```{r hyper}
 pars_pm1 <- marginal_par(res = ress1, process = "GIA")
 pars_pm2 <- marginal_par(res = ress2, process = "GIA")
-pars_pm3 <- marginal_par(res = ress3,  mixture = TRUE, mix_theta = 2)
+pars_pm3 <- marginal_par(res = ress3,  partition = TRUE, theta.names = c("sigma", "rho"))
 pars_pm4 <- marginal_par(res = ress4, partition = TRUE, theta.names = c("sigma1", "sigma2", "rho1", "rho2"))
 
 ## The posterior modes
 print(paste("The estimated correlation lengths are:",
             pars_pm1$rho_mode*6371, 
             pars_pm2$rho_mode*6371, 
-            pars_pm3$rho_mode*6371,
+            pars_pm3$thetam[2]*6371,
+            pars_pm4$thetam[3]*6371,
+            pars_pm4$thetam[4]*6371,
             sep = "  "))
 
 print(paste("The estimated marginal variances are:",
             pars_pm1$sigma_mode, 
             pars_pm2$sigma_mode, 
-            pars_pm3$sigma_mode,
+            pars_pm3$thetam[1],
+            pars_pm4$thetam[1],
+            pars_pm4$thetam[2],
             sep = "  "))
 par(mfrow = c(1,2))
 ## The posterior distributions
-plot(pars_pm1$Vmar, type = "l", xlim = c(2.5, 5), ylim = c(0, 1.5), 
+plot(pars_pm1$Vmar, type = "l", xlim = c(0, 7), ylim = c(0, 1.5), 
      ylab = "posterior density", xlab = bquote(bold({sigma^2})))
 lines(pars_pm2$Vmar, col = 2)
-lines(pars_pm3$Vmar, col = 4)
-legend("topright", c("stationary",  "subset", "partition"), lty = rep(1), col = c(1,2,4))
+lines(pars_pm3$thetamar[[1]], col = 3)
+lines(pars_pm4$thetamar[[1]], col = 4)
+lines(pars_pm4$thetamar[[2]], col = 5)
+legend("topright", c("stationary",  "subset", "partition", "p1", "p2"), lty = rep(1), col = c(1,2,3,4, 5))
 
-plot(pars_pm1$Rmar, type = "l", xlim = c(0.06, 0.2), ylim = c(0, 60),
+plot(pars_pm1$Rmar, type = "l", xlim = c(0, 0.5), ylim = c(0, 60),
      ylab = "posterior density", xlab = bquote(bold({rho})))
 lines(pars_pm2$Rmar, col = 2)
-lines(pars_pm3$Rmar, col = 4)
-legend("topright", c("stationary",  "subset", "partition"), lty = rep(1), col = c(1,2,4))
+lines(pars_pm3$thetamar[[2]], col = 3)
+lines(pars_pm4$thetamar[[3]], col = 4)
+lines(pars_pm4$thetamar[[4]], col = 5)
+legend("topright", c("stationary",  "subset", "partition", "p1", "p2"), lty = rep(1), col = c(1,2,3,4, 5))
+
 ```
 
 
@@ -406,18 +415,18 @@ Plot the predictions.
 ```{r predict, fig.height=8, fig.width=6}
 ress1$GIA_pred$model <- "stationary"
 ress2$GIA_pred$model <- "subset"
-ress3$GIA_pred$model <- "mixture"
-ress4$GIA_pred$model <- "mixture"
-pred_all <- do.call(rbind, list(ress1$GIA_pred,  ress2$GIA_pred, ress4$GIA_pred))
-pred_all$model <- factor(pred_all$model, levels = c("stationary", "subset", "mixture"))
+ress3$GIA_pred$model <- "partition fixed"
+ress4$GIA_pred$model <- "partition"
+pred_all <- do.call(rbind, list(ress1$GIA_pred,  ress2$GIA_pred, ress3$GIA_pred, ress4$GIA_pred))
+pred_all$model <- factor(pred_all$model, levels = c("stationary", "subset", "partition fixed", "partition"))
 ## The predicted mean
-level_GIA(pred_data = pred_all, var = "mean", style ="zero", layout = c(1, 3), title = "predicted GIA mean field (mm/yr)")
+level_GIA(pred_data = pred_all, var = "mean", style ="zero", layout = c(1, 4), title = "predicted GIA mean field (mm/yr)")
 
 ## The predicted uncertainties
-level_GIA(pred_data = pred_all, var = "u", style ="positive",layout = c(1, 3), title = "predicted GIA uncertanties (mm/yr)")
+level_GIA(pred_data = pred_all, var = "u", style ="positive",layout = c(1, 4), title = "predicted GIA uncertanties (mm/yr)")
 
 ## The difference between the predicted mean and prior mean
-level_GIA(pred_data = pred_all, var = "diff", style ="zero", layout = c(1, 3), title = "predicted GIA mean field - prior mean (mm/yr)")
+level_GIA(pred_data = pred_all, var = "diff", style ="zero", layout = c(1, 4), title = "predicted GIA mean field - prior mean (mm/yr)")
 
 ```
 
