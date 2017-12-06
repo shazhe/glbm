@@ -364,7 +364,7 @@ dt.create.Q = function(mesh, Omega, initial.theta = NULL, same.sigma=TRUE,
     ## Now implemented: copy.ranges
     ## - NULL or c(values) list of values smaller than index for an index to copy
     ## - The purpose is to be able to use this to run a stationary model without creating another spde variable
-    ##  - copy.ranges.frac gives the fraction to multiply the range with
+    ## - copy.ranges.frac gives the fraction to multiply the range with
     
     ## Copy variables to current environment/scope
     dt.precision.new = dt.precision.new
@@ -384,7 +384,7 @@ dt.create.Q = function(mesh, Omega, initial.theta = NULL, same.sigma=TRUE,
           ranges <- theta[-(1:nn)]
           return(dt.precision.new(spde=spde, ranges=exp(ranges), sigma=exp(sigmas)))
         }
-        ntheta = length(theta)
+        ntheta = 2*length(spde$D)
     }else{
         if (is.null(fixed.ranges)){        
             if (is.null(copy.ranges)) {
