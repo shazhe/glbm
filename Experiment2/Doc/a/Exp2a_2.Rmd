@@ -14,8 +14,8 @@ library(rgdal); library(sp);library(GEOmap)
 library(INLA)
 library(ncdf4)
 library(gstat)
-source("C:/ZSwork/glbm/BHM_sphere/functions.R")
-source("C:/ZSwork/glbm/BHM_sphere/partition_fun.R")
+source(paste0(wd,"glbm/BHM_sphere/functions.R"))
+source(paste0(wd, "glbm/BHM_sphere/partition_fun.R"))
 
 ## Genereate Fibonacci points on the sphere
 fibo_points <- fiboSphere(N = 12960, L0 = TRUE)
@@ -34,7 +34,7 @@ Now we do the same thing for the sum of the mass change process and GIA $X_M$.
 Load the Grace mascon data.
 ```{r grace_data}
 grace_data <- read.table(paste0(dd, "WP2-SolidEarth/BHMinputs/GRACE/GRACE_v02.3b_trends_v03.txt"), header = T)
-grace_loc <-  read.table(paste0(dd, "Z:/WP2-SolidEarth/BHMinputs/GRACE/GRACE_v02.3b_loc_v03.txt"), skip = 1)
+grace_loc <-  read.table(paste0(dd, "WP2-SolidEarth/BHMinputs/GRACE/GRACE_v02.3b_loc_v03.txt"), skip = 1)
 n_grace <- ncol(grace_loc)
 n_ll <- (n_grace-4)/2
 names(grace_loc) <- c("id", "area", "lon_c", "lat_c", paste0(c("lon", "lat"), rep(1:n_ll, each = 2)))
