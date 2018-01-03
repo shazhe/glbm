@@ -19,9 +19,9 @@ plot(out.Poly); plot(int.Poly, add = T)
 
 
 # first create uniformaly dense points
-loc0 <- spsample(out.Poly, n = 1000, type = "hexagonal", offset = c(0, 0))
+loc0 <- spsample(out.Poly, n = 500, type = "hexagonal", offset = c(0, 0))
 ## mesh for the entire region
-mesh <- inla.mesh.2d(loc = loc0,  boundary = segm.bnd, offset = c(0.5, 0.5), cutoff = 0.1, max.edge = 0.5)
+mesh <- inla.mesh.2d(loc = loc0,  boundary = segm.bnd, offset = c(0.5, 0.5), cutoff = 0.2, max.edge = 0.5)
 ## separate the mesh
 mesh = dt.mesh.addon.posTri(mesh)
 TinP = unlist(over(int.Poly, SpatialPoints(mesh$posTri), returnList=T))
@@ -62,10 +62,10 @@ Sigma_data2 <- cov2cor(Amat2%*%solve(Q2, t(Amat2)))
 
 ## Space partition model example of correlation between A and B
 # generate points inside the polygon
-loc1 <- spsample(int.Poly, n = 1000, type = "hexagonal", offset = c(0, 0))
+loc1 <- spsample(int.Poly, n = 50, type = "hexagonal", offset = c(0, 0))
 ## generate mesh
-mesh2 <- inla.mesh.2d(loc = rbind(loc0,loc1),  boundary = segm.bnd, offset = c(0.5, 0.5), cutoff = 0.03, max.edge = 0.5)
-mesh2 <- inla.mesh.2d(loc = mesh2$loc,  boundary = segm.bnd, offset = c(0.5, 0.5), cutoff = 0.03, max.edge = 0.5)
+mesh2 <- inla.mesh.2d(loc = rbind(loc1@coords,mesh_sub$loc[,1:2]),  boundary = segm.bnd, offset = c(0.5, 0.5), cutoff = 0.1, max.edge = 1)
+mesh2 <- inla.mesh.2d(loc = mesh2$loc,  boundary = segm.bnd, offset = c(0.5, 0.5), cutoff = 0.1, max.edge = 0.5)
 ## separate the mesh
 mesh2 = dt.mesh.addon.posTri(mesh2)
 TinP = unlist(over(int.Poly, SpatialPoints(mesh2$posTri), returnList=T))
@@ -81,7 +81,7 @@ plot(mesh2, add=T)
 ## build the spdes for the partition model
 ## Create the precsion matrix function
 Q.function = dt.create.Q(mesh2, Omega2)
-ranges = c(log(0.5), log(1))
+ranges = c(log(1.5), log(1))
 Q3 = Q.function(theta = c(log(5), ranges))
 
 data_loc <- matrix(c(2.2,1.9, 2.2,2.8, 3.1, 2.8, 3.1, 1.9 ), byrow = TRUE, ncol = 2)
