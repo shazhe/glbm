@@ -1,7 +1,7 @@
 ## Load packages
 library(sp); library(INLA); library(GEOmap)
 source("glbm/BHM_sphere/functions.R")
-source("glbm/BHM_sphere/functions-barriers-dt-models-march2017.R")
+source("glbm/BHM_sphere/partition_fun.R")
 
 ############################################################################
 ## 0 Data and Mesh

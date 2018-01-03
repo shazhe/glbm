@@ -1,13 +1,8 @@
 ### DESCRIPTION ###
-# These functions define the Barrier and Different Terrains models
-
-
-### For internal use ###
-# This file should not be edited!
-# - Only perfect backwards compatible changes allowed
-# - Last update: 5. April 2017
-# A new filename should be created, and all files with the current filename should be systematically edited and verified.
-# (Master-Slave-document organisation was abandoned)
+## Functions are based on Bakka's barrier models
+## Extensions include:
+## (1) mesh partiton on sphere
+## (2) allow varying sigma in the INLA model
 
 ### LOAD LIBRARIES ###
 library(INLA)
@@ -352,105 +347,111 @@ if (!exists('dt.precision.new')) {
 dt.create.Q = function(mesh, Omega, initial.theta = NULL, same.sigma=TRUE,
                        fixed.ranges = NULL, copy.ranges = NULL, copy.ranges.frac = NULL)
 {
-  # This function creates the precision matrix with environment
-  
-  ## Input
-  # fixed.ranges
-  # - NULL, or a list of values for the fixed and NA (for the rest)
-  # initial.theta
-  # - Initial values for setting the hypers
-  # - Internal scale: log(sigma) log(ranges)
-  # - will be overridden by control.mode in the inla(...) statement
-  
-  ## Output Q
-  # - is a precision function with environment
-  # - contains n, ntheta, spde, dt.precision.new, initial.theta, and possibly others
-  
-  ## Now implemented: copy.ranges
-  # - NULL or c(values) list of values smaller than index for an index to copy
-  # - The purpose is to be able to use this to run a stationary model without creating another spde variable
-  # - copy.ranges.frac gives the fraction to multiply the range with
-  
-  ## Copy variables to current environment/scope
-  dt.precision.new = dt.precision.new
-  initial.theta = initial.theta
-  fixed.ranges = fixed.ranges
-  copy.ranges = copy.ranges
-  copy.ranges.frac = copy.ranges.frac
-  
-  ## Create spde object (time consuming)
-  spde = dt.fem.matrices(mesh = mesh, Omega = Omega)
-  if(!same.sigma){
-    Q = function(theta){
-      return(dt.precision.new(spde=spde, ranges=exp(theta[,2]), sigma=exp(theta[,1])))
-    }
-  }else{
-    ## Create Q function
-    if (is.null(fixed.ranges)){
-      
-      if (is.null(copy.ranges)) {
-        Q = function(theta){
-          return(dt.precision.new(spde=spde, ranges=exp(theta[-1]), sigma=exp(theta[1])))
-        }
-        
-        ntheta = 1+length(spde$D)
-        # - create variable needed for rgeneric
-        # - ntheta means number of thetas
-      } else {
-        ## Check input and use default values
-        if(length(copy.ranges)!=length(spde$D)) stop("Wrong input length for copy.ranges")
-        if (is.null(copy.ranges.frac)) copy.ranges.frac=rep(1, length(spde$D))
-        if(length(copy.ranges.frac)!=length(spde$D)) stop("Wrong input length for copy.ranges.frac")
-        copy.ranges.frac[is.na(copy.ranges.frac)] = 1
-        if(any(copy.ranges.frac[is.na(copy.ranges)] != 1)) warning("copy.ranges.frac ignored where you are not copying any ranges")
-        
-        if(!all(is.na(copy.ranges[copy.ranges[!is.na(copy.ranges)]]))) stop("You can only copy ranges that themselves are NA")
-        
-        ## Construct the Q function
-        Q = function(theta){
-          id.na = which(is.na(copy.ranges))
-          id.notna = which(!is.na(copy.ranges))
-          
-          exptheta = exp(theta[-1])
-          ranges = rep(NA, length(copy.ranges))
-          ranges[id.na] = exptheta
-          # - this dimension should be correct
-          ranges[id.notna] = ranges[copy.ranges[id.notna]]*copy.ranges.frac[id.notna]
-          # - this is copying from the other ranges values instead of from exptheta
-          # - only the appropriate scalings are taken into account
-          
-          return(dt.precision.new(spde=spde, ranges=ranges, sigma=exp(theta[1])))
-        }
-        
-        ntheta = 1+sum(1*is.na(copy.ranges))
-        
-      }
-      
-    } else {
-      if (!is.null(copy.ranges)) stop('Cannot have both fixed and copied ranges')
-      
-      # we have to fix some hyperparameters
-      stopifnot(length(fixed.ranges) == length(spde$D))
-      Q = function(theta){
-        if (length(theta) != sum(is.na(fixed.ranges))+1){
-          print(theta); print(fixed.ranges); stop("Num ranges not equal to num not fixed ranges")
-        }
-        internal.ranges = fixed.ranges
-        internal.ranges[is.na(internal.ranges)] = exp(theta[-1])
-        return(dt.precision.new(spde, internal.ranges, sigma = exp(theta[1])))
-      }
-      ntheta = 1+sum(is.na(fixed.ranges))
-      # - create variable needed for rgeneric
-      # - ntheta means number of thetas
-    }
+    ## This function creates the precision matrix with environment
     
-    n = dim(spde$I)[1]
+    ## Input
+    ## fixed.ranges
+    ## - NULL, or a list of values for the fixed and NA (for the rest)
+    ## initial.theta
+    ## - Initial values for setting the hypers
+    ## - Internal scale: log(sigma) log(ranges)
+    ## - will be overridden by control.mode in the inla(...) statement
     
-    if(is.null(initial.theta)) {
-      initial.theta = rep(0, ntheta)
+    ## Output Q
+    ## - is a precision function with environment
+    ## - contains n, ntheta, spde, dt.precision.new, initial.theta, and possibly others
+    
+    ## Now implemented: copy.ranges
+    ## - NULL or c(values) list of values smaller than index for an index to copy
+    ## - The purpose is to be able to use this to run a stationary model without creating another spde variable
+    ## - copy.ranges.frac gives the fraction to multiply the range with
+    
+    ## Copy variables to current environment/scope
+    dt.precision.new = dt.precision.new
+    initial.theta = initial.theta
+    fixed.ranges = fixed.ranges
+    copy.ranges = copy.ranges
+    copy.ranges.frac = copy.ranges.frac
+    
+    ## Create spde object (time consuming)
+    spde = dt.fem.matrices(mesh = mesh, Omega = Omega)
+
+    ## Create Q function  
+    if(!same.sigma){
+        Q = function(theta){
+          nn <- length(theta)/2
+          sigmas <- theta[1:nn]
+          ranges <- theta[-(1:nn)]
+          return(dt.precision.new(spde=spde, ranges=exp(ranges), sigma=exp(sigmas)))
+        }
+        ntheta = 2*length(spde$D)
+        if(is.null(initial.theta)) {
+          initial.theta = rep(0, ntheta)
+        }
+    }else{
+        if (is.null(fixed.ranges)){        
+            if (is.null(copy.ranges)) {
+                Q = function(theta){
+                    return(dt.precision.new(spde=spde, ranges=exp(theta[-1]), sigma=exp(theta[1])))
+                }  
+                ntheta = 1+length(spde$D)
+                ## - create variable needed for rgeneric
+                ## - ntheta means number of thetas
+            } else {
+                ## Check input and use default values
+                if(length(copy.ranges)!=length(spde$D)) stop("Wrong input length for copy.ranges")
+                if (is.null(copy.ranges.frac)) copy.ranges.frac=rep(1, length(spde$D))
+                if(length(copy.ranges.frac)!=length(spde$D)) stop("Wrong input length for copy.ranges.frac")
+                copy.ranges.frac[is.na(copy.ranges.frac)] = 1
+                if(any(copy.ranges.frac[is.na(copy.ranges)] != 1)) warning("copy.ranges.frac ignored where you are not copying any ranges")
+                
+                if(!all(is.na(copy.ranges[copy.ranges[!is.na(copy.ranges)]]))) stop("You can only copy ranges that themselves are NA")
+                
+                ## Construct the Q function
+                Q = function(theta){
+                    id.na = which(is.na(copy.ranges))
+                    id.notna = which(!is.na(copy.ranges))
+                    
+                    exptheta = exp(theta[-1])
+                    ranges = rep(NA, length(copy.ranges))
+                    ranges[id.na] = exptheta
+                                        # - this dimension should be correct
+                    ranges[id.notna] = ranges[copy.ranges[id.notna]]*copy.ranges.frac[id.notna]
+                                        # - this is copying from the other ranges values instead of from exptheta
+                                        # - only the appropriate scalings are taken into account
+                    
+                    return(dt.precision.new(spde=spde, ranges=ranges, sigma=exp(theta[1])))
+                }
+                
+                ntheta = 1+sum(1*is.na(copy.ranges))
+                
+            }
+            
+        } else {
+            if (!is.null(copy.ranges)) stop('Cannot have both fixed and copied ranges')
+            
+                                        # we have to fix some hyperparameters
+            stopifnot(length(fixed.ranges) == length(spde$D))
+            Q = function(theta){
+                if (length(theta) != sum(is.na(fixed.ranges))+1){
+                    print(theta); print(fixed.ranges); stop("Num ranges not equal to num not fixed ranges")
+                }
+                internal.ranges = fixed.ranges
+                internal.ranges[is.na(internal.ranges)] = exp(theta[-1])
+                return(dt.precision.new(spde, internal.ranges, sigma = exp(theta[1])))
+            }
+            ntheta = 1+sum(is.na(fixed.ranges))
+                                        # - create variable needed for rgeneric
+                                        # - ntheta means number of thetas
+        }
+        
+        n = dim(spde$I)[1]
+        
+        if(is.null(initial.theta)) {
+            initial.theta = rep(0, ntheta)
+        }
     }
-  }
-  return(Q)
+    return(Q)
 }
 
 
@@ -513,15 +514,15 @@ dt.create.prior.log.norm = function(prior.param, same.sigma = TRUE) {
   
   if(same.sigma){
     log.prior = function(theta) {
-      theta1_m <- prior.param$sigma[1]
-      theta1_s <- prior.param$sigma[2]
+      thetas_m <- prior.param$sigma[1]
+      thetas_s <- prior.param$sigma[2]
       thetar_m <- prior.param$range[,1]
       thetar_s <- prior.param$range[,2]
       
       ntheta = length(theta)
       
       ## Prior for standard deviation
-      val = 0 + dnorm(theta[1], mean = theta1_m, sd = theta1_s, log = TRUE)
+      val = 0 + dnorm(theta[1], mean = thetas_m, sd = thetas_s, log = TRUE)
       ## Prior for range(s)
       for (i in 2:ntheta) {
         val = val + dnorm(theta[2], mean=thetar_m[i-1], sd = thetar_s[i-1], log = TRUE)
@@ -530,21 +531,21 @@ dt.create.prior.log.norm = function(prior.param, same.sigma = TRUE) {
     }
   }else{
   log.prior = function(theta) {
-    theta1_m <- prior.param$sigma[,1]
-    theta1_s <- prior.param$sigma[,2]
+    thetas_m <- prior.param$sigma[,1]
+    thetas_s <- prior.param$sigma[,2]
     thetar_m <- prior.param$range[,1]
     thetar_s <- prior.param$range[,2]
     
-    ntheta = nrow(theta)
+    nn = length(theta)/2
     
     ## Prior for standard deviation
     val <- 0
-    for (i in 1:ntheta){
-    val = val + dnorm(theta[i,1], mean = theta1_m[i], sd = theta1_s[i], log = TRUE)
+    for (i in 1:nn){
+    val = val + dnorm(theta[i], mean = thetas_m[i], sd = thetas_s[i], log = TRUE)
     }
     ## Prior for range(s)
-    for (i in 1:ntheta) {
-      val = val + dnorm(theta[i,2], mean=thetar_m[i], sd = thetar_s[i], log = TRUE)
+    for (i in 1:nn) {
+      val = val + dnorm(theta[nn+i], mean=thetar_m[i], sd = thetar_s[i], log = TRUE)
     }
     return(val)
   }
@@ -568,7 +569,7 @@ dt.inla.model = function(Q, log.prior, same.sigma = TRUE) {
   if(identical(environment(Q),.GlobalEnv)) stop("Cannot use global environments")
   if(identical(environment(log.prior),.GlobalEnv)) stop("Cannot use global environments")
   if(anyDuplicated(ls(environment(Q)), ls(environment(log.prior)))) stop("Duplicate variables")
-}
+  }
   model.rgeneric = inla.rgeneric.define(model = general.rgeneric.model, Q=Q, log.prior=log.prior)
   return(model.rgeneric)
 }
@@ -611,20 +612,6 @@ general.rgeneric.model = function(
 
   initial = function(theta)
   {
-    ## Switch:
-    #print.v = print
-    print.v = function(x) { }
-
-    print.v("Test hi - this should work!")
-    print.v(ls())
-    print.v("next one up 1")
-    print.v(ls(envir = (parent.env(environment()))))
-    print.v("next one up 2")
-    print.v(parent.env(parent.env(environment())))
-    print.v(ls(envir = parent.env(parent.env(environment()))))
-    print.v("Q environment")
-    print.v(ls(environment(Q)))
-
     return (environment(Q)$initial.theta)
   }
 
@@ -635,8 +622,6 @@ general.rgeneric.model = function(
   val = do.call(match.arg(cmd), args = list(theta))
   return (val)
 } # end function definition
-
-
 
 
 

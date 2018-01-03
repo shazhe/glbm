@@ -24,7 +24,7 @@ Therefore, in the following we use the same approach as in Experiment 1 to obtai
 library(rgdal); library(sp);library(GEOmap)
 library(INLA)
 source("C:/ZSwork/glbm/BHM_sphere/functions.R")
-source("C:/ZSwork/glbm/BHM_sphere/functions-barriers-dt-models-march2017.R")
+source("C:/ZSwork/glbm/BHM_sphere/partition_fun.R")
 ```
 
 # Update $X_{ssh}$
@@ -300,7 +300,8 @@ Polygons_list <- lapply(1:length(Polygon_list), function(x) Polygons(list(Polygo
 SpPolygon <- SpatialPolygons(Polygons_list, proj4string = CRS("+proj=longlat"))
 
 grace_sp <- SpatialPolygonsDataFrame(SpPolygon,grace_data)
-spplot(grace_sp, "mmweq", at = seq(-50, 50, 5))
+grace_sp$mmweq2 <- ifelse(abs(grace_sp$mmweq) > 20, sign(grace_sp$mmweq)*20, grace_sp$mmweq )
+spplot(grace_sp, "mmweq2", at = seq(-21, 21, 2))
 
 ## note the area calcuated by R is different from those given in the dataset -- ask Maike
 ```
@@ -406,7 +407,7 @@ GIA_v <- ice6g2$trend2[mesh_idx]
 
 ```{r grace_gia_remove}
 GIA_grace <- A_GRACE_data %*% GIA_v
-grace_data <- grace_sp$mmweq - GIA_grace
+grace_data <- grace_sp$mmweq + GIA_grace
 grace_sp@data$gia <- as.numeric(GIA_grace)
 grace_sp@data$mass <- as.numeric(grace_data)
 spplot(grace_sp, "gia")

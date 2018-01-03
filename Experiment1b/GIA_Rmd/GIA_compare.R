@@ -1,7 +1,7 @@
 ## Load packages
 library(sp); library(INLA); library(GEOmap)
 source("glbm/BHM_sphere/functions.R")
-source("glbm/BHM_sphere/functions-barriers-dt-models-march2017.R")
+source("glbm/BHM_sphere/partition_fun.R")
 
 ############################################################################
 ## 0 Data and Mesh
@@ -107,7 +107,7 @@ Omega = dt.Omega(list(TinPoly, 1:mesh2$t), mesh2)
 ## 12 Prepare GPS data for non-stationary models 
 ## 12.1 Remove GPS data inside the polygon -- GPS data 2
 GPS_inPoly <- unlist(over(zeroPoly, SpatialPoints(coords = cbind(GPSV4b$lon, GPSV4b$lat), 
-                                                                 proj4string = CRS(proj4string(zeroPoly))), returnList=T))
+                                                  proj4string = CRS(proj4string(zeroPoly))), returnList=T))
 GPS_All <- 1:nrow(GPS_data)
 GPS_outPoly <- GPS_All[-GPS_inPoly]
 GPS_data2 <- GPS_data[GPS_outPoly,]
@@ -207,7 +207,7 @@ GIA_pred <- data.frame(lon = GIA_grid[,1], lat = GIA_grid[,2],
                        model = rep("stationary", nrow(GIA_grid)))
 
 ress1 <- list(res_inla = res_inla, spde = GIA_spde, st = stGIA, 
-            mesh = mesh1, GPS_pred = GPS_pred, GIA_pred = GIA_pred, GIA_predn = GIA_predn)
+              mesh = mesh1, GPS_pred = GPS_pred, GIA_pred = GIA_pred, GIA_predn = GIA_predn)
 
 
 
@@ -272,7 +272,7 @@ GIA_pred <- data.frame(lon = GIA_grid[,1], lat = GIA_grid[,2],
                        model = rep("subset", nrow(GIA_grid)))
 GIA_predn <- data.frame(diff = GIA_diff, mean = GIA_m, u=GIA_u)
 ress2 <- list(res_inla = res_inla, spde = GIA_spde, st = stGIA,
-            mesh = mesh, GPS_pred = GPS_pred, GIA_pred = GIA_pred, GIA_predn = GIA_predn)
+              mesh = mesh, GPS_pred = GPS_pred, GIA_pred = GIA_pred, GIA_predn = GIA_predn)
 
 
 ##########################################################################
@@ -302,8 +302,8 @@ prec_scale <- c(1/gps_data$std^2,  rep(1, nrow(A_pred)))
 
 ## Run INLA
 res_inla <- inla(formula, data=inla.stack.data(stGIA), family = "gaussian",
-                   scale =prec_scale, control.family = list(hyper = hyper),
-                   control.predictor=list(A = inla.stack.A(stGIA), compute = TRUE))
+                 scale =prec_scale, control.family = list(hyper = hyper),
+                 control.predictor=list(A = inla.stack.A(stGIA), compute = TRUE))
 
 ## Extract and project predictions
 INLA_pred <- res_inla$summary.linear.predictor
@@ -329,7 +329,7 @@ GIA_pred <- data.frame(lon = GIA_grid[,1], lat = GIA_grid[,2],
 GIA_predn <- data.frame(diff = GIA_diff, mean = GIA_m, u=GIA_u)
 
 ress3 <- list(res_inla = res_inla, spde = GIA_spde, st = stGIA,
-            mesh = mesh, GPS_pred = GPS_pred, GIA_pred = GIA_pred, GIA_predn = GIA_predn)
+              mesh = mesh, GPS_pred = GPS_pred, GIA_pred = GIA_pred, GIA_predn = GIA_predn)
 
 ##########################################################################
 ## 4 partition model
@@ -339,7 +339,7 @@ gps_data <- rbind(GPS_data2, GPS_data5)
 gps_loc <- rbind(GPS_loc2, GPS_loc5)
 
 Q.mixture = dt.create.Q(mesh, Omega, same.sigma = FALSE)
-trho0 <- Tlognorm(4, 1)
+trho0 <- Tlognorm(4, 16)
 prior0 <- list(sigma = matrix(rep(tsigma,2), ncol = 2, byrow = TRUE),
                range = matrix(c(trho0, trho), ncol = 2, byrow = TRUE))
 log.prior <- dt.create.prior.log.norm(prior.param = prior0, same.sigma = FALSE) 
@@ -390,4 +390,4 @@ ress4 <- list(res_inla = res_inla, spde = GIA_spde, st = stGIA,
               mesh = mesh, GPS_pred = GPS_pred, GIA_pred = GIA_pred, GIA_predn = GIA_predn)
 
 
-save(ress1, ress2, ress3, ress4, file ="/./projects/GlobalMass/WP1-BHM/Experiment1b/GIA_RGL/GIA_compare2.RData")
+save(ress1, ress2, ress3, ress4, file ="/./projects/GlobalMass/WP1-BHM/Experiment1b/GIA_RGL/GIA_compare.RData")
