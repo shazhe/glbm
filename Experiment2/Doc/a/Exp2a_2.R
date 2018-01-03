@@ -66,8 +66,8 @@ M_spde <- inla.spde2.matern(mesh0, B.tau = matrix(c(ltau0, -1, 1),1,3), B.kappa 
 ## ----grace_link, eval = FALSE--------------------------------------------
 ## ## For each polygon observation we generate the regular spaced grid and the number of grid cell is proportional to the area of the polygon
 grace_area <- geosphere::areaPolygon(grace_sp)/(1000^2)
-plot(grace_loc$area, grace_area)
-abline(a = 0, b =1)
+#plot(grace_loc$area, grace_area)
+#abline(a = 0, b =1)
 grace_sp$area <-grace_area
 area_mean <- mean(grace_area)
 #spplot(grace_sp, "area")

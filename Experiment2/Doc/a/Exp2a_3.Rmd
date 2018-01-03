@@ -6,12 +6,15 @@ output: html_document
 ---
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+wd <-"C:/ZSwork/"
+dd <-"Z:/"
+
 library(rgdal); library(sp);library(GEOmap)
 library(INLA)
 library(ncdf4)
 library(gstat)
-source("C:/ZSwork/glbm/BHM_sphere/functions.R")
-source("C:/ZSwork/glbm/BHM_sphere/partition_fun.R")
+source(paste0(wd,"glbm/BHM_sphere/functions.R"))
+source(paste0(wd, "glbm/BHM_sphere/partition_fun.R"))
 
 ## Genereate Fibonacci points on the sphere
 fibo_points <- fiboSphere(N = 12960, L0 = TRUE)
@@ -23,12 +26,12 @@ mesh0 <- inla.mesh.2d(loc = mesh0$loc, cutoff = 0.01, max.edge = 1)
 
 
 # Update $X_{mass}$
-
-The GRACE data also see the contribution of GIA. In this experiment, we assume GIA is known so we can remove the GIA contribution to GRACE.
+The GRACE data also see the contribution of GIA. In this experiment, we assume GIA is known so we can remove the GIA contribution to GRACE. We can separate the updated mass from $X_M$ by 
+$$X_{mass} |Y_{GRACE} = X_M | Y_{GRACE} - x_{GIA}$$.
 
 First load the GIA data. We use the ICE-6G data and use the same mesh grid as $mass$ to reprensent GIA.
 ```{r gia_data, eval = FALSE}
-ice6g <- read.table("Z:/WP2-SolidEarth/BHMinputs/GIA/GIA_Pel-6-VM5_ewh.txt", header = T)
+ice6g <- read.table(paste0(dd, "WP2-SolidEarth/BHMinputs/GIA/GIA_Pel-6-VM5_ewh.txt"), header = T)
 ice6g$x_center <- ifelse(ice6g$x_center < 0, ice6g$x_center+360, ice6g$x_center)
 ice6g2<- ice6g[order(ice6g$y_center,ice6g$x_center ),]
 gia_loc <- do.call(cbind, Lll2xyz(lat = ice6g2$y_center, lon = ice6g2$x_center))
@@ -47,12 +50,18 @@ ice6g2$trend2 <- ice6g2$trend/(gia_area)
 GIA_v <- ice6g2$trend2[mesh_idx]
 ```
 
-
+Thenload the updated $X_M$ and remove the $x_GIA$.
 ```{r grace_gia_remove}
+load(paste0(dd, "WP1-BHM/Experiment2a/exp2a_M.RData"))
+
+mass_m <- res_M$M_pred$mean - GIA_v
+mass_u <- res_M$M_pred$u
+mass_pred1 <- data.frame(lon = res_M$M_pred$lon, lat = res_M$M_pred$lat,
+                       mean = mass_m, u = mass_u)
 GIA_grace <- A_GRACE_data %*% GIA_v
-grace_data <- grace_sp$mmweq + GIA_grace
+mass_grace <- grace_sp$pred_mean - GIA_grace
 grace_sp@data$gia <- as.numeric(GIA_grace)
-grace_sp@data$mass <- as.numeric(grace_data)
+grace_sp@data$mass <- as.numeric(mass_grace)
 spplot(grace_sp, "gia")
 spplot(grace_sp, "mass")
 ```
