@@ -1,7 +1,7 @@
 ## ----setup, include=FALSE------------------------------------------------
 knitr::opts_chunk$set(echo = TRUE)
-wd <-"C:/ZSwork/"
-dd <-"Z:/"
+wd <-"~/"
+dd <-"/./projects/GlobalMass/"
 
 library(rgdal); library(sp);library(GEOmap)
 library(INLA)
@@ -72,32 +72,32 @@ M_spde <- inla.spde2.matern(mesh0, B.tau = matrix(c(ltau0, -1, 1),1,3), B.kappa 
 
 ## ----grace_link, eval = FALSE--------------------------------------------
 ## ## For each polygon observation we generate the regular spaced grid and the number of grid cell is proportional to the area of the polygon
-## grace_area <- geosphere::areaPolygon(grace_sp)/(1000^2)
-## plot(grace_loc$area, grace_area)
-## abline(a = 0, b =1)
-## grace_sp$area <-grace_area
-## area_mean <- mean(grace_area)
-## #spplot(grace_sp, "area")
-## 
-## ## Generate the integration grid for each polygons
-## poly_block <- function(i, dis = 10){
-##   sp_i <- SpatialPolygons(list(grace_sp@polygons[[i]]), proj4string=CRS("+proj=longlat"))
-##   area_i <- grace_sp$area[i]
-##   grid_i <- spsample(sp_i, n = round(area_i/dis^2), type = "regular", offset=c(0.5, 0.5))
-##   ngrid_i <- length(grid_i)
-##   grid_xyz <- do.call(cbind, Lll2xyz(lat = grid_i@coords[,2], lon = grid_i@coords[,1]))
-##   block_i <- rep(i, ngrid_i)
-##   weights <- rep(area_i/ngrid_i, ngrid_i)
-##   return(list(grid_xyz = grid_xyz, block = block_i, weights = weights, ngrid = ngrid_i))
-## }
-## 
-## grace_block <- lapply(1:nrow(grace_sp), poly_block, dis = 10)
-## 
-## grid_xyz <- do.call(rbind, lapply(grace_block, "[[", "grid_xyz"))
-## grid_block <- do.call(c, lapply(grace_block, "[[", "block"))
-## weights <- do.call(c, lapply(grace_block, "[[", "weights"))
-## 
-## A_GRACE_data <- inla.spde.make.A(mesh = mesh0, loc = grid_xyz, block = grid_block,  weights = weights)
+grace_area <- geosphere::areaPolygon(grace_sp)/(1000^2)
+plot(grace_loc$area, grace_area)
+abline(a = 0, b =1)
+grace_sp$area <-grace_area
+area_mean <- mean(grace_area)
+#spplot(grace_sp, "area")
+
+## Generate the integration grid for each polygons
+poly_block <- function(i, dis = 10){
+  sp_i <- SpatialPolygons(list(grace_sp@polygons[[i]]), proj4string=CRS("+proj=longlat"))
+  area_i <- grace_sp$area[i]
+  grid_i <- spsample(sp_i, n = round(area_i/dis^2), type = "regular", offset=c(0.5, 0.5))
+  ngrid_i <- length(grid_i)
+  grid_xyz <- do.call(cbind, Lll2xyz(lat = grid_i@coords[,2], lon = grid_i@coords[,1]))
+  block_i <- rep(i, ngrid_i)
+  weights <- rep(area_i/ngrid_i, ngrid_i)
+  return(list(grid_xyz = grid_xyz, block = block_i, weights = weights, ngrid = ngrid_i))
+}
+
+grace_block <- lapply(1:nrow(grace_sp), poly_block, dis = 10)
+
+grid_xyz <- do.call(rbind, lapply(grace_block, "[[", "grid_xyz"))
+grid_block <- do.call(c, lapply(grace_block, "[[", "block"))
+weights <- do.call(c, lapply(grace_block, "[[", "weights"))
+
+A_GRACE_data <- inla.spde.make.A(mesh = mesh0, loc = grid_xyz, block = grid_block,  weights = weights)
 
 ## ----grace_pred_link-----------------------------------------------------
 ## Same for prediction on a 1 degree resolution grid, we need to know the area of the grid for integration
@@ -122,44 +122,44 @@ st.pred <- inla.stack(data = list(y=NA), A = list(rbind(A_GRACE_data, A_M_pred))
 stmass <- inla.stack(st.est, st.pred)
 
 ## ----inla_run_grace, include = TRUE, eval = FALSE------------------------
-## ## Fix altimetry errors as they are known
-## hyper <- list(prec = list(fixed = TRUE, initial = 0))
-## prec_scale <- c(1/grace_sp$std^2, rep(1, nrow(A_GRACE_data) + nrow(A_M_pred)))
-## 
-## ## The formular for modelling the SSH mean
-## formula = y ~ -1 +  f(M, model = M_spde)
-## 
-## ## Run INLA
-## res_inla <- inla(formula, data = inla.stack.data(stM, spde = M_spde), family = "gaussian",
-##                  scale =prec_scale, control.family = list(hyper = hyper),
-##                  control.predictor=list(A=inla.stack.A(stM), compute =TRUE))
+## Fix altimetry errors as they are known
+hyper <- list(prec = list(fixed = TRUE, initial = 0))
+prec_scale <- c(1/grace_sp$std^2, rep(1, nrow(A_GRACE_data) + nrow(A_M_pred)))
+
+## The formular for modelling the SSH mean
+formula = y ~ -1 +  f(M, model = M_spde)
+
+## Run INLA
+res_inla <- inla(formula, data = inla.stack.data(stM, spde = M_spde), family = "gaussian",
+                 scale =prec_scale, control.family = list(hyper = hyper),
+                 control.predictor=list(A=inla.stack.A(stM), compute =TRUE))
 
 ## ----inla_res_grace, include = TRUE, eval = FALSE------------------------
-## INLA_pred <- res_inla$summary.linear.predictor
-## ## Extract and project predictions
-## pred_idx <- inla.stack.index(stmass, tag = "pred")$data
-## idx_grace <- pred_idx[1:nrow(A_GRACE_data)]
-## idx_grid <- pred_idx[-(1:nrow(A_GRACE_data))]
-## 
-## ## mass + GIA
-## M_m <- INLA_pred$mean[idx_grid]
-## M_u <- INLA_pred$sd[idx_grid]
-## proj <- inla.mesh.projector(mesh0, projection = "longlat", dims = c(360,180), xlim = c(0,359), ylim = c(-89.5, 89.5))
-## M_grid <- expand.grid(proj$x, proj$y)
-## M_pred <- data.frame(lon = M_grid[,1], lat = M_grid[,2],
-##                        mean = M_m,
-##                        u = M_u)
-## 
-## res_M <- list(res_inla = res_inla, spde = M_spde, st = stM,
-##             mesh = mesh0,  M_pred = M_pred)
-## 
-## grace_m <- INLA_pred$mean[idx_grace]
-## grace_u <- INLA_pred$sd[idx_grace]
-## grace_sp@data$pred_mean <- grace_m
-## grace_sp@data$pred_u <- grace_u
-## 
-## 
-## save(res_M, grace_sp, file =paste0(dd, "WP1-BHM/Experiment2a/exp2a_M.RData"))
+INLA_pred <- res_inla$summary.linear.predictor
+## Extract and project predictions
+pred_idx <- inla.stack.index(stmass, tag = "pred")$data
+idx_grace <- pred_idx[1:nrow(A_GRACE_data)]
+idx_grid <- pred_idx[-(1:nrow(A_GRACE_data))]
+
+## mass + GIA
+M_m <- INLA_pred$mean[idx_grid]
+M_u <- INLA_pred$sd[idx_grid]
+proj <- inla.mesh.projector(mesh0, projection = "longlat", dims = c(360,180), xlim = c(0,359), ylim = c(-89.5, 89.5))
+M_grid <- expand.grid(proj$x, proj$y)
+M_pred <- data.frame(lon = M_grid[,1], lat = M_grid[,2],
+                       mean = M_m,
+                       u = M_u)
+
+res_M <- list(res_inla = res_inla, spde = M_spde, st = stM,
+            mesh = mesh0,  M_pred = M_pred)
+
+grace_m <- INLA_pred$mean[idx_grace]
+grace_u <- INLA_pred$sd[idx_grace]
+grace_sp@data$pred_mean <- grace_m
+grace_sp@data$pred_u <- grace_u
+
+
+save(res_M, grace_sp, file =paste0(dd, "WP1-BHM/Experiment2a/exp2a_M.RData"))
 
 ## ----hyper_grace, include=TRUE-------------------------------------------
 load(paste0(dd, "WP1-BHM/Experiment2a/exp2a_M.RData"))
