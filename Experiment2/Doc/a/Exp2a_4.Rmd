@@ -1,0 +1,144 @@
+---
+title: "Exp2a4"
+author: "Z Sha"
+date: "3 January 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(rgdal); library(sp);library(GEOmap)
+library(INLA)
+library(ncdf4)
+library(gstat)
+source("C:/ZSwork/glbm/BHM_sphere/functions.R")
+source("C:/ZSwork/glbm/BHM_sphere/partition_fun.R")
+
+## Genereate Fibonacci points on the sphere
+fibo_points <- fiboSphere(N = 12960, L0 = TRUE)
+fibo_points_xyz <- do.call(cbind, Lll2xyz(lat = fibo_points[,2], lon = fibo_points[,1]))
+mesh0 <- inla.mesh.2d(loc = fibo_points_xyz, cutoff = 0.01, max.edge = 1)
+## Make this "smoother"
+mesh0 <- inla.mesh.2d(loc = mesh0$loc, cutoff = 0.01, max.edge = 1)
+```
+
+# Update $X_{steric}$
+
+In this experiment, steric can be represented by SSH, MASS and GIA. 
+$$X_{steric} = X_{SSH} - X_{MASS} - x_{GIA}$$
+Since these processes are all Gaussian, the are additive. We have 
+$$E(X_{steric} | Y_{alt}, Y_{GRACE}, X_{GIA} = x_{GIA}) = E(X_{SSH}| ) - E(X_{mass}|Y_{GRACE}) - x_{GIA} \\
+V(X_{steric}| Y_{alt}, Y_{GRACE}, X_{GIA} = x_{GIA}) = V(X_{SSH}| Y_{alt}) + V(X_{mass}|Y_{GRACE})$$
+
+## Load GIA data
+
+Here we use the ICE-6G data to fix the GIA.
+```{r gia_data, eval = FALSE}
+ice6g <- read.table("Z:/WP2-SolidEarth/BHMinputs/GIA/GIA_Pel-6-VM5_ewh.txt", header = T)
+ice6g$x_center <- ifelse(ice6g$x_center < 0, ice6g$x_center+360, ice6g$x_center)
+ice6g<- ice6g[order(ice6g$y_center,ice6g$x_center ),]
+ice6g2 <- read.table("Z:/WP2-SolidEarth/BHMinputs/GIA/GIA_Pel-6-VM5.txt", header = T)
+ice6g2<- ice6g2[order(ice6g2$y_center,ice6g2$x_center ),]
+
+ice<-data.frame(x = ice6g$x_center, y = ice6g$y_center, rt = ice6g$trend/ice6g2$trend, rs = ice6g$std/ice6g2$std)
+
+lattice::levelplot(rs ~ x + y, data = ice, aspect = "iso",  at= seq(0, 2, 0.2),
+                     panel = function(x,y,z,...){
+                       lattice::panel.levelplot(x,y,z,...)
+                       map2 <- map("world2", interior = FALSE, plot = FALSE)
+                       lattice::panel.xyplot(x=map2$x, y=map2$y, type = "l", col = "black")
+                     },
+                     main = title, xlab = "longitude", ylab = "latitude")
+```
+
+## Results
+
+Now assemble the predicted mean of and uncertainty of steric at 1 degree resolution.
+```{r setric, eval = FALSE}
+steric_m <- res_SSH$SSH_pred$mean - res_mass$mass_pred$mean - ice6g2$trend
+steric_u <- res_SSH$SSH_pred$u + res_mass$mass_pred$u
+steric_data <- data.frame(lon = ice6g2$x_center, lat = ice6g2$y_center, mean = steric_m, u = steric_u)
+
+```
+
+Plot the steric map.
+```{r plot_steric}
+load("Z:/WP1-BHM/Experiment2a/exp2a_all.RData")
+lattice::levelplot(mean ~ lon + lat, data = steric_data, aspect = "iso",  at = seq(-5, 5, 1),
+                     panel = function(x,y,z,...){
+                       lattice::panel.levelplot(x,y,z,...)
+                       map2 <- map("world2", interior = FALSE, plot = FALSE)
+                       lattice::panel.xyplot(x=map2$x, y=map2$y, type = "l", col = "black")
+                     },
+                     main = title, xlab = "longitude", ylab = "latitude")
+
+lattice::levelplot(u ~ lon + lat, data = steric_data, aspect = "iso", at = seq(0, 4, 0.5),
+                     panel = function(x,y,z,...){
+                       lattice::panel.levelplot(x,y,z,...)
+                       map2 <- map("world2", interior = FALSE, plot = FALSE)
+                       lattice::panel.xyplot(x=map2$x, y=map2$y, type = "l", col = "black")
+                     },
+                     main = title, xlab = "longitude", ylab = "latitude")
+```
+
+# Compare with other steric results
+
+We compare the steric prediction with other four steric solutions.
+
+```{r load_steric}
+steric_files <- system(paste("ls", "Z:/WP3-Ocean/BHMinputs/steric/"), intern = TRUE)
+steric_models <- c("EN4", "IFEMER", "JAMSTEC", "SCRIPPS", "BHM")
+
+steric_read <- function(file, name){
+  filen <- paste0("Z:/WP3-Ocean/BHMinputs/steric/", file)
+  steric_nc <- nc_open(filen)
+  print(steric_nc)
+  lon <-  ncvar_get(steric_nc, "LONGITUDE")
+  lon <- ifelse(lon < 0, lon + 360, lon)
+  lon <- ifelse(lon > 360, lon - 360, lon)
+  lat <- ncvar_get(steric_nc, "LATITUDE")
+  grid <- expand.grid(lon, lat)
+  trend <- ncvar_get(steric_nc, "trend") #note that there re NAs for land datat
+  err <- ncvar_get(steric_nc, "err")
+  steric_data <- data.frame(trend = as.numeric(trend), err = as.numeric(err), 
+                            model = name, lon = grid[,1], lat = grid[,2])
+  nc_close(steric_nc)
+  return(steric_data)
+}
+
+sterics <- list()
+
+for (i in 1:4){
+  sterics[[i]] <- steric_read(steric_files[i], steric_models[i])
+}
+
+steric_all <- do.call(rbind, sterics)
+steric_bhm <- data.frame(trend = steric_data$mean, err = steric_data$u, 
+                         model = "BHM", lon = steric_data$lon, lat = steric_data$lat)
+steric_all <- rbind(steric_all, steric_bhm)
+
+```
+
+Now plot and compare the mean trend.
+```{r mean_steric}
+steric_plot <- steric_all
+steric_plot$trend <- ifelse(abs(steric_plot$trend) > 5, sign(steric_plot$trend)*5.5, steric_plot$trend)
+steric_plot$err <- ifelse(steric_plot$err > 5, 5.1, steric_plot$err)
+
+lattice::levelplot(trend ~ lon + lat|model, data = steric_plot, aspect = "iso",  
+                     panel = function(x,y,z,...){
+                       lattice::panel.levelplot(x,y,z,...)
+                       map2 <- map("world2", interior = FALSE, plot = FALSE)
+                       lattice::panel.xyplot(x=map2$x, y=map2$y, type = "l", col = "black")
+                     },
+                     main = title, xlab = "longitude", ylab = "latitude")
+
+lattice::levelplot(err ~ lon + lat|model, data = steric_plot, aspect = "iso",  
+                     panel = function(x,y,z,...){
+                       lattice::panel.levelplot(x,y,z,...)
+                       map2 <- map("world2", interior = FALSE, plot = FALSE)
+                       lattice::panel.xyplot(x=map2$x, y=map2$y, type = "l", col = "black")
+                     },
+                     main = title, xlab = "longitude", ylab = "latitude")
+```
+

@@ -1,0 +1,60 @@
+---
+title: "Exp2a3"
+author: "Z Sha"
+date: "3 January 2018"
+output: html_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(rgdal); library(sp);library(GEOmap)
+library(INLA)
+library(ncdf4)
+library(gstat)
+source("C:/ZSwork/glbm/BHM_sphere/functions.R")
+source("C:/ZSwork/glbm/BHM_sphere/partition_fun.R")
+
+## Genereate Fibonacci points on the sphere
+fibo_points <- fiboSphere(N = 12960, L0 = TRUE)
+fibo_points_xyz <- do.call(cbind, Lll2xyz(lat = fibo_points[,2], lon = fibo_points[,1]))
+mesh0 <- inla.mesh.2d(loc = fibo_points_xyz, cutoff = 0.01, max.edge = 1)
+## Make this "smoother"
+mesh0 <- inla.mesh.2d(loc = mesh0$loc, cutoff = 0.01, max.edge = 1)
+```
+
+
+# Update $X_{mass}$
+
+The GRACE data also see the contribution of GIA. In this experiment, we assume GIA is known so we can remove the GIA contribution to GRACE.
+
+First load the GIA data. We use the ICE-6G data and use the same mesh grid as $mass$ to reprensent GIA.
+```{r gia_data, eval = FALSE}
+ice6g <- read.table("Z:/WP2-SolidEarth/BHMinputs/GIA/GIA_Pel-6-VM5_ewh.txt", header = T)
+ice6g$x_center <- ifelse(ice6g$x_center < 0, ice6g$x_center+360, ice6g$x_center)
+ice6g2<- ice6g[order(ice6g$y_center,ice6g$x_center ),]
+gia_loc <- do.call(cbind, Lll2xyz(lat = ice6g2$y_center, lon = ice6g2$x_center))
+
+polycoords <- ice6g2[,c(6:13, 6,7)] 
+plist <- lapply(ice6g2$ID, 
+                function(x) Polygons(list(Polygon(cbind(lon = as.numeric(polycoords[x, c(1,3,5,7,9)]), 
+                                                        lat = as.numeric(polycoords[x, c(2,4,6,8,10)])))), ID = x))
+Plist <- SpatialPolygons(plist, proj4string = CRS("+proj=longlat"))
+gia_area <- geosphere::areaPolygon(Plist)/(1000^2)
+meshLL <- Lxyz2ll(list(x=mesh0$loc[,1], y = mesh0$loc[,2], z = mesh0$loc[,3]))
+mesh_sp <- SpatialPoints(data.frame(lon = meshLL$lon, lat = meshLL$lat), proj4string = CRS("+proj=longlat")) 
+
+mesh_idx <- over(mesh_sp, Plist)
+ice6g2$trend2 <- ice6g2$trend/(gia_area)
+GIA_v <- ice6g2$trend2[mesh_idx]
+```
+
+
+```{r grace_gia_remove}
+GIA_grace <- A_GRACE_data %*% GIA_v
+grace_data <- grace_sp$mmweq + GIA_grace
+grace_sp@data$gia <- as.numeric(GIA_grace)
+grace_sp@data$mass <- as.numeric(grace_data)
+spplot(grace_sp, "gia")
+spplot(grace_sp, "mass")
+```
+
+# [Update steric.](Exp2a4)
