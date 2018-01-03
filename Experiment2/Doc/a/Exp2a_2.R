@@ -37,17 +37,10 @@ SpPolygon <- SpatialPolygons(Polygons_list, proj4string = CRS("+proj=longlat"))
 
 grace_sp <- SpatialPolygonsDataFrame(SpPolygon,grace_data)
 grace_sp$mmweq2 <- ifelse(abs(grace_sp$mmweq) > 20, sign(grace_sp$mmweq)*20, grace_sp$mmweq )
-spplot(grace_sp, "mmweq2", at = seq(-21, 21, 2))
 
 ## note the area calcuated by R is different from those given in the dataset -- ask Maike
 
 ## ----Grace_prior---------------------------------------------------------
-grace_v <- data.frame(mean = grace_data$mmweq, lon = grace_loc$lon_c, lat = grace_loc$lat_c)
-coordinates(grace_v) <- c("lon", "lat")
-proj4string(grace_v) <- CRS("+proj=longlat")
-v2 <- variogram(mean~1, grace_v) 
-plot(v2)
-
 ## Priors mean and variance for the parameters: rho and sigma
 mu_r <- 2000/6371
 v_r <- 1
@@ -116,10 +109,10 @@ A_M_pred <- inla.spde.make.A(mesh = mesh0, loc = grid_pred, weights = areas/1e4)
 
 ## Create the estimation and prediction stack
 st.est <- inla.stack(data = list(y=grace_sp$mmweq), A = list(A_GRACE_data),
-                     effects = list(mass = 1:M_spde$n.spde), tag = "est")
+                     effects = list(M = 1:M_spde$n.spde), tag = "est")
 st.pred <- inla.stack(data = list(y=NA), A = list(rbind(A_GRACE_data, A_M_pred)),
-                      effects = list(mass=1:M_spde$n.spde), tag = "pred")
-stmass <- inla.stack(st.est, st.pred)
+                      effects = list(M=1:M_spde$n.spde), tag = "pred")
+stM <- inla.stack(st.est, st.pred)
 
 ## ----inla_run_grace, include = TRUE, eval = FALSE------------------------
 ## Fix altimetry errors as they are known
@@ -137,7 +130,7 @@ res_inla <- inla(formula, data = inla.stack.data(stM, spde = M_spde), family = "
 ## ----inla_res_grace, include = TRUE, eval = FALSE------------------------
 INLA_pred <- res_inla$summary.linear.predictor
 ## Extract and project predictions
-pred_idx <- inla.stack.index(stmass, tag = "pred")$data
+pred_idx <- inla.stack.index(stM, tag = "pred")$data
 idx_grace <- pred_idx[1:nrow(A_GRACE_data)]
 idx_grid <- pred_idx[-(1:nrow(A_GRACE_data))]
 
@@ -160,41 +153,3 @@ grace_sp@data$pred_u <- grace_u
 
 
 save(res_M, grace_sp, file =paste0(dd, "WP1-BHM/Experiment2a/exp2a_M.RData"))
-
-## ----hyper_grace, include=TRUE-------------------------------------------
-load(paste0(dd, "WP1-BHM/Experiment2a/exp2a_M.RData"))
-pars_M <- marginal_par(res = res_M, process = "mass", plot = TRUE)
-## The posterior modes
-print(paste("The estimated correlation lengths are:", pars_M$rho_mode*6371,  sep = "  "))
-
-print(paste("The estimated marginal variances are:", pars_M$sigma_mode,sep = "  "))
-
-## ----predict_grace, include=TRUE-----------------------------------------
-M_pred <- res_M$M_pred
-M_pred$source1 <- "M predicted mean"
-M_pred$source2 <- "M predicted uncertainty"
-
-
-## plot the mean 
-lattice::levelplot(mean ~ lon + lat, data = M_pred, aspect = "iso", 
-                     panel = function(x,y,z,...){
-                       lattice::panel.levelplot(x,y,z,...)
-                       map2 <- map("world2", interior = FALSE, plot = FALSE)
-                       lattice::panel.xyplot(x=map2$x, y=map2$y, type = "l", col = "black")
-                     },
-                     main = title, xlab = "longitude", ylab = "latitude")
-
-## plot the uncertainty
-lattice::levelplot(u ~ lon + lat, data = M_pred, aspect = "iso", 
-                     panel = function(x,y,z,...){
-                       lattice::panel.levelplot(x,y,z,...)
-                       map2 <- map("world2", interior = FALSE, plot = FALSE)
-                       lattice::panel.xyplot(x=map2$x, y=map2$y, type = "l", col = "black")
-                     },
-                     main = title, xlab = "longitude", ylab = "latitude")
-
-
-spplot(grace_sp, "pred_mean")
-
-spplot(grace_sp, "pred_u")
-

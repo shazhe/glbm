@@ -24,29 +24,6 @@ alt_data$lat <- rep(lat, each = 360)
 alt_data2 <- na.omit(alt_data)
 ## Find the xyz coords of the altimetry data
 alt_loc <- do.call(cbind, Lll2xyz(lon = alt_data2$lon, lat = alt_data2$lat))
-## plot the data
-lattice::levelplot(trend_ssh ~ lon + lat, data = alt_data2, aspect = "iso",  at =seq(-20, 20, 4),
-                     panel = function(x,y,z,...){
-                       lattice::panel.levelplot(x,y,z,...)
-                       map2 <- map("world2", interior = FALSE, plot = FALSE)
-                       lattice::panel.xyplot(x=map2$x, y=map2$y, type = "l", col = "black")
-                     },
-                     main = title, xlab = "longitude", ylab = "latitude")
-
-lattice::levelplot(err_ssh ~ lon + lat, data = alt_data2, aspect = "iso",  at = seq(0, 4, 0.5),
-                     panel = function(x,y,z,...){
-                       lattice::panel.levelplot(x,y,z,...)
-                       map2 <- map("world2", interior = FALSE, plot = FALSE)
-                       lattice::panel.xyplot(x=map2$x, y=map2$y, type = "l", col = "black")
-                     },
-                     main = title, xlab = "longitude", ylab = "latitude")
-
-## ----variogram, message = FALSE------------------------------------------
-coordinates(alt_data2) <- c("lon", "lat")
-proj4string(alt_data2) <- CRS("+proj=longlat")
-alt_datas <- alt_data2[sample(1:nrow(alt_data2), 5000),] # thin the data otherwise it takes too long! plot remains the same
-v1 <- gstat::variogram(trend_ssh ~ 1, alt_datas) 
-plot(v1)
 
 ## ----prior---------------------------------------------------------------
 ## Priors mean and variance for the parameters: rho and sigma
@@ -66,7 +43,6 @@ mesh0 <- inla.mesh.2d(loc = mesh0$loc, cutoff = 0.01, max.edge = 1)
 ## ----ssh_mesh2-----------------------------------------------------------
 ## Load the Ocean polygon
 Ocean <- readOGR(dsn = paste0(dd, "WP1-BHM/maps/ne_110m_ocean"), layer = "ne_110m_ocean")
-plot(Ocean)
 
 ## Remove mesh not in the ocean
 mesh0 <- dt.mesh.addon.posTri(mesh = mesh0, globe = TRUE) 
@@ -140,50 +116,3 @@ res_SSH <- list(res_inla = res_inla, spde = SSH_spde, st = stSSH,
             mesh = mesh_ssh,  SSH_pred = SSH_pred)
 
 save(res_SSH, file =paste0(dd, "WP1-BHM/Experiment2a/exp2a_ssh.RData"))
-
-## ----hyper, include=TRUE-------------------------------------------------
-load(paste0(dd, "WP1-BHM/Experiment2a/exp2a_ssh.RData"))
-pars_SSH <- marginal_par(res = res_SSH, process = "SSH", plot = TRUE)
-## The posterior modes
-print(paste("The estimated correlation lengths are:", pars_SSH$rho_mode*6371,  sep = "  "))
-
-print(paste("The estimated marginal variances are:", pars_SSH$sigma_mode,sep = "  "))
-
-## ----predict, include=TRUE-----------------------------------------------
-alt_pred <- res_SSH$SSH_pred
-alt_pred$source1 <- "SSH predicted mean"
-alt_pred$source2 <- "SSH predicted uncertainty"
-alt_data$source1 <- "Altimetry trend"
-alt_data$source2 <- "Altimetry error"
-names(alt_data)[1:2] <- c("mean", "u") 
-alt_diff <- data.frame(lon = alt_pred$lon, lat = alt_pred$lat, diff = alt_pred$mean-alt_data$mean)
-alt_pred <- rbind(alt_pred, alt_data)
-
-
-## plot the mean 
-lattice::levelplot(mean ~ lon + lat | source1, data = alt_pred, aspect = "iso", at = seq(-20, 20, 2),
-                     panel = function(x,y,z,...){
-                       lattice::panel.levelplot(x,y,z,...)
-                       map2 <- map("world2", interior = FALSE, plot = FALSE)
-                       lattice::panel.xyplot(x=map2$x, y=map2$y, type = "l", col = "black")
-                     },
-                     main = title, xlab = "longitude", ylab = "latitude")
-
-## plot the uncertainty
-lattice::levelplot(u ~ lon + lat | source2, data = alt_pred, aspect = "iso", at = seq(0, 3, 0.5),
-                     panel = function(x,y,z,...){
-                       lattice::panel.levelplot(x,y,z,...)
-                       map2 <- map("world2", interior = FALSE, plot = FALSE)
-                       lattice::panel.xyplot(x=map2$x, y=map2$y, type = "l", col = "black")
-                     },
-                     main = title, xlab = "longitude", ylab = "latitude")
-
-## Plot the differnce
-lattice::levelplot(diff ~ lon + lat, data = alt_diff, aspect = "iso", at = seq(-20, 20, 2),
-                     panel = function(x,y,z,...){
-                       lattice::panel.levelplot(x,y,z,...)
-                       map2 <- map("world2", interior = FALSE, plot = FALSE)
-                       lattice::panel.xyplot(x=map2$x, y=map2$y, type = "l", col = "black")
-                     },
-                     main = title, xlab = "longitude", ylab = "latitude")
-
