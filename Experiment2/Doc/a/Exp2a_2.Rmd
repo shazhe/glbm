@@ -52,8 +52,8 @@ Polygons_list <- lapply(1:length(Polygon_list), function(x) Polygons(list(Polygo
 SpPolygon <- SpatialPolygons(Polygons_list, proj4string = CRS("+proj=longlat"))
 
 grace_sp <- SpatialPolygonsDataFrame(SpPolygon,grace_data)
-grace_sp$mmweq2 <- ifelse(abs(grace_sp$mmweq) > 20, sign(grace_sp$mmweq)*20, grace_sp$mmweq )
-spplot(grace_sp, "mmweq2", at = seq(-21, 21, 2))
+grace_sp$mmweqt <- ifelse(abs(grace_sp$mmweq) > 20, sign(grace_sp$mmweq)*20, grace_sp$mmweq )
+spplot(grace_sp, "mmweqt", at = seq(-21, 21, 2))
 
 ## note the area calcuated by R is different from those given in the dataset -- ask Maike
 ```
@@ -69,10 +69,10 @@ v2 <- variogram(mean~1, grace_v)
 plot(v2)
 
 ## Priors mean and variance for the parameters: rho and sigma
-mu_r <- 2000/6371
+mu_r <- 2500/6371
 v_r <- 1
-mu_s <- 2
-v_s <- 5^2
+mu_s <- 10
+v_s <- 20^2
 
 ## Transform the parameters for the SPDE_GMRF approximation
 trho <- Tlognorm(mu_r, v_r)
@@ -98,19 +98,25 @@ We also need a mesh to represent the mass process. For the same reason as discus
 
 ## Link data to process
 
-The GRACE data we have are mass anomalies aggregated into large polygon grid and we call them "super mascons" as they are on larger grid than the original data provided by the GRACE project. To link the data to the process, we need to integrate the process value over the corresponding polygon. The integration can be done numerically as weighted sum of the grid values within the polygons. The grid values are represented by the GMRF.
+The GRACE data are mass anomalies aggregated into large polygon grid and we call them "super mascons" as they are on larger grid than the original data provided by the GRACE project. The area of the super mascons are provided in the original data. We calculate the areas by using function in R and compare them to the provided ones. There are some difference and need to be check with MS later.
+```{r grace_area, cache = TRUE}
+grace_area <- geosphere::areaPolygon(grace_sp)/(1000^2) # km^2
+plot(grace_loc$area ~ grace_area, xlim = c(0, 3e5), ylim = c(0, 3e5))
+abline(a = 0, b = 1)
 
-A most tricky setting is the scaling factor! Since the projection matrix A approximate map inputs to outputs on different scales, this can make the computation unstable when the difference in the scales are huge. The scale also determines the scale of the marginal variance and predicted uncertainties. 
+grace_sp$area <-grace_area
+spplot(grace_sp, "area")
 
-We choose to scale the prediction by $1e4$ for a $100km \times 100km$ area resolution. This approximately correspond to a 1 degree resolution and also at the similar scale of the GRACE data polygon size.
+grace_sp$area2 <- grace_loc$area
+spplot(grace_sp, "area2")
+
+area_mean <- mean(grace_area)
+```
+
+
+To link the data to the process, we need to integrate the process value over the corresponding polygon. The integration can be done numerically as weighted sum of the grid values within the polygons. The grid values are represented by the GMRF.
 ```{r grace_link, eval = FALSE}
 ## For each polygon observation we generate the regular spaced grid and the number of grid cell is proportional to the area of the polygon
-grace_area <- geosphere::areaPolygon(grace_sp)/(1000^2)
-plot(grace_loc$area, grace_area)
-abline(a = 0, b =1)
-grace_sp$area <-grace_area
-area_mean <- mean(grace_area)
-#spplot(grace_sp, "area")
 
 ## Generate the integration grid for each polygons
 poly_block <- function(i, dis = 10){
@@ -129,10 +135,16 @@ grace_block <- lapply(1:nrow(grace_sp), poly_block, dis = 10)
 grid_xyz <- do.call(rbind, lapply(grace_block, "[[", "grid_xyz"))
 grid_block <- do.call(c, lapply(grace_block, "[[", "block"))
 weights <- do.call(c, lapply(grace_block, "[[", "weights"))
-
-A_GRACE_data <- inla.spde.make.A(mesh = mesh0, loc = grid_xyz, block = grid_block,  weights = weights)
 ```
 
+A most tricky setting is the scaling factor! Since the projection matrix A approximate map inputs to outputs on different scales, this can make the computation unstable when the difference in the scales are huge. The scale also determines the scale of the marginal variance and predicted uncertainties. 
+
+We choose to scale the prediction by $1e4$ for a $100km \times 100km$ area resolution. This approximately correspond to a 1 degree resolution and also at the similar scale of the GRACE data polygon size.
+```{r grace_link2, eval = FALSE}
+A_GRACE_data <- inla.spde.make.A(mesh = mesh0, loc = grid_xyz, block = grid_block,  weights = weights/1e4)
+```
+
+Similarly, we create the projection matrix for prediction.
 ```{r grace_pred_link, eval = FALSE}
 ## Same for prediction on a 1 degree resolution grid, we need to know the area of the grid for integration
 ## generate the prediction grid
@@ -150,10 +162,10 @@ A_M_pred <- inla.spde.make.A(mesh = mesh0, loc = grid_pred, weights = areas/1e4)
 
 ## Create the estimation and prediction stack
 st.est <- inla.stack(data = list(y=grace_sp$mmweq), A = list(A_GRACE_data),
-                     effects = list(mass = 1:M_spde$n.spde), tag = "est")
+                     effects = list(M= 1:M_spde$n.spde), tag = "est")
 st.pred <- inla.stack(data = list(y=NA), A = list(rbind(A_GRACE_data, A_M_pred)),
-                      effects = list(mass=1:M_spde$n.spde), tag = "pred")
-stmass <- inla.stack(st.est, st.pred)
+                      effects = list(M=1:M_spde$n.spde), tag = "pred")
+stM <- inla.stack(st.est, st.pred)
 ```
 
 ## INLA inference

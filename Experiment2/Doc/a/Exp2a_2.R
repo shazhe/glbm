@@ -42,10 +42,10 @@ grace_sp$mmweq2 <- ifelse(abs(grace_sp$mmweq) > 20, sign(grace_sp$mmweq)*20, gra
 
 ## ----Grace_prior---------------------------------------------------------
 ## Priors mean and variance for the parameters: rho and sigma
-mu_r <- 2000/6371
+mu_r <- 2500/6371
 v_r <- 1
-mu_s <- 2
-v_s <- 5^2
+mu_s <- 10
+v_s <- 20^2
 
 ## Transform the parameters for the SPDE_GMRF approximation
 trho <- Tlognorm(mu_r, v_r)
@@ -90,7 +90,7 @@ grid_xyz <- do.call(rbind, lapply(grace_block, "[[", "grid_xyz"))
 grid_block <- do.call(c, lapply(grace_block, "[[", "block"))
 weights <- do.call(c, lapply(grace_block, "[[", "weights"))
 
-A_GRACE_data <- inla.spde.make.A(mesh = mesh0, loc = grid_xyz, block = grid_block,  weights = weights)
+A_GRACE_data <- inla.spde.make.A(mesh = mesh0, loc = grid_xyz, block = grid_block,  weights = weights/1e4)
 
 ## ----grace_pred_link-----------------------------------------------------
 ## Same for prediction on a 1 degree resolution grid, we need to know the area of the grid for integration
