@@ -1,5 +1,5 @@
 ---
-title: "Experiment 2a(2)"
+title: "Experiment 2a -- Update Mass + GIA"
 author: "Z Sha"
 date: "3 January 2018"
 output: html_document
@@ -24,6 +24,7 @@ mesh0 <- inla.mesh.2d(loc = fibo_points_xyz, cutoff = 0.01, max.edge = 1)
 ## Make this "smoother"
 mesh0 <- inla.mesh.2d(loc = mesh0$loc, cutoff = 0.01, max.edge = 1)
 ```
+# [Introduction](Exp2a_1)
 
 # Update $X_{M}$
 
@@ -132,7 +133,7 @@ weights <- do.call(c, lapply(grace_block, "[[", "weights"))
 A_GRACE_data <- inla.spde.make.A(mesh = mesh0, loc = grid_xyz, block = grid_block,  weights = weights)
 ```
 
-```{r grace_pred_link}
+```{r grace_pred_link, eval = FALSE}
 ## Same for prediction on a 1 degree resolution grid, we need to know the area of the grid for integration
 ## generate the prediction grid
 gx <- seq(0, 359, 1)
@@ -211,7 +212,7 @@ save(res_M, grace_sp, file =paste0(dd, "WP1-BHM/Experiment2a/exp2a_M.RData"))
 
 ```{r hyper_grace, include=TRUE}
 load(paste0(dd, "WP1-BHM/Experiment2a/exp2a_M.RData"))
-pars_M <- marginal_par(res = res_M, process = "mass", plot = TRUE)
+pars_M <- marginal_par(res = res_M, process = "M", plot = TRUE)
 ## The posterior modes
 print(paste("The estimated correlation lengths are:", pars_M$rho_mode*6371,  sep = "  "))
 
@@ -254,3 +255,5 @@ spplot(grace_sp, "pred_u")
 ```
 
 # [Separate mass and GIA process](Exp2a3)
+
+# [Update Steric](Exp2a4)

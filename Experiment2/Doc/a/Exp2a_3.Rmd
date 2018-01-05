@@ -1,5 +1,5 @@
 ---
-title: "Exp2a3"
+title: "Exp2a -- Update Mass only"
 author: "Z Sha"
 date: "3 January 2018"
 output: html_document
@@ -24,6 +24,9 @@ mesh0 <- inla.mesh.2d(loc = fibo_points_xyz, cutoff = 0.01, max.edge = 1)
 mesh0 <- inla.mesh.2d(loc = mesh0$loc, cutoff = 0.01, max.edge = 1)
 ```
 
+# [Introduction](Exp2a1)
+
+# [Update mass + GIA process](Exp2a2)
 
 # Update $X_{mass}$
 The GRACE data also see the contribution of GIA. In this experiment, we assume GIA is known so we can remove the GIA contribution to GRACE. We can separate the updated mass from $X_M$ by 
@@ -66,4 +69,4 @@ spplot(grace_sp, "gia")
 spplot(grace_sp, "mass")
 ```
 
-# [Update steric.](Exp2a4)
+# [Update steric](Exp2a4)

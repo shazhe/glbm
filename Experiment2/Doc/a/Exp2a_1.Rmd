@@ -275,3 +275,7 @@ lattice::levelplot(diff ~ lon + lat, data = alt_diff, aspect = "iso", at = seq(-
 
 
 # [Update the sum of mass and GIA](Exp2a2)
+
+# [Separate mass and GIA process](Exp2a3)
+
+# [Update steric](Exp2a4)

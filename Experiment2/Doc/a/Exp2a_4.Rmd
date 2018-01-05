@@ -1,5 +1,5 @@
 ---
-title: "Exp2a4"
+title: "Exp2a -- Update Steric"
 author: "Z Sha"
 date: "3 January 2018"
 output: html_document
@@ -25,6 +25,12 @@ mesh0 <- inla.mesh.2d(loc = fibo_points_xyz, cutoff = 0.01, max.edge = 1)
 mesh0 <- inla.mesh.2d(loc = mesh0$loc, cutoff = 0.01, max.edge = 1)
 ```
 
+# [Introduction](Exp2a1)
+
+# [Update the sum of mass and GIA](Exp2a2)
+
+# [Separate mass and GIA process](Exp2a3)
+
 # Update $X_{steric}$
 
 In this experiment, steric can be represented by SSH, MASS and GIA. 
@@ -34,7 +40,7 @@ $$E(X_{steric} | Y_{alt}, Y_{GRACE}, X_{GIA} = x_{GIA}) = E(X_{SSH}| ) - E(X_{ma
 V(X_{steric}| Y_{alt}, Y_{GRACE}, X_{GIA} = x_{GIA}) = V(X_{SSH}| Y_{alt}) + V(X_{mass}|Y_{GRACE})= V(X_{SSH}| Y_{alt}) + V(X_{M}|Y_{GRACE})$$
 
 ## Load updated processes
-```{r up_pro, eval = FALSE}
+```{r up_pro}
 load(paste0(dd, "WP1-BHM/Experiment2a/exp2a_ssh.RData"))
 load(paste0(dd, "WP1-BHM/Experiment2a/exp2a_M.RData"))
 ```
@@ -42,7 +48,7 @@ load(paste0(dd, "WP1-BHM/Experiment2a/exp2a_M.RData"))
 ## Results
 
 Now assemble the predicted mean of and uncertainty of steric at 1 degree resolution.
-```{r setric, eval = FALSE}
+```{r setric}
 steric_m <- res_SSH$SSH_pred$mean - res_M$M_pred$mean
 steric_u <- res_SSH$SSH_pred$u + res_M$M_pred$u
 steric_data <- data.frame(lon = res_SSH$SSH_pred$lon, lat = res_SSH$SSH_pred$lat, mean = steric_m, u = steric_u)
