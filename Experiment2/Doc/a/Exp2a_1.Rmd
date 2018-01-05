@@ -51,19 +51,25 @@ alt_data <- data.frame(trend_ssh = as.numeric(trend_ssh), err_ssh = as.numeric(e
 alt_data$lon <- rep(lon, 180) 
 alt_data$lat <- rep(lat, each = 360)
 alt_data2 <- na.omit(alt_data)
+trend_ssh2 <- ifelse(abs(alt_data2$trend_ssh) > 19, sign(alt_data2$trend_ssh)*20, alt_data2$trend_ssh)
+alt_data2$trend_ssh2 <- trend_ssh2
+err_ssh2 <- ifelse(alt_data2$err_ssh > 3, 3.5, alt_data2$err_ssh)
+alt_data2$err_ssh2 <- err_ssh2
 ## Find the xyz coords of the altimetry data
 alt_loc <- do.call(cbind, Lll2xyz(lon = alt_data2$lon, lat = alt_data2$lat))
 ## plot the data
-lattice::levelplot(trend_ssh ~ lon + lat, data = alt_data2, aspect = "iso",  at =seq(-20, 20, 4),
+lattice::levelplot(trend_ssh2 ~ lon + lat, data = alt_data2, aspect = "iso",  at =seq(-20, 20, 4),
                      panel = function(x,y,z,...){
+                       lattice::panel.fill(col = "grey")
                        lattice::panel.levelplot(x,y,z,...)
                        map2 <- map("world2", interior = FALSE, plot = FALSE)
                        lattice::panel.xyplot(x=map2$x, y=map2$y, type = "l", col = "black")
                      },
                      main = title, xlab = "longitude", ylab = "latitude")
 
-lattice::levelplot(err_ssh ~ lon + lat, data = alt_data2, aspect = "iso",  at = seq(0, 4, 0.5),
+lattice::levelplot(err_ssh2 ~ lon + lat, data = alt_data2, aspect = "iso",  at = seq(0, 4, 0.5), col.regions = topo.colors(10),
                      panel = function(x,y,z,...){
+                       lattice::panel.fill(col = "grey")
                        lattice::panel.levelplot(x,y,z,...)
                        map2 <- map("world2", interior = FALSE, plot = FALSE)
                        lattice::panel.xyplot(x=map2$x, y=map2$y, type = "l", col = "black")
@@ -244,10 +250,14 @@ names(alt_data)[1:2] <- c("mean", "u")
 alt_diff <- data.frame(lon = alt_pred$lon, lat = alt_pred$lat, diff = alt_pred$mean-alt_data$mean)
 alt_pred <- rbind(alt_pred, alt_data)
 
+alt_pred$mean2 <- ifelse(abs(alt_pred$mean) > 19, sign(alt_pred$mean)*20, alt_pred$mean)
+alt_pred$u2 <- ifelse(alt_pred$u > 3, 3.5, alt_pred$u)
+alt_diff$diff2 <- ifelse(abs(alt_diff$diff) > 19, sign(alt_diff$diff)*20, alt_diff$diff)
 
 ## plot the mean 
 lattice::levelplot(mean ~ lon + lat | source1, data = alt_pred, aspect = "iso", at = seq(-20, 20, 2),
                      panel = function(x,y,z,...){
+                       lattice::panel.fill(col = "grey")
                        lattice::panel.levelplot(x,y,z,...)
                        map2 <- map("world2", interior = FALSE, plot = FALSE)
                        lattice::panel.xyplot(x=map2$x, y=map2$y, type = "l", col = "black")
@@ -255,8 +265,9 @@ lattice::levelplot(mean ~ lon + lat | source1, data = alt_pred, aspect = "iso", 
                      main = title, xlab = "longitude", ylab = "latitude")
 
 ## plot the uncertainty
-lattice::levelplot(u ~ lon + lat | source2, data = alt_pred, aspect = "iso", at = seq(0, 3, 0.5),
+lattice::levelplot(u ~ lon + lat | source2, data = alt_pred, aspect = "iso", at = seq(0, 4, 0.5),col.regions = topo.colors(10),
                      panel = function(x,y,z,...){
+                       lattice::panel.fill(col = "grey")
                        lattice::panel.levelplot(x,y,z,...)
                        map2 <- map("world2", interior = FALSE, plot = FALSE)
                        lattice::panel.xyplot(x=map2$x, y=map2$y, type = "l", col = "black")
@@ -266,6 +277,7 @@ lattice::levelplot(u ~ lon + lat | source2, data = alt_pred, aspect = "iso", at 
 ## Plot the differnce
 lattice::levelplot(diff ~ lon + lat, data = alt_diff, aspect = "iso", at = seq(-20, 20, 2),
                      panel = function(x,y,z,...){
+                       lattice::panel.fill(col = "grey")
                        lattice::panel.levelplot(x,y,z,...)
                        map2 <- map("world2", interior = FALSE, plot = FALSE)
                        lattice::panel.xyplot(x=map2$x, y=map2$y, type = "l", col = "black")

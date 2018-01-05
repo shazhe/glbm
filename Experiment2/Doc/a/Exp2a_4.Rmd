@@ -50,23 +50,28 @@ load(paste0(dd, "WP1-BHM/Experiment2a/exp2a_M.RData"))
 Now assemble the predicted mean of and uncertainty of steric at 1 degree resolution.
 ```{r setric}
 steric_m <- res_SSH$SSH_pred$mean - res_M$M_pred$mean
+mean2 <- ifelse(abs(steric_m) > 5, sign(steric_m)*5.5, steric_m)
 steric_u <- res_SSH$SSH_pred$u + res_M$M_pred$u
-steric_data <- data.frame(lon = res_SSH$SSH_pred$lon, lat = res_SSH$SSH_pred$lat, mean = steric_m, u = steric_u)
+u2 <- ifelse(steric_u > 3, 3.5, steric_u)
+steric_data <- data.frame(lon = res_SSH$SSH_pred$lon, lat = res_SSH$SSH_pred$lat, 
+                          mean = steric_m, mean2 = mean2, u = steric_u, u2=u2)
 
 ```
 
 Plot the steric map.
 ```{r plot_steric}
-lattice::levelplot(mean ~ lon + lat, data = steric_data, aspect = "iso",  at = seq(-5, 5, 1),
+lattice::levelplot(mean2 ~ lon + lat, data = steric_data, aspect = "iso",  at = seq(-6, 6, 1),
                      panel = function(x,y,z,...){
+                       lattice::panel.fill(col = "grey")
                        lattice::panel.levelplot(x,y,z,...)
                        map2 <- map("world2", interior = FALSE, plot = FALSE)
                        lattice::panel.xyplot(x=map2$x, y=map2$y, type = "l", col = "black")
                      },
                      main = title, xlab = "longitude", ylab = "latitude")
 
-lattice::levelplot(u ~ lon + lat, data = steric_data, aspect = "iso", at = seq(0, 4, 0.5),
+lattice::levelplot(u2 ~ lon + lat, data = steric_data, aspect = "iso", at = seq(0, 4, 0.5), col.regions = topo.colors(10), 
                      panel = function(x,y,z,...){
+                       lattice::panel.fill(col = "grey")
                        lattice::panel.levelplot(x,y,z,...)
                        map2 <- map("world2", interior = FALSE, plot = FALSE)
                        lattice::panel.xyplot(x=map2$x, y=map2$y, type = "l", col = "black")
@@ -116,18 +121,20 @@ Now plot and compare the mean trend.
 ```{r mean_steric}
 steric_plot <- steric_all
 steric_plot$trend <- ifelse(abs(steric_plot$trend) > 5, sign(steric_plot$trend)*5.5, steric_plot$trend)
-steric_plot$err <- ifelse(steric_plot$err > 5, 5.1, steric_plot$err)
+steric_plot$err <- ifelse(steric_plot$err > 3, 3.5, steric_plot$err)
 
 lattice::levelplot(trend ~ lon + lat|model, data = steric_plot, aspect = "iso",  
                      panel = function(x,y,z,...){
+                       lattice::panel.fill(col = "grey")
                        lattice::panel.levelplot(x,y,z,...)
                        map2 <- map("world2", interior = FALSE, plot = FALSE)
                        lattice::panel.xyplot(x=map2$x, y=map2$y, type = "l", col = "black")
                      },
                      main = title, xlab = "longitude", ylab = "latitude")
 
-lattice::levelplot(err ~ lon + lat|model, data = steric_plot, aspect = "iso",  
+lattice::levelplot(err ~ lon + lat|model, data = steric_plot, aspect = "iso", at = seq(0, 4, 0.5), col.regions = topo.colors(10),
                      panel = function(x,y,z,...){
+                       lattice::panel.fill(col = "grey")
                        lattice::panel.levelplot(x,y,z,...)
                        map2 <- map("world2", interior = FALSE, plot = FALSE)
                        lattice::panel.xyplot(x=map2$x, y=map2$y, type = "l", col = "black")

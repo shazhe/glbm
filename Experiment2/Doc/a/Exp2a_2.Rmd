@@ -260,8 +260,8 @@ lattice::levelplot(u ~ lon + lat, data = M_pred, aspect = "iso",
                      },
                      main = title, xlab = "longitude", ylab = "latitude")
 
-
-spplot(grace_sp, "pred_mean")
+grace_sp$pred_mean2 <- ifelse(abs(grace_sp$pred_mean) > 20, sign(grace_sp$pred_mean)*20, grace_sp$pred_mean )
+spplot(grace_sp, "pred_mean2", at = seq(-21, 21, 2))
 
 spplot(grace_sp, "pred_u")
 ```
