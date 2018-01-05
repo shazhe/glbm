@@ -44,8 +44,8 @@ grace_sp$mmweq2 <- ifelse(abs(grace_sp$mmweq) > 20, sign(grace_sp$mmweq)*20, gra
 ## Priors mean and variance for the parameters: rho and sigma
 mu_r <- 2500/6371
 v_r <- 1
-mu_s <- 10
-v_s <- 20^2
+mu_s <- 10/10
+v_s <- 5^2
 
 ## Transform the parameters for the SPDE_GMRF approximation
 trho <- Tlognorm(mu_r, v_r)

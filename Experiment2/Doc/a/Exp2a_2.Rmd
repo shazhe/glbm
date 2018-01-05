@@ -71,8 +71,8 @@ plot(v2)
 ## Priors mean and variance for the parameters: rho and sigma
 mu_r <- 2500/6371
 v_r <- 1
-mu_s <- 10
-v_s <- 20^2
+mu_s <- 10/10 # area scale to about 100km^2 ~ 1 degree resolution
+v_s <- 5^2
 
 ## Transform the parameters for the SPDE_GMRF approximation
 trho <- Tlognorm(mu_r, v_r)
