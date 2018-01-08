@@ -90,7 +90,7 @@ grid_xyz <- do.call(rbind, lapply(grace_block, "[[", "grid_xyz"))
 grid_block <- do.call(c, lapply(grace_block, "[[", "block"))
 weights <- do.call(c, lapply(grace_block, "[[", "weights"))
 
-A_GRACE_data <- inla.spde.make.A(mesh = mesh0, loc = grid_xyz, block = grid_block,  weights = weights/1e4)
+A_GRACE_data <- inla.spde.make.A(mesh = mesh0, loc = grid_xyz, block = grid_block,  weights = weights)
 
 ## ----grace_pred_link-----------------------------------------------------
 ## Same for prediction on a 1 degree resolution grid, we need to know the area of the grid for integration
@@ -105,10 +105,10 @@ pred_data <- as(pred_data, "SpatialPolygons")
 proj4string(pred_data) <- CRS("+proj=longlat")
 areas <- geosphere::areaPolygon(pred_data)/(1000^2)
 grid_pred <- do.call(cbind,Lll2xyz(lat = grid_ll[,2], lon = grid_ll[,1]))
-A_M_pred <- inla.spde.make.A(mesh = mesh0, loc = grid_pred, weights = areas/1e4)
+A_M_pred <- inla.spde.make.A(mesh = mesh0, loc = grid_pred, weights = areas)
 
 ## Create the estimation and prediction stack
-st.est <- inla.stack(data = list(y=grace_sp$mmweq), A = list(A_GRACE_data),
+st.est <- inla.stack(data = list(y=grace_sp$mmweq * grace_sp$area), A = list(A_GRACE_data),
                      effects = list(M = 1:M_spde$n.spde), tag = "est")
 st.pred <- inla.stack(data = list(y=NA), A = list(rbind(A_GRACE_data, A_M_pred)),
                       effects = list(M=1:M_spde$n.spde), tag = "pred")
@@ -146,7 +146,7 @@ M_pred <- data.frame(lon = M_grid[,1], lat = M_grid[,2],
 res_M <- list(res_inla = res_inla, spde = M_spde, st = stM, 
               mesh = mesh0,  M_pred = M_pred, Adata = A_GRACE_data, Apred = A_M_pred)
 
-grace_m <- INLA_pred$mean[idx_grace]
+grace_m <- INLA_pred$mean[idx_grace]/grace_sp$area
 grace_u <- INLA_pred$sd[idx_grace]
 grace_sp@data$pred_mean <- grace_m
 grace_sp@data$pred_u <- grace_u
