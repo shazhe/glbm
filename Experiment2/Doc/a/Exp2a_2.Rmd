@@ -141,7 +141,7 @@ A most tricky setting is the scaling factor! Since the projection matrix A appro
 
 We choose to scale the prediction by $1e4$ for a $100km \times 100km$ area resolution. This approximately correspond to a 1 degree resolution and also at the similar scale of the GRACE data polygon size.
 ```{r grace_link2, eval = FALSE}
-A_GRACE_data <- inla.spde.make.A(mesh = mesh0, loc = grid_xyz, block = grid_block,  weights = weights)
+A_GRACE_data <- inla.spde.make.A(mesh = mesh0, loc = grid_xyz, block = grid_block, block.rescale = "count")
 ```
 
 Similarly, we create the projection matrix for prediction.
@@ -161,7 +161,7 @@ grid_pred <- do.call(cbind,Lll2xyz(lat = grid_ll[,2], lon = grid_ll[,1]))
 A_M_pred <- inla.spde.make.A(mesh = mesh0, loc = grid_pred) 
 
 ## Create the estimation and prediction stack
-st.est <- inla.stack(data = list(y=grace_sp$mmweq * grace_sp$area), A = list(A_GRACE_data),
+st.est <- inla.stack(data = list(y=grace_sp$mmweq), A = list(A_GRACE_data),
                      effects = list(M= 1:M_spde$n.spde), tag = "est")
 st.pred <- inla.stack(data = list(y=NA), A = list(rbind(A_GRACE_data, A_M_pred)),
                       effects = list(M=1:M_spde$n.spde), tag = "pred")
