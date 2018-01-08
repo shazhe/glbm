@@ -65,7 +65,7 @@ lattice::levelplot(trend_ssh2 ~ lon + lat, data = alt_data2, aspect = "iso",  at
                        map2 <- map("world2", interior = FALSE, plot = FALSE)
                        lattice::panel.xyplot(x=map2$x, y=map2$y, type = "l", col = "black")
                      },
-                     main = title, xlab = "longitude", ylab = "latitude")
+                     main = "The altimetry trend (mm/yr ewh)", xlab = "longitude", ylab = "latitude")
 
 lattice::levelplot(err_ssh2 ~ lon + lat, data = alt_data2, aspect = "iso",  at = seq(0, 4, 0.5), col.regions = topo.colors(10),
                      panel = function(x,y,z,...){
@@ -74,7 +74,7 @@ lattice::levelplot(err_ssh2 ~ lon + lat, data = alt_data2, aspect = "iso",  at =
                        map2 <- map("world2", interior = FALSE, plot = FALSE)
                        lattice::panel.xyplot(x=map2$x, y=map2$y, type = "l", col = "black")
                      },
-                     main = title, xlab = "longitude", ylab = "latitude")
+                     main = "The altimetry errors (mm/yr ewh)", xlab = "longitude", ylab = "latitude")
 ```
 
 ## prior set up
@@ -262,7 +262,7 @@ lattice::levelplot(mean ~ lon + lat | source1, data = alt_pred, aspect = "iso", 
                        map2 <- map("world2", interior = FALSE, plot = FALSE)
                        lattice::panel.xyplot(x=map2$x, y=map2$y, type = "l", col = "black")
                      },
-                     main = title, xlab = "longitude", ylab = "latitude")
+                     main = "The predicted SSH trend (mm/yr ewh)", xlab = "longitude", ylab = "latitude")
 
 ## plot the uncertainty
 lattice::levelplot(u ~ lon + lat | source2, data = alt_pred, aspect = "iso", at = seq(0, 4, 0.5),col.regions = topo.colors(10),
@@ -272,7 +272,7 @@ lattice::levelplot(u ~ lon + lat | source2, data = alt_pred, aspect = "iso", at 
                        map2 <- map("world2", interior = FALSE, plot = FALSE)
                        lattice::panel.xyplot(x=map2$x, y=map2$y, type = "l", col = "black")
                      },
-                     main = title, xlab = "longitude", ylab = "latitude")
+                     main = "The predited SSH uncertainties (mm/yr ewh)", xlab = "longitude", ylab = "latitude")
 
 ## Plot the differnce
 lattice::levelplot(diff ~ lon + lat, data = alt_diff, aspect = "iso", at = seq(-20, 20, 2),
@@ -282,12 +282,10 @@ lattice::levelplot(diff ~ lon + lat, data = alt_diff, aspect = "iso", at = seq(-
                        map2 <- map("world2", interior = FALSE, plot = FALSE)
                        lattice::panel.xyplot(x=map2$x, y=map2$y, type = "l", col = "black")
                      },
-                     main = title, xlab = "longitude", ylab = "latitude")
+                     main = "Differnce between predicted SSH and altimetry data (mm/yr ewh)", xlab = "longitude", ylab = "latitude")
 ```
 
 
-# [Update the sum of mass and GIA](Exp2a2)
+# [Update the sum of mass and GIA](http://rpubs.com/zs_sz/Exp2a_2)
 
-# [Separate mass and GIA process](Exp2a3)
-
-# [Update steric](Exp2a4)
+# [Update steric](http://rpubs.com/zs_sz/Exp2a_3)

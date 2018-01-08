@@ -65,7 +65,7 @@ poly_block <- function(i, dis = 10){
   ngrid_i <- length(grid_i)
   grid_xyz <- do.call(cbind, Lll2xyz(lat = grid_i@coords[,2], lon = grid_i@coords[,1]))
   block_i <- rep(i, ngrid_i) 
-  weights <- rep(area_i/1e4/ngrid_i, ngrid_i)
+  weights <- rep(area_i/ngrid_i, ngrid_i)
   return(list(grid_xyz = grid_xyz, block = block_i, weights = weights, ngrid = ngrid_i))
 }
 
@@ -89,10 +89,10 @@ pred_data <- as(pred_data, "SpatialPolygons")
 proj4string(pred_data) <- CRS("+proj=longlat")
 areas <- geosphere::areaPolygon(pred_data)/(1000^2)
 grid_pred <- do.call(cbind,Lll2xyz(lat = grid_ll[,2], lon = grid_ll[,1]))
-A_M_pred <- inla.spde.make.A(mesh = mesh0, loc = grid_pred, weights = areas/1e4)
+A_M_pred <- inla.spde.make.A(mesh = mesh0, loc = grid_pred, weights = areas)
 
 ## Create the estimation and prediction stack
-st.est <- inla.stack(data = list(y=grace_sp$mmweq), A = list(A_GRACE_data),
+st.est <- inla.stack(data = list(y=grace_sp$mmweq * grace_sp$area), A = list(A_GRACE_data),
                      effects = list(M = 1:M_spde$n.spde), tag = "est")
 st.pred <- inla.stack(data = list(y=NA), A = list(rbind(A_GRACE_data, A_M_pred)),
                       effects = list(M=1:M_spde$n.spde), tag = "pred")
