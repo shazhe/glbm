@@ -158,7 +158,7 @@ pred_data <- as(pred_data, "SpatialPolygons")
 proj4string(pred_data) <- CRS("+proj=longlat")
 areas <- geosphere::areaPolygon(pred_data)/(1000^2)
 grid_pred <- do.call(cbind,Lll2xyz(lat = grid_ll[,2], lon = grid_ll[,1]))
-A_M_pred <- inla.spde.make.A(mesh = mesh0, loc = grid_pred, weights = areas)
+A_M_pred <- inla.spde.make.A(mesh = mesh0, loc = grid_pred) 
 
 ## Create the estimation and prediction stack
 st.est <- inla.stack(data = list(y=grace_sp$mmweq * grace_sp$area), A = list(A_GRACE_data),
@@ -210,7 +210,7 @@ M_pred <- data.frame(lon = M_grid[,1], lat = M_grid[,2],
 res_M <- list(res_inla = res_inla, spde = M_spde, st = stM, 
             mesh = mesh0,  M_pred = M_pred, Adata = A_GRACE_data, Apred = A_M_pred)
 
-grace_m <- INLA_pred$mean[idx_grace] 
+grace_m <- INLA_pred$mean[idx_grace]/grace_sp$area # adjust to be height
 grace_u <- INLA_pred$sd[idx_grace]
 grace_sp@data$pred_mean <- grace_m
 grace_sp@data$pred_u <- grace_u
@@ -248,7 +248,7 @@ lattice::levelplot(mean ~ lon + lat, data = M_pred, aspect = "iso",
                        map2 <- map("world2", interior = FALSE, plot = FALSE)
                        lattice::panel.xyplot(x=map2$x, y=map2$y, type = "l", col = "black")
                      },
-                     main = "The predicited unadjusted mass change", xlab = "longitude", ylab = "latitude")
+                     main = "The predicited unadjusted mass change  (mm/yr ewh)", xlab = "longitude", ylab = "latitude")
 
 ## plot the uncertainty
 lattice::levelplot(u ~ lon + lat, data = M_pred, aspect = "iso", 
@@ -257,7 +257,7 @@ lattice::levelplot(u ~ lon + lat, data = M_pred, aspect = "iso",
                        map2 <- map("world2", interior = FALSE, plot = FALSE)
                        lattice::panel.xyplot(x=map2$x, y=map2$y, type = "l", col = "black")
                      },
-                     main = "The predicted uncertainties", xlab = "longitude", ylab = "latitude")
+                     main = "The predicted uncertainties  (mm/yr ewh)", xlab = "longitude", ylab = "latitude")
 
 grace_sp$pred_mean2 <- ifelse(abs(grace_sp@data$pred_mean) > 20, sign(grace_sp@data$pred_mean)*20, grace_sp@data$pred_mean )
 spplot(grace_sp, "pred_mean2", at = seq(-21, 21, 2), main = "The predicted unadjusted mean (mm/yr ewh)")
@@ -320,7 +320,7 @@ meshLL <- Lxyz2ll(list(x=mesh0$loc[,1], y = mesh0$loc[,2], z = mesh0$loc[,3]))
 mesh_sp <- SpatialPoints(data.frame(lon = meshLL$lon, lat = meshLL$lat), proj4string = CRS("+proj=longlat")) 
 
 mesh_idx <- over(mesh_sp, Plist)
-ice6g$trendm <- ice6g$trend/gia_area*1e4 # scale to have about the same area as the mesh triangles
+ice6g$trendm <- ice6g$trend
 GIA_v <- ice6g$trendm[mesh_idx]
 GIA_grace <- res_M$Adata %*% GIA_v
 
