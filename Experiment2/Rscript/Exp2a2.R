@@ -127,8 +127,8 @@ M_pred <- data.frame(lon = M_grid[,1], lat = M_grid[,2],
                         mean = M_m,
                         u = M_u)
 
-res_M <- list(res_inla = res_inla, spde = M_spde, st = stM,
-                 mesh = mesh0,  M_pred = M_pred)
+res_M <- list(res_inla = res_inla, spde = M_spde, st = stM, 
+                 mesh = mesh0,  M_pred = M_pred,  Adata = A_GRACE_data, Apred = A_M_pred)
 
 grace_m <- INLA_pred$mean[idx_grace]/grace_sp$area
 grace_u <- INLA_pred$sd[idx_grace]

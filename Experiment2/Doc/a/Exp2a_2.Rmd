@@ -211,7 +211,7 @@ res_M <- list(res_inla = res_inla, spde = M_spde, st = stM,
             mesh = mesh0,  M_pred = M_pred, Adata = A_GRACE_data, Apred = A_M_pred)
 
 grace_m <- INLA_pred$mean[idx_grace]/grace_sp$area # adjust to be height
-grace_u <- INLA_pred$sd[idx_grace]
+grace_u <- INLA_pred$sd[idx_grace]/grace_sp$area^2
 grace_sp@data$pred_mean <- grace_m
 grace_sp@data$pred_u <- grace_u
 
@@ -237,9 +237,6 @@ print(paste("The estimated marginal variances are:", pars_M$sigma_mode,sep = "  
 We first plot the predicted $X_M$ on a 1 degree grid and then the aggregated $X_m$ on the same super mascons grid as the GRACE data. We call $X_m$ the unadjusted mass change.
 ```{r predict_grace, include=TRUE}
 M_pred <- res_M$M_pred
-M_pred$source1 <- "M predicted mean"
-M_pred$source2 <- "M predicted uncertainty"
-
 
 ## plot the mean 
 lattice::levelplot(mean ~ lon + lat, data = M_pred, aspect = "iso", 
@@ -283,8 +280,10 @@ mass_m <- res_M$M_pred$mean - ice6g2$trend
 mass_u <- res_M$M_pred$u
 mass_pred <- data.frame(lon = res_M$M_pred$lon, lat = res_M$M_pred$lat,
                        mean = mass_m, u = mass_u)
+
 ice6g2$trend2 <- ifelse(abs(ice6g2$trend) > 19, sign(ice6g2$trend) * 20, ice6g2$trend)
 mass_pred$mean2 <- ifelse(abs(mass_pred$mean) > 19, sign(mass_pred$mean) * 20, mass_pred$mean)
+
 lattice::levelplot(trend2 ~ x_center + y_center, data = ice6g2, aspect = "iso", at = seq(-20, 20, 4),
                      panel = function(x,y,z,...){
                        lattice::panel.fill(col = "grey")
@@ -320,8 +319,7 @@ meshLL <- Lxyz2ll(list(x=mesh0$loc[,1], y = mesh0$loc[,2], z = mesh0$loc[,3]))
 mesh_sp <- SpatialPoints(data.frame(lon = meshLL$lon, lat = meshLL$lat), proj4string = CRS("+proj=longlat")) 
 
 mesh_idx <- over(mesh_sp, Plist)
-ice6g$trendm <- ice6g$trend
-GIA_v <- ice6g$trendm[mesh_idx]
+GIA_v <- ice6g$trend[mesh_idx]
 GIA_grace <- res_M$Adata %*% GIA_v
 
 mass_grace <- grace_sp@data$pred_mean - GIA_grace
