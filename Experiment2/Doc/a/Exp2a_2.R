@@ -105,7 +105,7 @@ pred_data <- as(pred_data, "SpatialPolygons")
 proj4string(pred_data) <- CRS("+proj=longlat")
 areas <- geosphere::areaPolygon(pred_data)/(1000^2)
 grid_pred <- do.call(cbind,Lll2xyz(lat = grid_ll[,2], lon = grid_ll[,1]))
-A_M_pred <- inla.spde.make.A(mesh = mesh0, loc = grid_pred, weights = areas)
+A_M_pred <- inla.spde.make.A(mesh = mesh0, loc = grid_pred)
 
 ## Create the estimation and prediction stack
 st.est <- inla.stack(data = list(y=grace_sp$mmweq * grace_sp$area), A = list(A_GRACE_data),
