@@ -141,7 +141,7 @@ A most tricky setting is the scaling factor! Since the projection matrix A appro
 
 We choose to scale the prediction by $1e4$ for a $100km \times 100km$ area resolution. This approximately correspond to a 1 degree resolution and also at the similar scale of the GRACE data polygon size.
 ```{r grace_link2, eval = FALSE}
-A_GRACE_data <- inla.spde.make.A(mesh = mesh0, loc = grid_xyz, block = grid_block, block.rescale = "none")
+A_GRACE_data <- inla.spde.make.A(mesh = mesh0, loc = grid_xyz, block = grid_block, weights = weights/100)
 ```
 
 Similarly, we create the projection matrix for prediction.
@@ -320,7 +320,28 @@ mesh_sp <- SpatialPoints(data.frame(lon = meshLL$lon, lat = meshLL$lat), proj4st
 
 mesh_idx <- over(mesh_sp, Plist)
 GIA_v <- ice6g$trend[mesh_idx]
-GIA_grace <- res_M$Adata %*% GIA_v
+
+## Generate the integration grid for each polygons
+poly_block <- function(i, dis = 10){
+  sp_i <- SpatialPolygons(list(grace_sp@polygons[[i]]), proj4string=CRS("+proj=longlat"))
+  area_i <- grace_sp$area[i]
+  grid_i <- spsample(sp_i, n = round(area_i/dis^2), type = "regular", offset=c(0.5, 0.5))
+  ngrid_i <- length(grid_i)
+  grid_xyz <- do.call(cbind, Lll2xyz(lat = grid_i@coords[,2], lon = grid_i@coords[,1]))
+  block_i <- rep(i, ngrid_i) 
+  weights <- rep(area_i/ngrid_i, ngrid_i)
+  return(list(grid_xyz = grid_xyz, block = block_i, weights = weights, ngrid = ngrid_i))
+}
+
+grace_block <- lapply(1:nrow(grace_sp), poly_block, dis = 10)
+
+grid_xyz <- do.call(rbind, lapply(grace_block, "[[", "grid_xyz"))
+grid_block <- do.call(c, lapply(grace_block, "[[", "block"))
+weights <- do.call(c, lapply(grace_block, "[[", "weights"))
+
+Adata <- inla.spde.make.A(mesh = mesh0, loc = grid_xyz, block = grid_block, weights = weights/100, block.rescale = "weights")
+
+GIA_grace <- Adata %*% GIA_v
 
 mass_grace <- grace_sp@data$pred_mean - GIA_grace
 grace_sp@data$gia <- as.numeric(GIA_grace)
@@ -328,7 +349,7 @@ grace_sp@data$mass <- as.numeric(mass_grace)
 
 grace_sp@data$gia2 <- ifelse(abs(grace_sp@data$gia) > 49, sign(grace_sp@data$gia)*50, grace_sp@data$gia )
 grace_sp@data$mass2 <- ifelse(abs(grace_sp@data$mass) > 49, sign(grace_sp@data$mass)*50, grace_sp@data$mass )
-spplot(grace_sp, "gia2", main = "GIA aggreated on the GRACE grid (mm/yr ewh)")
+spplot(grace_sp, "gia", main = "GIA aggreated on the GRACE grid (mm/yr ewh)")
 spplot(grace_sp, "mass2", main = "Adjusted mass change agrregated on the GRACE grid (mm/yr ewh)")
 ```
 
