@@ -60,6 +60,20 @@ spplot(grace_sp, "mmweqt", at = seq(-21, 21, 2), main = "The GRACE super mascons
 
 ## prior set up
 
+### Load ice6g data
+
+The GRACE data also see the contribution of GIA. In this experiment, we assume GIA is known so we can remove the GIA contribution to GRACE. We can separate the updated mass from $X_M$ by 
+$$X_{mass} |Y_{GRACE} = X_M | Y_{mass}$$, where $Y_{mass}$ is the GRACE observation after adjusted by GIA.
+The GIA contribution and the updated unadjusted mass are both give in mm water equivalence on a 1 degree grid.
+
+First load the GIA data. We use the ICE-6G data and use the same mesh grid as $mass$ to reprensent GIA. To substract the GIA from the unadjusted mass, we need re-order the GIA data set to have the same coordinates and orders as the unadjusted mass.
+```{r gia_data}
+ice6g <- read.table(paste0(dd, "WP2-SolidEarth/BHMinputs/GIA/GIA_Pel-6-VM5_ewh.txt"), header = T)
+ice6g$x_center <- ifelse(ice6g$x_center < 0, ice6g$x_center+360, ice6g$x_center)
+ice6g2<- ice6g[order(ice6g$y_center,ice6g$x_center ),]
+```
+
+
 Use the polygon data to have rough estimate of the correlation length and variance.
 ```{r Grace_prior}
 grace_v <- data.frame(mean = grace_data$mmweq, lon = grace_loc$lon_c, lat = grace_loc$lat_c)
@@ -262,16 +276,6 @@ spplot(grace_sp, "pred_u", main = "The predicted uncertainties (mm/yr ewh)")
 ```
 
 # Update $X_{mass}$
-The GRACE data also see the contribution of GIA. In this experiment, we assume GIA is known so we can remove the GIA contribution to GRACE. We can separate the updated mass from $X_M$ by 
-$$X_{mass} |Y_{GRACE} = X_M | Y_{GRACE} - x_{GIA}$$.
-The GIA contribution and the updated unadjusted mass are both give in mm water equivalence on a 1 degree grid.
-
-First load the GIA data. We use the ICE-6G data and use the same mesh grid as $mass$ to reprensent GIA. To substract the GIA from the unadjusted mass, we need re-order the GIA data set to have the same coordinates and orders as the unadjusted mass.
-```{r gia_data}
-ice6g <- read.table(paste0(dd, "WP2-SolidEarth/BHMinputs/GIA/GIA_Pel-6-VM5_ewh.txt"), header = T)
-ice6g$x_center <- ifelse(ice6g$x_center < 0, ice6g$x_center+360, ice6g$x_center)
-ice6g2<- ice6g[order(ice6g$y_center,ice6g$x_center ),]
-```
 
 Then load the updated $X_M$ and remove the $x_GIA$.
 ```{r grace_gia_remove}
@@ -321,27 +325,7 @@ mesh_sp <- SpatialPoints(data.frame(lon = meshLL$lon, lat = meshLL$lat), proj4st
 mesh_idx <- over(mesh_sp, Plist)
 GIA_v <- ice6g$trend[mesh_idx]
 
-## Generate the integration grid for each polygons
-poly_block <- function(i, dis = 10){
-  sp_i <- SpatialPolygons(list(grace_sp@polygons[[i]]), proj4string=CRS("+proj=longlat"))
-  area_i <- grace_sp$area[i]
-  grid_i <- spsample(sp_i, n = round(area_i/dis^2), type = "regular", offset=c(0.5, 0.5))
-  ngrid_i <- length(grid_i)
-  grid_xyz <- do.call(cbind, Lll2xyz(lat = grid_i@coords[,2], lon = grid_i@coords[,1]))
-  block_i <- rep(i, ngrid_i) 
-  weights <- rep(area_i/ngrid_i, ngrid_i)
-  return(list(grid_xyz = grid_xyz, block = block_i, weights = weights, ngrid = ngrid_i))
-}
-
-grace_block <- lapply(1:nrow(grace_sp), poly_block, dis = 10)
-
-grid_xyz <- do.call(rbind, lapply(grace_block, "[[", "grid_xyz"))
-grid_block <- do.call(c, lapply(grace_block, "[[", "block"))
-weights <- do.call(c, lapply(grace_block, "[[", "weights"))
-
-Adata <- inla.spde.make.A(mesh = mesh0, loc = grid_xyz, block = grid_block, weights = weights/100, block.rescale = "weights")
-
-GIA_grace <- Adata %*% GIA_v
+GIA_grace <- res_M$Adata %*% GIA_v
 
 mass_grace <- grace_sp@data$pred_mean - GIA_grace
 grace_sp@data$gia <- as.numeric(GIA_grace)
