@@ -7,8 +7,8 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-wd <-"C:/ZSwork/"
-dd <-"Z:/"
+wd <-"~/"
+dd <-"~/globalmass/"
 
 library(rgdal); library(sp);library(GEOmap)
 library(INLA)
@@ -155,7 +155,7 @@ A most tricky setting is the scaling factor! Since the projection matrix A appro
 
 We choose to scale the prediction by $1e4$ for a $100km \times 100km$ area resolution. This approximately correspond to a 1 degree resolution and also at the similar scale of the GRACE data polygon size.
 ```{r grace_link2, eval = FALSE}
-A_GRACE_data <- inla.spde.make.A(mesh = mesh0, loc = grid_xyz, block = grid_block, weights = weights/100)
+A_GRACE_data <- inla.spde.make.A(mesh = mesh0, loc = grid_xyz, block = grid_block, weights = weights/100, block.rescale = "weights")
 ```
 
 Similarly, we create the projection matrix for prediction.
@@ -252,8 +252,10 @@ We first plot the predicted $X_M$ on a 1 degree grid and then the aggregated $X_
 ```{r predict_grace, include=TRUE}
 M_pred <- res_M$M_pred
 
+M_pred$mean2 <- ifelse(abs(M_pred$mean) > 10, sign(M_pred$mean)*12, M_pred$mean)
+M_pred$u2 <- ifelse(abs(M_pred$u) > 5, 7, M_pred$u)
 ## plot the mean 
-lattice::levelplot(mean ~ lon + lat, data = M_pred, aspect = "iso", 
+lattice::levelplot(mean2 ~ lon + lat, data = M_pred, aspect = "iso", at = seq(-12, 12, 2),
                      panel = function(x,y,z,...){
                        lattice::panel.levelplot(x,y,z,...)
                        map2 <- map("world2", interior = FALSE, plot = FALSE)
@@ -262,7 +264,7 @@ lattice::levelplot(mean ~ lon + lat, data = M_pred, aspect = "iso",
                      main = "The predicited unadjusted mass change  (mm/yr ewh)", xlab = "longitude", ylab = "latitude")
 
 ## plot the uncertainty
-lattice::levelplot(u ~ lon + lat, data = M_pred, aspect = "iso", 
+lattice::levelplot(u2 ~ lon + lat, data = M_pred, aspect = "iso", col.regions = topo.colors(20),
                      panel = function(x,y,z,...){
                        lattice::panel.levelplot(x,y,z,...)
                        map2 <- map("world2", interior = FALSE, plot = FALSE)

@@ -90,7 +90,7 @@ grid_xyz <- do.call(rbind, lapply(grace_block, "[[", "grid_xyz"))
 grid_block <- do.call(c, lapply(grace_block, "[[", "block"))
 weights <- do.call(c, lapply(grace_block, "[[", "weights"))
 
-A_GRACE_data <- inla.spde.make.A(mesh = mesh0, loc = grid_xyz, block = grid_block, weights = weights/100, block.rescale = "weights")
+A_GRACE_data <- inla.spde.make.A(mesh = mesh0, loc = grid_xyz, block = grid_block, block.rescale = "count")
 
 ## ----grace_pred_link-----------------------------------------------------
 ## Same for prediction on a 1 degree resolution grid, we need to know the area of the grid for integration
