@@ -7,8 +7,12 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-wd <-"C:/ZSwork/"
-dd <-"Z:/"
+wd <-"/home/zs16444/"
+dd <-"/home/zs16444/globalmass/"
+
+## BS
+## wd <- "C:/ZSwork/"
+## dd <"Z:/"
 
 library(rgdal); library(sp);library(GEOmap)
 library(INLA)
@@ -27,30 +31,33 @@ mesh0 <- inla.mesh.2d(loc = mesh0$loc, cutoff = 0.01, max.edge = 1)
 
 # [Introduction](http://rpubs.com/zs_sz/Exp2a_1)
 
-# [Update the sum of mass and GIA](http://rpubs.com/zs_sz/Exp2a_2)
+# [Update mass](http://rpubs.com/zs_sz/Exp2a_2)
 
 # Update $X_{steric}$
 
 In this experiment, steric can be represented by SSH, MASS and GIA. 
 $$X_{steric} = X_{SSH} - X_{MASS} - x_{GIA}$$
 Since these processes are all Gaussian, the are additive. We have 
-$$E(X_{steric} | Y_{alt}, Y_{GRACE}, X_{GIA} = x_{GIA}) = E(X_{SSH}| ) - E(X_{mass}|Y_{GRACE}) - x_{GIA} = E(X_{SSH}| ) - E(X_M|Y_{GRACE})\\
-V(X_{steric}| Y_{alt}, Y_{GRACE}, X_{GIA} = x_{GIA}) = V(X_{SSH}| Y_{alt}) + V(X_{mass}|Y_{GRACE})= V(X_{SSH}| Y_{alt}) + V(X_{M}|Y_{GRACE})$$
+$$E(X_{steric} | Y_{alt}, Y_{GRACE}, X_{GIA} = x_{GIA}) = E(X_{SSH}| Y_{alt}) - E(X_{mass}|Y_{GRACE}, x_{GIA}^m) - x_{GIA}^{vlm}\\
+V(X_{steric}| Y_{alt}, Y_{GRACE}, X_{GIA} = x_{GIA}) = V(X_{SSH}| Y_{alt}) + V(X_{mass}|Y_{GRACE}, x_{GIA}^m)$$
 
-## Load updated processes
+## Load updated processes and data
 ```{r up_pro}
 load(paste0(dd, "WP1-BHM/Experiment2a/exp2a_ssh.RData"))
 load(paste0(dd, "WP1-BHM/Experiment2a/exp2a_M.RData"))
+ice6g <- read.table(paste0(dd, "WP2-SolidEarth/BHMinputs/GIA/GIA_Pel-6-VM5.txt"), header = T)
+ice6g$x_center <- ifelse(ice6g$x_center < 0, ice6g$x_center+360, ice6g$x_center)
+ice6g2<- ice6g[order(ice6g$y_center,ice6g$x_center ),] # re-order the data according to the coordinates
 ```
 
 ## Results
 
 Now assemble the predicted mean of and uncertainty of steric at 1 degree resolution.
 ```{r setric}
-steric_m <- res_SSH$SSH_pred$mean - res_M$M_pred$mean
+steric_m <- res_SSH$SSH_pred$mean - res_M$M_pred$mean - ice6g2$trend
 mean2 <- ifelse(abs(steric_m) > 5, sign(steric_m)*5.5, steric_m)
 steric_u <- res_SSH$SSH_pred$u + res_M$M_pred$u
-u2 <- ifelse(steric_u > 3, 3.5, steric_u)
+u2 <- ifelse(steric_u > 6, 6.5, steric_u)
 steric_data <- data.frame(lon = res_SSH$SSH_pred$lon, lat = res_SSH$SSH_pred$lat, 
                           mean = steric_m, mean2 = mean2, u = steric_u, u2=u2)
 
@@ -67,7 +74,7 @@ lattice::levelplot(mean2 ~ lon + lat, data = steric_data, aspect = "iso",  at = 
                      },
                      main = "The predicted steric trend (mm/yr ewh)", xlab = "longitude", ylab = "latitude")
 
-lattice::levelplot(u2 ~ lon + lat, data = steric_data, aspect = "iso", at = seq(0, 4, 0.5), col.regions = topo.colors(10), 
+lattice::levelplot(u2 ~ lon + lat, data = steric_data, aspect = "iso", at = seq(0, 7, 1), col.regions = topo.colors(10), 
                      panel = function(x,y,z,...){
                        lattice::panel.fill(col = "grey")
                        lattice::panel.levelplot(x,y,z,...)

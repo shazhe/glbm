@@ -1,5 +1,5 @@
 ---
-title: "Experiment 2a -- Update Mass + GIA"
+title: "Experiment 2a -- Update Mass"
 author: "Z Sha"
 date: "3 January 2018"
 output: html_document
@@ -7,8 +7,12 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-wd <-"~/"
-dd <-"~/globalmass/"
+wd <-"/home/zs16444/"
+dd <-"/home/zs16444/globalmass/"
+
+## BS
+## wd <- "C:/ZSwork/"
+## dd <"Z:/"
 
 library(rgdal); library(sp);library(GEOmap)
 library(INLA)
@@ -115,7 +119,7 @@ area_mean <- mean(grace_area)
 
 
 To link the data to the process, we need to integrate the process value over the corresponding polygon. The integration can be done numerically as weighted sum of the grid values within the polygons. The grid values are represented by the GMRF.
-```{r grace_link, eval = FALSE}
+```{r grace_link, cache = TRUE}
 ## For each polygon observation we generate the regular spaced grid and the number of grid cell is proportional to the area of the polygon
 
 ## Generate the integration grid for each polygons
@@ -141,12 +145,12 @@ weights <- do.call(c, lapply(grace_block, "[[", "weights"))
 A most tricky setting is the scaling factor! Since the projection matrix A approximate map inputs to outputs on different scales, this can make the computation unstable when the difference in the scales are huge. The scale also determines the scale of the marginal variance and predicted uncertainties. 
 
 We choose to scale the prediction by $1e4$ for a $100km \times 100km$ area resolution. This approximately correspond to a 1 degree resolution and also at the similar scale of the GRACE data polygon size.
-```{r grace_link2, eval = FALSE}
+```{r grace_link2, cache=TRUE}
 A_GRACE_data <- inla.spde.make.A(mesh = mesh0, loc = grid_xyz, block = grid_block,  block.rescale = "count")
 ```
 
 Similarly, we create the projection matrix for prediction.
-```{r grace_pred_link, eval = FALSE}
+```{r grace_pred_link}
 ## Same for prediction on a 1 degree resolution grid, we need to know the area of the grid for integration
 ## generate the prediction grid
 gx <- seq(0, 359, 1)

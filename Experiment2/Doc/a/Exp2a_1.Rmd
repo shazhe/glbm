@@ -11,18 +11,21 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-wd <-"C:/ZSwork/"
-dd <-"Z:/"
+
+## Maths
+wd <-"/home/zs16444/"
+dd <-"/home/zs16444/globalmass/"
+
+## BS
+## wd <- "C:/ZSwork/"
+## dd <"Z:/"
 ```
 
 # Introduction
 
-In this experiment, we assume the GIA is known so there will be only two independent latent process $X_{ssh}$ and $X_{mass}$ and the third one $X_{steric}$ is given by $X_{steric} = X_{ssh} - x_{GIA} - X_{mass}$. The GRACE data see both mass and GIA and we assume the two process contribute to the GRACE signal as a sum denoted by $X_M = X_{mass} + X_{GIA}$. Given the altimetry and GRACE data, the $X_{steric}$ can be predicted as an linear combination of posterior ssh and mass change:
-$$X_{steric} |  Y_{alt}, Y_{GRACE} = X_{ssh} | Y_{alt} - X_{M}|Y_{GRACE}$$.
-And since the GIA is assumed to be known, we can separate mass from $X_M$ by
-$$X_{mass} |Y_{GRACE} = X_M | Y_{GRACE} - x_{GIA}$$
+In this experiment, we assume the GIA is known so there will be only two independent latent process $X_{ssh}$ and $X_{mass}$ and the third one $X_{steric}$ is given by $$X_{steric} = X_{ssh} - x_{GIA} - X_{mass}$$. Here we assume the GIA is given by the ice6g soltuion and $x_{GIA}$ repersents the vertical bedrock movement and it is in the unit of mm. The GRACE data see both mass and GIA and we assume the two processes contribute to the GRACE signal as a sum $X_{mass} + X_{GIA}$. To get $X_{mass}$, we need to remove the GIA signals from the GRACE data. The GIA used to correct the GRACE observations are given in the unit of mm water equivalence height.
 
-Therefore, in the following we use the same approach as in Experiment 1 to obtain the updated $X_ssh$ and $X_{mass}$. In this first experiment we assume these two process can be updated independently. 
+In the following we use the same approach as in Experiment 1 to obtain the updated $X_{ssh}$ and $X_{mass}$. In this experiment we update these two processes independently. 
 
 ```{r loadlibs, message = FALSE, warning = FALSE}
 library(rgdal); library(sp);library(GEOmap)
@@ -286,6 +289,6 @@ lattice::levelplot(diff ~ lon + lat, data = alt_diff, aspect = "iso", at = seq(-
 ```
 
 
-# [Update the sum of mass and GIA](http://rpubs.com/zs_sz/Exp2a_2)
+# [Update mass](http://rpubs.com/zs_sz/Exp2a_2)
 
 # [Update steric](http://rpubs.com/zs_sz/Exp2a_3)
