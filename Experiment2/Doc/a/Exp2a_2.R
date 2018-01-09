@@ -107,8 +107,29 @@ areas <- geosphere::areaPolygon(pred_data)/(1000^2)
 grid_pred <- do.call(cbind,Lll2xyz(lat = grid_ll[,2], lon = grid_ll[,1]))
 A_M_pred <- inla.spde.make.A(mesh = mesh0, loc = grid_pred)
 
+## ---- remove gia -----------------------------------------------------
+ice6g <- read.table(paste0(dd, "WP2-SolidEarth/BHMinputs/GIA/GIA_Pel-6-VM5_ewh.txt"), header = T)
+ice6g$x_center <- ifelse(ice6g$x_center < 0, ice6g$x_center+360, ice6g$x_center)
+gia_loc <- do.call(cbind, Lll2xyz(lat = ice6g$y_center, lon = ice6g$x_center))
+polycoords <- ice6g[,c(6:13, 6,7)] 
+plist <- lapply(ice6g$ID, 
+                function(x) Polygons(list(Polygon(cbind(lon = as.numeric(polycoords[x, c(1,3,5,7,9)]), 
+                                                        lat = as.numeric(polycoords[x, c(2,4,6,8,10)])))), ID = x))
+Plist <- SpatialPolygons(plist, proj4string = CRS("+proj=longlat"))
+gia_area <- geosphere::areaPolygon(Plist)/(1000^2)
+meshLL <- Lxyz2ll(list(x=mesh0$loc[,1], y = mesh0$loc[,2], z = mesh0$loc[,3]))
+mesh_sp <- SpatialPoints(data.frame(lon = meshLL$lon, lat = meshLL$lat), proj4string = CRS("+proj=longlat")) 
+mesh_idx <- over(mesh_sp, Plist)
+GIA_v <- ice6g$trend[mesh_idx]
+GIA_grace <- A_GRACE_data %*% GIA_v
+grace_sp@data$gia <- as.numeric(GIA_grace)
+## mass contribution to GRACE
+mass_grace <- grace_sp@data$mmweq - GIA_grace
+grace_sp@data$mass <- as.numeric(mass_grace)
+
+## ---- datastacks -----------------------------------------------------
 ## Create the estimation and prediction stack
-st.est <- inla.stack(data = list(y=grace_sp$mmweq), A = list(A_GRACE_data),
+st.est <- inla.stack(data = list(y=grace_sp$mass), A = list(A_GRACE_data),
                      effects = list(M = 1:M_spde$n.spde), tag = "est")
 st.pred <- inla.stack(data = list(y=NA), A = list(rbind(A_GRACE_data, A_M_pred)),
                       effects = list(M=1:M_spde$n.spde), tag = "pred")

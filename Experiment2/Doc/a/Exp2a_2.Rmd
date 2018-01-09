@@ -60,20 +60,6 @@ spplot(grace_sp, "mmweqt", at = seq(-21, 21, 2), main = "The GRACE super mascons
 
 ## prior set up
 
-### Load ice6g data
-
-The GRACE data also see the contribution of GIA. In this experiment, we assume GIA is known so we can remove the GIA contribution to GRACE. We can separate the updated mass from $X_M$ by 
-$$X_{mass} |Y_{GRACE} = X_M | Y_{mass}$$, where $Y_{mass}$ is the GRACE observation after adjusted by GIA.
-The GIA contribution and the updated unadjusted mass are both give in mm water equivalence on a 1 degree grid.
-
-First load the GIA data. We use the ICE-6G data and use the same mesh grid as $mass$ to reprensent GIA. To substract the GIA from the unadjusted mass, we need re-order the GIA data set to have the same coordinates and orders as the unadjusted mass.
-```{r gia_data}
-ice6g <- read.table(paste0(dd, "WP2-SolidEarth/BHMinputs/GIA/GIA_Pel-6-VM5_ewh.txt"), header = T)
-ice6g$x_center <- ifelse(ice6g$x_center < 0, ice6g$x_center+360, ice6g$x_center)
-ice6g2<- ice6g[order(ice6g$y_center,ice6g$x_center ),]
-```
-
-
 Use the polygon data to have rough estimate of the correlation length and variance.
 ```{r Grace_prior}
 grace_v <- data.frame(mean = grace_data$mmweq, lon = grace_loc$lon_c, lat = grace_loc$lat_c)
@@ -139,7 +125,8 @@ poly_block <- function(i, dis = 10){
   grid_i <- spsample(sp_i, n = round(area_i/dis^2), type = "regular", offset=c(0.5, 0.5))
   ngrid_i <- length(grid_i)
   grid_xyz <- do.call(cbind, Lll2xyz(lat = grid_i@coords[,2], lon = grid_i@coords[,1]))
-  block_i <- rep(i, ngrid_i) 
+  block_i <- rep(i, ngrid_i)
+  
   weights <- rep(area_i/ngrid_i, ngrid_i)
   return(list(grid_xyz = grid_xyz, block = block_i, weights = weights, ngrid = ngrid_i))
 }
@@ -155,7 +142,7 @@ A most tricky setting is the scaling factor! Since the projection matrix A appro
 
 We choose to scale the prediction by $1e4$ for a $100km \times 100km$ area resolution. This approximately correspond to a 1 degree resolution and also at the similar scale of the GRACE data polygon size.
 ```{r grace_link2, eval = FALSE}
-A_GRACE_data <- inla.spde.make.A(mesh = mesh0, loc = grid_xyz, block = grid_block, weights = weights/100, block.rescale = "weights")
+A_GRACE_data <- inla.spde.make.A(mesh = mesh0, loc = grid_xyz, block = grid_block,  block.rescale = "count")
 ```
 
 Similarly, we create the projection matrix for prediction.
@@ -173,9 +160,44 @@ proj4string(pred_data) <- CRS("+proj=longlat")
 areas <- geosphere::areaPolygon(pred_data)/(1000^2)
 grid_pred <- do.call(cbind,Lll2xyz(lat = grid_ll[,2], lon = grid_ll[,1]))
 A_M_pred <- inla.spde.make.A(mesh = mesh0, loc = grid_pred) 
+```
 
+Next, we create the stack for INLA inference. Since the GIA is given as known in mm/year water equivalence from the ice6g solution, we can substract this part from the GRACE observation first.
+
+### Remove the ice6g from the GRACE
+First load the GIA data. We use the ICE-6G data and use the same mesh grid as $mass$ to reprensent GIA. To substract the GIA from the unadjusted mass, we need re-order the GIA data set to have the same coordinates and orders as the unadjusted mass.
+```{r gia_data}
+ice6g <- read.table(paste0(dd, "WP2-SolidEarth/BHMinputs/GIA/GIA_Pel-6-VM5_ewh.txt"), header = T)
+ice6g$x_center <- ifelse(ice6g$x_center < 0, ice6g$x_center+360, ice6g$x_center)
+```
+
+Then with the above data link map, we calculate the GIA contribution to the GRACE data.
+```{r gia_grace}
+gia_loc <- do.call(cbind, Lll2xyz(lat = ice6g$y_center, lon = ice6g$x_center))
+polycoords <- ice6g[,c(6:13, 6,7)] 
+plist <- lapply(ice6g$ID, 
+                function(x) Polygons(list(Polygon(cbind(lon = as.numeric(polycoords[x, c(1,3,5,7,9)]), 
+                                                        lat = as.numeric(polycoords[x, c(2,4,6,8,10)])))), ID = x))
+Plist <- SpatialPolygons(plist, proj4string = CRS("+proj=longlat"))
+gia_area <- geosphere::areaPolygon(Plist)/(1000^2)
+meshLL <- Lxyz2ll(list(x=mesh0$loc[,1], y = mesh0$loc[,2], z = mesh0$loc[,3]))
+mesh_sp <- SpatialPoints(data.frame(lon = meshLL$lon, lat = meshLL$lat), proj4string = CRS("+proj=longlat")) 
+mesh_idx <- over(mesh_sp, Plist)
+GIA_v <- ice6g$trend[mesh_idx]
+GIA_grace <- A_GRACE_data %*% GIA_v
+grace_sp@data$gia <- as.numeric(GIA_grace)
+spplot(grace_sp, "gia", main = "GIA aggreated on the GRACE grid (mm/yr ewh)")
+
+## mass contribution to GRACE
+mass_grace <- grace_sp@data$mmweq - GIA_grace
+grace_sp@data$mass <- as.numeric(mass_grace)
+spplot(grace_sp, "mass", main = "Adjusted mass change agrregated on the GRACE grid (mm/yr ewh)")
+```
+
+Now we can create the stacks for INLA inference.
+```{r stacks, eval = FALSE}
 ## Create the estimation and prediction stack
-st.est <- inla.stack(data = list(y=grace_sp$mmweq), A = list(A_GRACE_data),
+st.est <- inla.stack(data = list(y=grace_sp$mass), A = list(A_GRACE_data),
                      effects = list(M= 1:M_spde$n.spde), tag = "est")
 st.pred <- inla.stack(data = list(y=NA), A = list(rbind(A_GRACE_data, A_M_pred)),
                       effects = list(M=1:M_spde$n.spde), tag = "pred")
@@ -212,7 +234,7 @@ pred_idx <- inla.stack.index(stM, tag = "pred")$data
 idx_grace <- pred_idx[1:nrow(A_GRACE_data)]
 idx_grid <- pred_idx[-(1:nrow(A_GRACE_data))]
 
-## mass + GIA
+## mass
 M_m <- INLA_pred$mean[idx_grid] 
 M_u <- INLA_pred$sd[idx_grid]
 proj <- inla.mesh.projector(mesh0, projection = "longlat", dims = c(360,180), xlim = c(0,359), ylim = c(-89.5, 89.5))
@@ -224,11 +246,10 @@ M_pred <- data.frame(lon = M_grid[,1], lat = M_grid[,2],
 res_M <- list(res_inla = res_inla, spde = M_spde, st = stM, 
             mesh = mesh0,  M_pred = M_pred, Adata = A_GRACE_data, Apred = A_M_pred)
 
-grace_m <- INLA_pred$mean[idx_grace]/grace_sp$area # adjust to be height
-grace_u <- INLA_pred$sd[idx_grace]/grace_sp$area^2
+grace_m <- INLA_pred$mean[idx_grace]
+grace_u <- INLA_pred$sd[idx_grace]
 grace_sp@data$pred_mean <- grace_m
 grace_sp@data$pred_u <- grace_u
-
 
 save(res_M, grace_sp, file =paste0(dd, "WP1-BHM/Experiment2a/exp2a_M.RData"))
 ```
@@ -248,7 +269,7 @@ print(paste("The estimated marginal variances are:", pars_M$sigma_mode,sep = "  
 
 ## Plot the predictions
 
-We first plot the predicted $X_M$ on a 1 degree grid and then the aggregated $X_m$ on the same super mascons grid as the GRACE data. We call $X_m$ the unadjusted mass change.
+We first plot the predicted $X_{mass}$ on a 1 degree grid and then the aggregated $X_m$ on the same super mascons grid as the GRACE data.
 ```{r predict_grace, include=TRUE}
 M_pred <- res_M$M_pred
 
@@ -261,7 +282,7 @@ lattice::levelplot(mean2 ~ lon + lat, data = M_pred, aspect = "iso", at = seq(-1
                        map2 <- map("world2", interior = FALSE, plot = FALSE)
                        lattice::panel.xyplot(x=map2$x, y=map2$y, type = "l", col = "black")
                      },
-                     main = "The predicited unadjusted mass change  (mm/yr ewh)", xlab = "longitude", ylab = "latitude")
+                     main = "The predicited mass change  (mm/yr ewh)", xlab = "longitude", ylab = "latitude")
 
 ## plot the uncertainty
 lattice::levelplot(u2 ~ lon + lat, data = M_pred, aspect = "iso", col.regions = topo.colors(20),
@@ -273,70 +294,10 @@ lattice::levelplot(u2 ~ lon + lat, data = M_pred, aspect = "iso", col.regions = 
                      main = "The predicted uncertainties  (mm/yr ewh)", xlab = "longitude", ylab = "latitude")
 
 grace_sp$pred_mean2 <- ifelse(abs(grace_sp@data$pred_mean) > 20, sign(grace_sp@data$pred_mean)*20, grace_sp@data$pred_mean )
-spplot(grace_sp, "pred_mean2", at = seq(-21, 21, 2), main = "The predicted unadjusted mean (mm/yr ewh)")
+spplot(grace_sp, "pred_mean2", at = seq(-21, 21, 2), main = "The predicted mass (mm/yr ewh)")
 spplot(grace_sp, "pred_u", main = "The predicted uncertainties (mm/yr ewh)")
 ```
 
-# Update $X_{mass}$
-
-Then load the updated $X_M$ and remove the $x_GIA$.
-```{r grace_gia_remove}
-M_pred <- res_M$M_pred
-mass_m <- res_M$M_pred$mean - ice6g2$trend
-mass_u <- res_M$M_pred$u
-mass_pred <- data.frame(lon = res_M$M_pred$lon, lat = res_M$M_pred$lat,
-                       mean = mass_m, u = mass_u)
-
-ice6g2$trend2 <- ifelse(abs(ice6g2$trend) > 19, sign(ice6g2$trend) * 20, ice6g2$trend)
-mass_pred$mean2 <- ifelse(abs(mass_pred$mean) > 19, sign(mass_pred$mean) * 20, mass_pred$mean)
-
-lattice::levelplot(trend2 ~ x_center + y_center, data = ice6g2, aspect = "iso", at = seq(-20, 20, 4),
-                     panel = function(x,y,z,...){
-                       lattice::panel.fill(col = "grey")
-                       lattice::panel.levelplot(x,y,z,...)
-                       map2 <- map("world2", interior = FALSE, plot = FALSE)
-                       lattice::panel.xyplot(x=map2$x, y=map2$y, type = "l", col = "black")
-                     },
-                     main = "Global GIA (mm/yr ewh)", xlab = "longitude", ylab = "latitude")
-
-lattice::levelplot(mean2 ~ lon + lat, data = mass_pred, aspect = "iso",at = seq(-20, 20, 4),
-                     panel = function(x,y,z,...){
-                       lattice::panel.fill(col = "grey")
-                       lattice::panel.levelplot(x,y,z,...)
-                       map2 <- map("world2", interior = FALSE, plot = FALSE)
-                       lattice::panel.xyplot(x=map2$x, y=map2$y, type = "l", col = "black")
-                     },
-                     main = "Updated mass seen by GRACE after removing GIA (mm/yr ewh)", xlab = "longitude", ylab = "latitude")
-
-```
-
-
-We also aggregate the mass data into the super mascon grid. This is a very rough approximation since the GIA data are not ready in the super mascon grid. Proper aggregation should be done in the same way as Maike has done for the GRACE data.
-```{r grace_grid}
-gia_loc <- do.call(cbind, Lll2xyz(lat = ice6g$y_center, lon = ice6g$x_center))
-
-polycoords <- ice6g[,c(6:13, 6,7)] 
-plist <- lapply(ice6g$ID, 
-                function(x) Polygons(list(Polygon(cbind(lon = as.numeric(polycoords[x, c(1,3,5,7,9)]), 
-                                                        lat = as.numeric(polycoords[x, c(2,4,6,8,10)])))), ID = x))
-Plist <- SpatialPolygons(plist, proj4string = CRS("+proj=longlat"))
-gia_area <- geosphere::areaPolygon(Plist)/(1000^2)
-meshLL <- Lxyz2ll(list(x=mesh0$loc[,1], y = mesh0$loc[,2], z = mesh0$loc[,3]))
-mesh_sp <- SpatialPoints(data.frame(lon = meshLL$lon, lat = meshLL$lat), proj4string = CRS("+proj=longlat")) 
-
-mesh_idx <- over(mesh_sp, Plist)
-GIA_v <- ice6g$trend[mesh_idx]
-
-GIA_grace <- res_M$Adata %*% GIA_v
-
-mass_grace <- grace_sp@data$pred_mean - GIA_grace
-grace_sp@data$gia <- as.numeric(GIA_grace)
-grace_sp@data$mass <- as.numeric(mass_grace)
-
-grace_sp@data$gia2 <- ifelse(abs(grace_sp@data$gia) > 49, sign(grace_sp@data$gia)*50, grace_sp@data$gia )
-grace_sp@data$mass2 <- ifelse(abs(grace_sp@data$mass) > 49, sign(grace_sp@data$mass)*50, grace_sp@data$mass )
-spplot(grace_sp, "gia", main = "GIA aggreated on the GRACE grid (mm/yr ewh)")
-spplot(grace_sp, "mass2", main = "Adjusted mass change agrregated on the GRACE grid (mm/yr ewh)")
-```
+## Sanity checks
 
 # [Update Steric](http://rpubs.com/zs_sz/Exp2a_3)
