@@ -13,12 +13,12 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 
 ## Maths
-wd <-"/home/zs16444/"
-dd <-"/home/zs16444/globalmass/"
+# wd <-"/home/zs16444/"
+# dd <-"/home/zs16444/globalmass/"
 
 ## BS
-## wd <- "C:/ZSwork/"
-## dd <"Z:/"
+wd <- "C:/ZSwork/"
+dd <- "Z:/"
 ```
 
 # Introduction

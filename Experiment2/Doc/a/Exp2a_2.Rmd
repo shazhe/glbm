@@ -11,12 +11,13 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-wd <-"/home/zs16444/"
-dd <-"/home/zs16444/globalmass/"
+## Math
+# wd <-"/home/zs16444/"
+# dd <-"/home/zs16444/globalmass/"
 
 ## BS
-## wd <- "C:/ZSwork/"
-## dd <"Z:/"
+wd <- "C:/ZSwork/"
+dd <- "Z:/"
 
 library(rgdal); library(sp);library(GEOmap)
 library(INLA)
@@ -178,6 +179,7 @@ First load the GIA data in the water equivalence height unit. We use the same me
 ```{r gia_data}
 ice6g <- read.table(paste0(dd, "WP2-SolidEarth/BHMinputs/GIA/GIA_Pel-6-VM5_ewh.txt"), header = T)
 ice6g$x_center <- ifelse(ice6g$x_center < 0, ice6g$x_center+360, ice6g$x_center)
+ice6g2<- ice6g[order(ice6g$y_center,ice6g$x_center ),] # re-order the data according to the coordinates
 ```
 
 Then with the above data link map, we calculate the GIA contribution to the GRACE data.
@@ -316,15 +318,23 @@ First we check the global trend of the mass change in mm water equivalence heigh
 order_id <- order(ice6g$y_center,ice6g$x_center ) # re-order the data according to the coordinates
 grid_area2 <- grid_area[order_id]
 
-mean(M_pred$mean)
-sum(M_pred$mean*grid_area2/(4*pi*6371^2))
+print(paste0("global average is ", mean(M_pred$mean)))
+print(paste0("weighted global average is ", sum(M_pred$mean*areas/sum(areas))))
 ```
 
-Then we check the ocean mass change. We need to first identify which grid belongs to the oceans.
+Then we check the ocean mass change. We need to first identify which grid belongs to the oceans. The values are similar to and between existing studies.
 ```{r oceanmean}
 Ocean <- readOGR(dsn = paste0(dd, "WP1-BHM/maps/ne_110m_ocean"), layer = "ne_110m_ocean")
-grid_inO <- unlist(over(Ocean, SpatialPoints(coords = ice6g2[, 2:3], proj4string = CRS(proj4string(Ocean))), returnList = TRUE))
-mean(M_pred$mean[grid_inO])
+coords <- ice6g2[,2:3]
+coords[,1] <- ifelse(coords[,1] > 180, coords[,1]-360, coords[,1])
+grid_inO <- unlist(over(Ocean, SpatialPoints(coords = coords, proj4string = CRS(proj4string(Ocean))), returnList = TRUE))
+print(paste0("average over oceans is ", mean(M_pred$mean[grid_inO])))
+print(paste0("weighted average over the oceans is ", sum(M_pred$mean[grid_inO]*areas[grid_inO]/sum(areas))))
+
+print(paste0("average on land is ", mean(M_pred$mean[-grid_inO])))
+print(paste0("weighted average on land is ", sum(M_pred$mean[-grid_inO]*areas[-grid_inO]/sum(areas))))
+
+
 ```
 
 
