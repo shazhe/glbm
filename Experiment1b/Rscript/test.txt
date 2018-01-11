@@ -1,5 +1,0 @@
-#!/bin/bash
-
-cd /./projects/GlobalMass/WP1-BHM/Experiment1b/
-
-echo "i"
